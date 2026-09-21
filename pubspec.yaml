@@ -1,0 +1,64 @@
+# ==============================================================================
+# File: pubspec.yaml
+# Architecture: Asset Pipeline & Dependency Blueprint
+# Features:
+# 1. Khai báo đầy đủ thư mục chứa assets cho Logo & Typography:
+#    - assets/google_fonts/
+#    - assets/icons/
+#    - assets/images/
+# ==============================================================================
+
+name: pfm_app
+description: "A new Flutter personal finance project."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.2.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_riverpod: ^2.5.1
+  drift: ^2.18.0
+  sqlite3_flutter_libs: ^0.5.24
+  path_provider: ^2.1.3
+  path: ^1.9.0
+  google_generative_ai: ^0.4.0
+  intl: ^0.19.0
+  google_fonts: ^8.2.1
+  flutter_slidable: ^4.0.3
+  emoji_picker_flutter: ^4.5.4
+  local_auth: ^3.0.2
+  google_sign_in: ^6.2.1
+  flutter_secure_storage: ^9.2.2
+  shared_preferences: ^2.2.3
+  image_picker: ^1.2.3
+  googleapis: ^17.0.0
+  extension_google_sign_in_as_googleapis_auth: ^2.0.13
+  archive: ^4.3.0
+  encrypt: ^5.0.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+  drift_dev: ^2.18.0
+  build_runner: ^2.4.9
+  change_app_package_name: ^1.5.0
+  flutter_launcher_icons: ^0.14.4
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/google_fonts/
+    - assets/icons/
+    - assets/icons/app_icon.png
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/icons/app_icon.png"
+  min_sdk_android: 21
+  adaptive_icon_background: "#0F172A"
+  adaptive_icon_foreground: "assets/icons/app_icon.png"
