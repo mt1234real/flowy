@@ -224,7 +224,7 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                   },
                 ),
                 title: Text(
-                  'Két Tiết Kiệm & Dự Phòng',
+                  'Quỹ Tiết Kiệm',
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontSize: 16,
                     fontWeight: FontWeight.w800,
@@ -239,7 +239,7 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                       color: mutedText,
                       size: 21,
                     ),
-                    tooltip: 'Thiết lập mã PIN & Bảo mật',
+                    tooltip: 'Tạo mã PIN két',
                     onPressed: () {
                       HapticFeedback.selectionClick();
                       Navigator.of(context).push(
@@ -298,10 +298,12 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                             accent: accent,
                           ),
                           const SizedBox(height: 24),
-                          Row(
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 4,
                             children: [
                               Text(
-                                'MỤC TIÊU TÍCH LŨY',
+                                'Mục tiêu tích lũy',
                                 style: theme.textTheme.labelLarge?.copyWith(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w800,
@@ -309,9 +311,8 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                                   color: primaryText,
                                 ),
                               ),
-                              const SizedBox(width: 8),
                               Text(
-                                '(${goals.length} HŨ)',
+                                '(${goals.length} hũ)',
                                 style: theme.textTheme.labelMedium?.copyWith(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w700,
@@ -414,7 +415,7 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
               ),
               const SizedBox(height: 20),
               Text(
-                'Két đã tự động khóa',
+                'Két đang tạm khóa',
                 style: theme.textTheme.titleMedium?.copyWith(
                   fontSize: 17,
                   fontWeight: FontWeight.w800,
@@ -423,7 +424,7 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
               ),
               const SizedBox(height: 7),
               Text(
-                'Xác thực để tiếp tục xem tài sản và các mục tiêu tích lũy.',
+                'Tạm ẩn thông tin để bảo vệ số dư riêng tư của bạn.',
                 textAlign: TextAlign.center,
                 style: theme.textTheme.bodySmall?.copyWith(
                   fontSize: 12,
@@ -447,7 +448,7 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                   onPressed: _openPrivacyUnlock,
                   icon: const Icon(Icons.fingerprint_rounded, size: 20),
                   label: const Text(
-                    'Mở khóa bằng PIN / Sinh trắc học',
+                    'Mở khóa ngay',
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w800,
@@ -532,14 +533,30 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                         ),
                         const SizedBox(width: 7),
                         Expanded(
-                          child: Text(
-                            'TỔNG TÀI SẢN ĐANG BẢO VỆ',
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                            'TỔNG TÍCH LŨY HIỆN CÓ',
                             style: theme.textTheme.labelLarge?.copyWith(
                               fontSize: 11,
                               fontWeight: FontWeight.w800,
                               letterSpacing: 0.9,
                               color: mutedText,
                             ),
+                          ),
+                              const SizedBox(height: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: accent.primary.withValues(alpha: 0.10),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text('Riêng tư', style: TextStyle(
+                                  fontSize: 11, fontWeight: FontWeight.w600, color: accent.primary,
+                                )),
+                              ),
+                            ],
                           ),
                         ),
                         Tooltip(
@@ -619,8 +636,8 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                         Expanded(
                           child: Text(
                             totalGoals > 0
-                                ? 'Độc lập với ngân sách chi tiêu hàng ngày'
-                                : 'Tạo mục tiêu đầu tiên để bắt đầu tích lũy riêng biệt.',
+                                ? 'Tách biệt hoàn toàn với tiền chi tiêu hàng ngày'
+                                : 'Tách biệt hoàn toàn với tiền chi tiêu hàng ngày',
                             style: theme.textTheme.bodySmall?.copyWith(
                               fontSize: 11.5,
                               fontWeight: FontWeight.w600,
@@ -838,7 +855,7 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
               const SizedBox(height: 17),
               Row(
                 children: [
-                  Text('Đã tích lũy: ', style: theme.textTheme.bodyMedium?.copyWith(
+                  Text('Hiện có: ', style: theme.textTheme.bodyMedium?.copyWith(
                     fontSize: 12.5, fontWeight: FontWeight.w700, color: primaryText,
                   )),
                   Expanded(
@@ -849,25 +866,31 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                       height: 18,
                       style: TextStyle(
                         fontSize: 13, fontWeight: FontWeight.w800,
-                        fontFamily: 'monospace', letterSpacing: -0.5,
-                        color: primaryText,
+                        fontFamily: 'monospace', letterSpacing: -0.5, color: primaryText,
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  SizedBox(
-                    width: 44,
+                ],
+              ),
+              const SizedBox(height: 6),
+              Align(
+                alignment: Alignment.centerRight,
+                child: IntrinsicWidth(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     child: PreservedBalanceTumbler(
                       isVisible: !_isBalanceHidden,
-                      realValue: '$progressPercent%',
-                      maskedValue: '••%',
+                      realValue: '$progressPercent% mục tiêu',
+                      maskedValue: '••% mục tiêu',
                       height: 18,
                       alignment: Alignment.centerRight,
-                      style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800,
-                        fontFamily: 'monospace', color: accent.primary),
+                      style: TextStyle(
+                        fontSize: 11.5, fontWeight: FontWeight.w800,
+                        fontFamily: 'monospace', color: accent.primary,
+                      ),
                     ),
                   ),
-                ],
+                ),
               ),
               const SizedBox(height: 10),
               ClipRRect(
@@ -941,6 +964,7 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                       height: 44,
                       child: FilledButton.icon(
                         style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
                           backgroundColor: accent.primary,
                           foregroundColor: Colors.black,
                           elevation: 0,
@@ -970,6 +994,7 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                       height: 44,
                       child: OutlinedButton.icon(
                         style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
                           foregroundColor: primaryText,
                           side: BorderSide(color: border),
                           shape: RoundedRectangleBorder(
@@ -1045,7 +1070,7 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
           ),
           const SizedBox(height: 16),
           Text(
-            'Chưa có mục tiêu tích lũy',
+            'Chưa có mục tiêu nào',
             style: theme.textTheme.titleSmall?.copyWith(
               fontSize: 15,
               fontWeight: FontWeight.w800,
@@ -1054,7 +1079,7 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
           ),
           const SizedBox(height: 6),
           Text(
-            'Tạo một hũ riêng cho quỹ dự phòng, thiết bị, chuyến đi hoặc mục tiêu dài hạn.',
+            'Tạo khoản tiết kiệm cho bạn',
             textAlign: TextAlign.center,
             style: theme.textTheme.bodySmall?.copyWith(
               fontSize: 11.5,
@@ -1075,7 +1100,7 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
             onPressed: () => _showCreateOrEditGoalModal(context),
             icon: const Icon(Icons.add_rounded, size: 18),
             label: const Text(
-              'Tạo mục tiêu',
+              '+ Thêm mục tiêu đầu tiên',
               style: TextStyle(fontWeight: FontWeight.w800),
             ),
           ),
@@ -1191,7 +1216,7 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                                     CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        'Trích Nạp Tiền Vào Hũ',
+                                        'Nạp tiền vào quỹ',
                                         style: theme.textTheme.titleMedium
                                             ?.copyWith(
                                           fontSize: 16,
@@ -1201,7 +1226,7 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                                       ),
                                       const SizedBox(height: 4),
                                       Text(
-                                        'Mục tiêu tích lũy: ${goal.title}',
+                                        'Dành cho mục tiêu: ${goal.title}',
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                         style:
@@ -1254,7 +1279,7 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    'NGUỒN TIỀN TRÍCH',
+                                    'Nguồn tiền trích',
                                     style:
                                     theme.textTheme.labelSmall?.copyWith(
                                       fontSize: 10.5,
@@ -1325,7 +1350,7 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                                               const SizedBox(width: 8),
                                               Flexible(
                                                 child: Text(
-                                                _formatCurrency(wallet.balance),
+                                                'Khả dụng: ${_formatCurrency(wallet.balance)}',
                                                 maxLines: 1,
                                                 overflow: TextOverflow.ellipsis,
                                                 style: theme
@@ -1379,7 +1404,7 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                                   children: [
                                     Expanded(
                                       child: Text(
-                                        'SỐ TIỀN NẠP',
+                                        'Số tiền muốn tích lũy',
                                         style: theme.textTheme.labelSmall
                                             ?.copyWith(
                                           fontSize: 10.5,
@@ -1444,7 +1469,7 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                                 const SizedBox(width: 8),
                                 _buildVaultQuickFillChip(
                                   context: ctx,
-                                  label: 'Tất cả',
+                                  label: 'Tất cả ví',
                                   onTap: selectedWallet == null
                                       ? null
                                       : () => setAmount(
@@ -1493,15 +1518,14 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                             SizedBox(
                               width: double.infinity,
                               height: 50,
-                              child: FilledButton(
-                                style: FilledButton.styleFrom(
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
                                   backgroundColor: accent.primary,
                                   foregroundColor: Colors.white,
-                                  disabledBackgroundColor: accent.primary
-                                      .withValues(alpha: 0.38),
+                                  disabledBackgroundColor: accent.primary,
                                   disabledForegroundColor:
-                                  Colors.white.withValues(alpha: 0.68),
-                                  elevation: 0,
+                                  Colors.white,
+                                  elevation: 1,
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(14),
                                   ),
@@ -1574,7 +1598,7 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                                   ),
                                 )
                                     : const Text(
-                                  'XÁC NHẬN NẠP VÀO HŨ',
+                                  'Xác nhận nạp tiền',
                                   style: TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w800,
@@ -1710,7 +1734,7 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 const Text(
-                                  'Rút Tiền Về Ví Sinh Hoạt',
+                                  'Rút tiền về ví',
                                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Colors.white),
                                 ),
                                 Text(
@@ -1726,7 +1750,7 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
 
                       // CHỌN VÍ NHẬN TIỀN
                       const Text(
-                        'CHỌN VÍ NHẬN TIỀN HOÀN VỀ',
+                        'Chuyển tiền vào ví',
                         style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.white54),
                       ),
                       const SizedBox(height: 8),
@@ -1927,7 +1951,7 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                           },
                           child: isSubmitting
                               ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
-                              : const Text('Xác Nhận Rút Về Ví', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
+                              : const Text('Xác nhận rút tiền', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
                         ),
                       ),
                     ],

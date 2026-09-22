@@ -955,7 +955,7 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> with TickerProvider
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'Nhật ký thu chi & vay nợ',
+                                  'Nhật ký thu chi',
                                   style: TextStyle(
                                     fontSize: 12,
                                     color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
@@ -1372,7 +1372,7 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> with TickerProvider
             Icon(Icons.receipt_long_rounded, size: 48, color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted),
             const SizedBox(height: 10),
             Text(
-              'Không có giao dịch trong chu kỳ này.\nHãy nhấn (+) để thêm giao dịch mới!',
+              'Chưa có giao dịch nào\nChạm nút (+) bên dưới để ghi giao dịch',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 13, color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted),
             ),
@@ -1871,12 +1871,12 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> with TickerProvider
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          _buildSummaryColumn('Tổng tiền vào', '+${_formatCurrency(totalIncome)}', AppTokens.income, isDark),
+          _buildSummaryColumn('Tiền vào', '+${_formatCurrency(totalIncome)}', AppTokens.income, isDark),
           Container(width: 1, height: 26, color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
-          _buildSummaryColumn('Tổng tiền ra', '-${_formatCurrency(totalExpense)}', AppTokens.expense, isDark),
+          _buildSummaryColumn('Tiền ra', '-${_formatCurrency(totalExpense)}', AppTokens.expense, isDark),
           Container(width: 1, height: 26, color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
           _buildSummaryColumn(
-            'Dòng tiền ròng',
+            'Chênh lệch',
             '${netBalance >= 0 ? '+' : ''}${_formatCurrency(netBalance)}',
             netBalance >= 0 ? AppTokens.income : AppTokens.expense,
             isDark,
@@ -1887,31 +1887,41 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> with TickerProvider
   }
 
   Widget _buildSummaryColumn(String label, String value, Color valueColor, bool isDark) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.w600,
-            color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
-          ),
+    return Expanded(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+              ),
+            ),
+            const SizedBox(height: 2),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: _PreservedMetricSwitcher(
+                value: value,
+                animate: !_isPeriodTransitioning,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  fontFamily: 'monospace',
+                  color: valueColor,
+                ),
+              ),
+            ),
+          ],
         ),
-        const SizedBox(height: 2),
-        _PreservedMetricSwitcher(
-          value: value,
-          animate: !_isPeriodTransitioning,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w800,
-            fontFamily: 'monospace',
-            color: valueColor,
-          ),
-        ),
-      ],
+      ),
     );
   }
+
 }
 
 // ==============================================================================

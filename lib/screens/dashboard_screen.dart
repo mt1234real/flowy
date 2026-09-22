@@ -47,8 +47,7 @@ import 'ledger_screen.dart'
     cycleStartDaysByMonthProvider,
     computeMonthCycleRange,
     resolveStartDayForMonth,
-    CycleMode,
-    MonthCycleRange;
+    CycleMode;
 import 'main_scaffold.dart' show bottomNavIndexProvider;
 import 'vault_auth_screen.dart';
 import 'wallet_manager_screen.dart';
@@ -804,7 +803,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with TickerPr
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(
-                                'TỔNG SỐ DƯ KHẢ DỤNG',
+                                'Tổng số dư khả dụng',
                                 style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w700,
@@ -1019,19 +1018,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with TickerPr
                                           size: 14,
                                         ),
                                       ),
-                                      const SizedBox(width: 5),
-                                      Expanded(
-                                        child: Text(
-                                          'Thu Nhập',
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w700,
-                                            color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
-                                          ),
-                                        ),
-                                      ),
+                                      const Spacer(),
                                       Icon(
                                         _isIncomeVisible
                                             ? Icons.visibility_rounded
@@ -1042,6 +1029,16 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with TickerPr
                                             : (isDark ? Colors.white30 : Colors.black26),
                                       ),
                                     ],
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    'Thu nhập',
+                                    softWrap: true,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                                    ),
                                   ),
                                   const SizedBox(height: 8),
                                   PreservedBalanceTumbler(
@@ -1102,19 +1099,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with TickerPr
                                           size: 14,
                                         ),
                                       ),
-                                      const SizedBox(width: 5),
-                                      Expanded(
-                                        child: Text(
-                                          'Đã Chi',
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w700,
-                                            color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
-                                          ),
-                                        ),
-                                      ),
+                                      const Spacer(),
                                       Icon(
                                         _isExpenseVisible
                                             ? Icons.visibility_rounded
@@ -1125,6 +1110,16 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with TickerPr
                                             : (isDark ? Colors.white30 : Colors.black26),
                                       ),
                                     ],
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    'Đã chi',
+                                    softWrap: true,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                                    ),
                                   ),
                                   const SizedBox(height: 8),
                                   PreservedBalanceTumbler(
@@ -1186,19 +1181,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with TickerPr
                                           size: 15,
                                         ),
                                       ),
-                                      const SizedBox(width: 5),
-                                      Expanded(
-                                        child: Text(
-                                          'Tốc độ',
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w700,
-                                            color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
-                                          ),
-                                        ),
-                                      ),
+                                      const Spacer(),
                                       Icon(
                                         _isSpeedVisible
                                             ? Icons.visibility_rounded
@@ -1210,14 +1193,22 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with TickerPr
                                       ),
                                     ],
                                   ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    'Tốc độ tiêu',
+                                    softWrap: true,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                                    ),
+                                  ),
                                   const SizedBox(height: 8),
 
-                                  // 🌟 TÁCH RỜI SỐ % VỀ BÊN TRÁI VÀ TRẠNG THÁI VỀ BÊN PHẢI ĐỐI XỨNG
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    crossAxisAlignment: CrossAxisAlignment.center,
+                                  // Separate lines keep both progress and status readable on narrow cards.
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.stretch,
                                     children: [
-                                      // BÊN TRÁI: Số % tiến độ
                                       PreservedBalanceTumbler(
                                         isVisible: _isSpeedVisible,
                                         realValue: '${(budgetConsumedPct * 100).toStringAsFixed(0)}%',
@@ -1234,14 +1225,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with TickerPr
                                               : (isDark ? AppTokens.darkText : AppTokens.lightText),
                                         ),
                                       ),
-
-                                      // BÊN PHẢI: Trạng thái (Nhanh / Ổn định)
                                       PreservedBalanceTumbler(
                                         isVisible: _isSpeedVisible,
                                         realValue: isOverspending ? 'Nhanh' : 'Ổn định',
                                         maskedValue: '•••',
                                         height: 20,
-                                        alignment: Alignment.centerRight,
+                                        alignment: Alignment.centerLeft,
                                         style: TextStyle(
                                           fontSize: 11,
                                           fontWeight: FontWeight.w800,

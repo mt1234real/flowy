@@ -131,8 +131,14 @@ class _VaultPinChangeScreenState extends ConsumerState<VaultPinChangeScreen>
         _handleVerifyOldPin();
         break;
       case PinChangeWorkflowStep.enterNewPin:
+        final completedPin = _enteredNewPin;
         Future<void>.delayed(const Duration(milliseconds: 140), () {
-          if (!mounted) return;
+          if (!mounted ||
+              _currentStep != PinChangeWorkflowStep.enterNewPin ||
+              _enteredNewPin != completedPin ||
+              _enteredNewPin.length != _selectedPinLength) {
+            return;
+          }
           HapticFeedback.selectionClick();
           setState(() {
             _currentStep = PinChangeWorkflowStep.confirmNewPin;
@@ -172,7 +178,8 @@ class _VaultPinChangeScreenState extends ConsumerState<VaultPinChangeScreen>
     });
   }
 
-  Future<void> _rejectCurrentEntry(String message) async {
+  Future<void> _rejectCurrentEntry(String message,
+      {bool restartSetup = false}) async {
     if (_isRejectingPin) return;
 
     HapticFeedback.heavyImpact();
@@ -183,12 +190,26 @@ class _VaultPinChangeScreenState extends ConsumerState<VaultPinChangeScreen>
       _errorMessage = message;
     });
 
-    await _pinRejectController.forward(from: 0.0);
+    try {
+      await Future.wait([
+        _pinRejectController.forward(from: 0.0).orCancel,
+        if (restartSetup)
+          Future<void>.delayed(const Duration(milliseconds: 500)),
+      ]);
+    } on TickerCanceled {
+      return;
+    }
     if (!mounted) return;
 
     _pinRejectController.value = 0.0;
     setState(() {
       _setCurrentEntered('');
+      if (restartSetup) {
+        _enteredNewPin = '';
+        _enteredConfirmPin = '';
+        _currentStep = PinChangeWorkflowStep.enterNewPin;
+        _errorMessage = null;
+      }
       _pinErrorActive = false;
       _isRejectingPin = false;
     });
@@ -201,7 +222,7 @@ class _VaultPinChangeScreenState extends ConsumerState<VaultPinChangeScreen>
     if (!mounted) return;
 
     if (!isValid) {
-      await _rejectCurrentEntry('Mã PIN hiện tại không chính xác.');
+      await _rejectCurrentEntry('Mã PIN chưa đúng, thử lại nhé');
       return;
     }
 
@@ -215,7 +236,8 @@ class _VaultPinChangeScreenState extends ConsumerState<VaultPinChangeScreen>
 
   Future<void> _handleConfirmNewPin() async {
     if (_enteredConfirmPin != _enteredNewPin) {
-      await _rejectCurrentEntry('Mã PIN xác nhận không khớp.');
+      await _rejectCurrentEntry('Mã PIN không khớp, vui lòng nhập lại',
+          restartSetup: true);
       return;
     }
 
@@ -231,7 +253,7 @@ class _VaultPinChangeScreenState extends ConsumerState<VaultPinChangeScreen>
     if (!mounted) return;
     AppFeedback.showSuccess(
       context,
-      'Đã cập nhật mã PIN Két Tiết Kiệm ($_selectedPinLength số).',
+      'Đã cập nhật mã PIN két ($_selectedPinLength số).',
       emitHaptic: false,
     );
     Navigator.of(context).pop();
@@ -268,20 +290,18 @@ class _VaultPinChangeScreenState extends ConsumerState<VaultPinChangeScreen>
 
   String _stepTitle() {
     return switch (_currentStep) {
-      PinChangeWorkflowStep.verifyOldPin => 'XÁC THỰC MÃ PIN HIỆN TẠI',
-      PinChangeWorkflowStep.enterNewPin => 'TẠO MÃ PIN KÉT MỚI',
-      PinChangeWorkflowStep.confirmNewPin => 'XÁC NHẬN MÃ PIN MỚI',
+      PinChangeWorkflowStep.verifyOldPin => 'Nhập mã PIN hiện tại',
+      PinChangeWorkflowStep.enterNewPin => 'Đặt mã PIN mới',
+      PinChangeWorkflowStep.confirmNewPin => 'Xác nhận lại mã PIN',
     };
   }
 
   String _stepSubtitle() {
     return switch (_currentStep) {
       PinChangeWorkflowStep.verifyOldPin =>
-        'Nhập ${ref.read(vaultPinLengthProvider)} chữ số để xác thực chủ sở hữu',
-      PinChangeWorkflowStep.enterNewPin =>
-        'Nhập $_selectedPinLength chữ số bảo mật mới',
-      PinChangeWorkflowStep.confirmNewPin =>
-        'Nhập lại $_selectedPinLength chữ số vừa tạo',
+        'Nhập ${ref.read(vaultPinLengthProvider)} số bảo mật để đổi mã PIN',
+      PinChangeWorkflowStep.enterNewPin => 'Nhập mật khẩu mới',
+      PinChangeWorkflowStep.confirmNewPin => 'Nhập lại mật khẩu',
     };
   }
 
@@ -306,30 +326,25 @@ class _VaultPinChangeScreenState extends ConsumerState<VaultPinChangeScreen>
 
     return Scaffold(
       backgroundColor: const Color(0xFF080B11),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF080B11),
+        foregroundColor: Colors.white,
+        title: const Text('Tạo mã PIN'),
+        centerTitle: true,
+        leading: IconButton(
+          tooltip: 'Đóng',
+          icon: const Icon(Icons.close_rounded),
+          onPressed: () {
+            HapticFeedback.selectionClick();
+            Navigator.of(context).pop();
+          },
+        ),
+      ),
       body: VaultSecuritySurface(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 6, 20, 18),
           child: Column(
             children: [
-              Align(
-                alignment: Alignment.centerLeft,
-                child: SizedBox(
-                  width: 44,
-                  height: 44,
-                  child: IconButton(
-                    tooltip: 'Đóng',
-                    onPressed: () {
-                      HapticFeedback.selectionClick();
-                      Navigator.of(context).pop();
-                    },
-                    icon: const Icon(
-                      Icons.close_rounded,
-                      color: Colors.white70,
-                      size: 22,
-                    ),
-                  ),
-                ),
-              ),
               Expanded(
                 child: Center(
                   child: Column(

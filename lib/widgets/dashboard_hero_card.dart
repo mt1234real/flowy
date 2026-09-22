@@ -340,7 +340,7 @@ class DashboardHeroCard extends ConsumerWidget {
                           const SizedBox(width: 5),
                           Flexible(
                             child: Text(
-                              'AN TOÀN HÔM NAY',
+                              'An toàn hôm nay',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
@@ -430,7 +430,7 @@ class DashboardHeroCard extends ConsumerWidget {
                         )
                       else
                         Text(
-                          'Theo Chu kỳ Tháng ${DateFormat('MM').format(anchorMonth)} (còn $daysRemaining ngày)',
+                          'Chu kỳ tháng ${DateFormat('MM').format(anchorMonth)} • còn $daysRemaining ngày',
                           style: TextStyle(
                             fontSize: 12,
                             color: isDark ? Colors.white54 : AppTokens.lightMuted,

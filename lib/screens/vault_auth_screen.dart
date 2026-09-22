@@ -7,6 +7,7 @@
 // ==============================================================================
 
 import 'dart:math' as math;
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -19,6 +20,15 @@ import '../theme/app_theme.dart';
 import '../widgets/precision_numpad.dart';
 import '../widgets/vault_security_surface.dart';
 import 'savings_vault_screen.dart';
+
+// Session-scoped attempt history survives closing/reopening the PIN route.
+// No PIN or financial data is stored here.
+class _PinAttemptWindow {
+  int failedAttempts = 0;
+  DateTime? lockedUntil;
+}
+
+final _pinAttemptWindowProvider = Provider((ref) => _PinAttemptWindow());
 
 class VaultAuthScreen extends ConsumerStatefulWidget {
   final String? customPin;
@@ -50,6 +60,11 @@ class _VaultAuthScreenState extends ConsumerState<VaultAuthScreen>
   late final AnimationController _unlockController;
   bool _isUnlocking = false;
 
+  int _failedAttempts = 0;
+  Timer? _lockoutTimer;
+  bool _isLockedOut = false;
+  int _lockoutSeconds = 0;
+  late final _PinAttemptWindow _attemptWindow;
   String _enteredPin = '';
   bool _isAuthenticatingBiometrics = false;
   bool _isRejectingPin = false;
@@ -59,6 +74,11 @@ class _VaultAuthScreenState extends ConsumerState<VaultAuthScreen>
   @override
   void initState() {
     super.initState();
+    _attemptWindow = ref.read(_pinAttemptWindowProvider);
+    _failedAttempts = _attemptWindow.failedAttempts;
+    if (_attemptWindow.lockedUntil != null) {
+      _resumeLockout();
+    }
 
     _pinRejectController = AppAnimationPolicy.createController(
       vsync: this,
@@ -80,13 +100,58 @@ class _VaultAuthScreenState extends ConsumerState<VaultAuthScreen>
 
   @override
   void dispose() {
+    _lockoutTimer?.cancel();
     _pinRejectController.dispose();
     _unlockController.dispose();
     super.dispose();
   }
 
+  void _resumeLockout() {
+    final deadline = _attemptWindow.lockedUntil!;
+    _lockoutSeconds = math.max(
+        0, (deadline.difference(DateTime.now()).inMilliseconds / 1000).ceil());
+    if (_lockoutSeconds == 0) {
+      _resetAttempts();
+      return;
+    }
+    _isLockedOut = true;
+    final initialSeconds = _lockoutSeconds;
+    _lockoutTimer?.cancel();
+    _lockoutTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) return;
+      // Use the deadline to catch up after background suspension, and timer.tick
+      // so a delayed callback cannot extend the active countdown.
+      final byDeadline =
+          (deadline.difference(DateTime.now()).inMilliseconds / 1000).ceil();
+      setState(() {
+        _lockoutSeconds =
+            math.max(0, math.min(byDeadline, initialSeconds - timer.tick));
+        if (_lockoutSeconds == 0) {
+          _resetAttempts();
+          _enteredPin = '';
+          _pinErrorActive = false;
+        }
+      });
+    });
+  }
+
+  void _resetAttempts() {
+    _lockoutTimer?.cancel();
+    _lockoutTimer = null;
+    _attemptWindow.failedAttempts = 0;
+    _attemptWindow.lockedUntil = null;
+    _failedAttempts = 0;
+    _lockoutSeconds = 0;
+    _isLockedOut = false;
+  }
+
   Future<void> _authenticateWithBiometrics() async {
-    if (_isUnlocking || _isAuthenticatingBiometrics || _isRejectingPin) return;
+    if (_isLockedOut ||
+        _isUnlocking ||
+        _isAuthenticatingBiometrics ||
+        _isRejectingPin) {
+      return;
+    }
 
     setState(() {
       _isAuthenticatingBiometrics = true;
@@ -106,7 +171,7 @@ class _VaultAuthScreenState extends ConsumerState<VaultAuthScreen>
 
       if (canCheck || isSupported) {
         final didAuthenticate = await _localAuth.authenticate(
-          localizedReason: 'Xác thực để mở Két Tiết Kiệm',
+          localizedReason: 'Xác thực để vào két',
         );
 
         if (didAuthenticate && mounted) {
@@ -124,7 +189,8 @@ class _VaultAuthScreenState extends ConsumerState<VaultAuthScreen>
   }
 
   void _onKeyPress(String digit, int pinLength) {
-    if (_isUnlocking ||
+    if (_isLockedOut ||
+        _isUnlocking ||
         _isRejectingPin ||
         _isAuthenticatingBiometrics ||
         _enteredPin.length >= pinLength) {
@@ -142,7 +208,12 @@ class _VaultAuthScreenState extends ConsumerState<VaultAuthScreen>
   }
 
   void _onBackspace() {
-    if (_isUnlocking || _isRejectingPin || _isAuthenticatingBiometrics) return;
+    if (_isLockedOut ||
+        _isUnlocking ||
+        _isRejectingPin ||
+        _isAuthenticatingBiometrics) {
+      return;
+    }
     if (_enteredPin.isEmpty) return;
 
     setState(() {
@@ -152,7 +223,12 @@ class _VaultAuthScreenState extends ConsumerState<VaultAuthScreen>
   }
 
   void _clearPin() {
-    if (_isUnlocking || _isRejectingPin || _isAuthenticatingBiometrics) return;
+    if (_isLockedOut ||
+        _isUnlocking ||
+        _isRejectingPin ||
+        _isAuthenticatingBiometrics) {
+      return;
+    }
     if (_enteredPin.isEmpty) return;
 
     setState(() {
@@ -169,6 +245,13 @@ class _VaultAuthScreenState extends ConsumerState<VaultAuthScreen>
       return;
     }
 
+    _failedAttempts++;
+    _attemptWindow.failedAttempts = _failedAttempts;
+    if (_failedAttempts >= 3) {
+      _attemptWindow.lockedUntil =
+          DateTime.now().add(const Duration(seconds: 30));
+      _resumeLockout();
+    }
     HapticFeedback.heavyImpact();
 
     setState(() {
@@ -193,10 +276,14 @@ class _VaultAuthScreenState extends ConsumerState<VaultAuthScreen>
   }
 
   Future<void> _onSuccess() async {
-    if (!mounted || _isUnlocking || ModalRoute.of(context)?.isCurrent != true) {
+    if (!mounted ||
+        _isLockedOut ||
+        _isUnlocking ||
+        ModalRoute.of(context)?.isCurrent != true) {
       return;
     }
 
+    _resetAttempts();
     setState(() => _isUnlocking = true);
 
     HapticFeedback.lightImpact();
@@ -286,10 +373,10 @@ class _VaultAuthScreenState extends ConsumerState<VaultAuthScreen>
                     children: [
                       VaultBreathingShield(accent: accentColor),
                       const SizedBox(height: 18),
-                      Text('MÃ PIN BẢO MẬT', style: titleStyle),
+                      Text('Nhập mã PIN', style: titleStyle),
                       const SizedBox(height: 7),
                       Text(
-                        'Nhập $pinLength chữ số để giải mã dữ liệu',
+                        'Nhập 4 số bảo mật để mở',
                         style: theme.textTheme.bodySmall?.copyWith(
                           fontSize: 12,
                           fontWeight: FontWeight.w500,
@@ -320,26 +407,43 @@ class _VaultAuthScreenState extends ConsumerState<VaultAuthScreen>
                           ),
                         ),
                       ),
+                      const SizedBox(height: 12),
+                      Semantics(
+                        liveRegion: true,
+                        child: Text(
+                          _isLockedOut
+                              ? 'Đã nhập sai 3 lần. Tạm khóa sau $_lockoutSeconds giây'
+                              : _pinErrorActive
+                                  ? 'Mã PIN không chính xác'
+                                  : '',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                              color: AppTokens.expense, fontSize: 12),
+                        ),
+                      ),
                     ],
                   ),
                 ),
               ),
-              PrecisionNumpad(
-                onDigit: (digit) => _onKeyPress(digit, pinLength),
-                onBackspace: _onBackspace,
-                onBackspaceLongPress: _clearPin,
-                leadingAction: PrecisionNumpadAction(
-                  icon: _preferFaceIcon
-                      ? Icons.face_retouching_natural_rounded
-                      : Icons.fingerprint_rounded,
-                  onPressed: _authenticateWithBiometrics,
-                  color: accentColor,
-                  semanticLabel: 'Sinh trắc học',
+              IgnorePointer(
+                ignoring: _isLockedOut || _isRejectingPin || _isUnlocking,
+                child: PrecisionNumpad(
+                  onDigit: (digit) => _onKeyPress(digit, pinLength),
+                  onBackspace: _onBackspace,
+                  onBackspaceLongPress: _clearPin,
+                  leadingAction: PrecisionNumpadAction(
+                    icon: _preferFaceIcon
+                        ? Icons.face_retouching_natural_rounded
+                        : Icons.fingerprint_rounded,
+                    onPressed: _authenticateWithBiometrics,
+                    color: accentColor,
+                    semanticLabel: 'Sinh trắc học',
+                  ),
+                  digitColor: Colors.white,
+                  actionColor: accentColor,
+                  horizontalPadding: 18,
+                  rowSpacing: 8,
                 ),
-                digitColor: Colors.white,
-                actionColor: accentColor,
-                horizontalPadding: 18,
-                rowSpacing: 8,
               ),
             ],
           ),
