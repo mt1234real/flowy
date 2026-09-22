@@ -1491,7 +1491,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
                                         const SizedBox(width: 6),
                                         Expanded(
                                           child: Text(
-                                            'Khoản chi này lớn hơn hạn mức hôm nay (${_formatCurrency(dailySafeLimit)}). Bạn có muốn dàn đều khoản này cho cả chu kỳ không?',
+                                            'Khoản này vượt mức chi hôm nay (${_formatCurrency(dailySafeLimit)}). Bạn có muốn dàn đều cho các ngày tới?',
                                             style: TextStyle(
                                               fontSize: 11,
                                               fontWeight: FontWeight.w700,

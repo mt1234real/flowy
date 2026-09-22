@@ -342,7 +342,7 @@ class _SafeToSpendBreakdownSheetState extends State<SafeToSpendBreakdownSheet>
                           const Icon(Icons.shield_outlined, color: Color(0xFF10B981), size: 22),
                           const SizedBox(width: 8),
                           Text(
-                            'Bóc Tách An Toàn Mỗi Ngày',
+                            'Chi tiết hạn mức hôm nay',
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w800,
@@ -360,7 +360,7 @@ class _SafeToSpendBreakdownSheetState extends State<SafeToSpendBreakdownSheet>
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Công thức tài chính bảo lưu các hóa đơn bắt buộc chưa thanh toán trước khi chia đều cho số ngày còn lại.',
+                    'Hạn mức tự động làm mới vào 00:00 mỗi đêm.',
                     style: TextStyle(
                       fontSize: 11,
                       color: widget.isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
@@ -543,7 +543,7 @@ class _SafeToSpendBreakdownSheetState extends State<SafeToSpendBreakdownSheet>
                           child: Column(
                             children: [
                               Text(
-                                'MỨC CHI TIÊU AN TOÀN MỖI NGÀY',
+                                'Hôm nay có thể chi:',
                                 style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w800,

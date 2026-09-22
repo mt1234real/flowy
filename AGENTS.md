@@ -94,3 +94,8 @@ Khi nhận lệnh sửa mã nguồn:
    Sau khi chỉnh sửa xong các file, Agent phải chủ động chạy kiểm tra:
    - Phân tích cú pháp: `flutter analyze`
    - Nếu có thay đổi Schema Drift: `dart run build_runner build --delete-conflicting-outputs`
+### 5. Testing & Scope Boundaries (Non-negotiable)
+- **STRICT PROHIBITION ON SPECULATIVE TESTS**:
+   - Tuyệt đối KHÔNG tự ý tạo mới, sinh thêm hay sửa đổi các tệp kiểm thử trong thư mục `test/*` trừ khi người dùng có yêu cầu bằng văn bản rõ ràng: *"Hãy viết test cho tính năng này"*.
+   - Mọi nhiệm vụ liên quan đến UI/UX, Refactoring hoặc Copywriting chỉ được phép can thiệp trực tiếp vào danh sách các tệp mã nguồn (`lib/*`) được chỉ định trong phạm vi yêu cầu.
+   - Sau khi chỉnh sửa, chỉ chạy kiểm tra phân tích tĩnh (`flutter analyze`), không tự ý chạy hoặc sinh suite test tốn thời gian.

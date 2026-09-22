@@ -229,7 +229,9 @@ class _SpendingTrendChartState extends ConsumerState<SpendingTrendChart>
           infoTitle = selectedBucket.fullDateLabel;
           infoAmount = _formatCurrency(selectedBucket.amount);
         } else {
-          infoTitle = 'Tổng chi (${_getPeriodLabel(_selectedPeriod)})';
+          infoTitle = _selectedPeriod == ChartPeriod.days7
+              ? 'Tổng chi 7 ngày qua'
+              : 'Tổng chi (${_getPeriodLabel(_selectedPeriod)})';
           infoAmount = _formatCurrency(totalPeriodExpense);
         }
 
@@ -243,7 +245,7 @@ class _SpendingTrendChartState extends ConsumerState<SpendingTrendChart>
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'XU HƯỚNG CHI TIÊU',
+                    'Xu hướng chi tiêu',
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w800,
@@ -259,7 +261,7 @@ class _SpendingTrendChartState extends ConsumerState<SpendingTrendChart>
                     ),
                     child: Row(
                       children: [
-                        _buildPeriodTab('7 Ngày', ChartPeriod.days7, accent, isDark),
+                        _buildPeriodTab('7 ngày', ChartPeriod.days7, accent, isDark),
                         _buildPeriodTab('Tháng', ChartPeriod.month, accent, isDark),
                         _buildPeriodTab('Quý', ChartPeriod.quarter, accent, isDark),
                         _buildPeriodTab('Năm', ChartPeriod.year, accent, isDark),
@@ -459,13 +461,13 @@ class _SpendingTrendChartState extends ConsumerState<SpendingTrendChart>
   String _getPeriodLabel(ChartPeriod p) {
     switch (p) {
       case ChartPeriod.days7:
-        return '7 Ngày';
+        return '7 ngày';
       case ChartPeriod.month:
-        return 'Tháng Này';
+        return 'Tháng này';
       case ChartPeriod.quarter:
-        return 'Quý Này';
+        return 'Quý này';
       case ChartPeriod.year:
-        return 'Năm Nay';
+        return 'Năm nay';
     }
   }
 

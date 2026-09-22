@@ -234,7 +234,7 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'Bộ Thẩm Định Mua Sắm',
+                                  'Cân nhắc trước khi mua',
                                   style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w800,
@@ -242,7 +242,7 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
                                   ),
                                 ),
                                 Text(
-                                  'Chi phí cơ hội & Tác động đến hạn mức các ngày tới',
+                                  'Xem khoản này ảnh hưởng thế nào đến ngân sách',
                                   style: TextStyle(fontSize: 11, color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted),
                                 ),
                               ],
@@ -258,7 +258,7 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
                     ),
                     const SizedBox(height: 12),
 
-                    // 2 Top Tabs: [ 1 Món Đồ ] vs [ So Kèo A vs B ]
+                    // 2 Top Tabs: [ 1 món đồ ] vs [ So sánh 2 món ]
                     SlidingSegmentedBar<AdvisorTab>(
                       height: 42,
                       duration: const Duration(milliseconds: 190),
@@ -268,13 +268,13 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
                       items: [
                         SlidingSegmentedItem<AdvisorTab>(
                           value: AdvisorTab.single,
-                          label: '1 Món Đồ',
+                          label: '1 món đồ',
                           activeColor: Colors.white,
                           activeBackgroundColor: accent.primary,
                         ),
                         SlidingSegmentedItem<AdvisorTab>(
                           value: AdvisorTab.dilemma,
-                          label: 'So Kèo A vs B',
+                          label: 'So sánh 2 món',
                           activeColor: Colors.white,
                           activeBackgroundColor: accent.primary,
                         ),
@@ -305,17 +305,20 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
   // ===========================================================================
   Widget _buildSingleItemView(bool isDark, AppAccentPreset accent) {
     final double p = double.tryParse(_singleAmountBuffer) ?? 0.0;
-    final double sDaily = math.max(1.0, widget.dailySafe);
+    final double sDaily = widget.dailySafe.isFinite
+        ? math.max(0.0, widget.dailySafe)
+        : 0.0;
     final int d = math.max(1, widget.daysRemaining);
-    final double bFree = math.max(1.0, widget.freeBudgetRemaining);
+    final double bFree = widget.freeBudgetRemaining.isFinite
+        ? widget.freeBudgetRemaining
+        : 0.0;
 
-    final double dCost = p / sDaily;
     final double deltaS = (p / d).floorToDouble();
     final double sNew = math.max(0.0, sDaily - deltaS);
 
-    final bool isGreen = p <= sDaily;
-    final bool isYellow = p > sDaily && p <= bFree;
-    final bool isRed = p > bFree;
+    final bool isGreen = bFree > 0 && sDaily > 0 && p <= sDaily && p <= bFree;
+    final bool isYellow = bFree > 0 && p > sDaily && p <= bFree;
+    final bool isRed = bFree <= 0 || p > bFree;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -324,8 +327,8 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
           controller: _singleNameController,
           style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: isDark ? AppTokens.darkText : AppTokens.lightText),
           decoration: const InputDecoration(
-            labelText: 'Tên món đồ dự kiến mua (Tùy chọn)',
-            hintText: 'Ví dụ: Áo khoác, Ly trà sữa, Tai nghe...',
+            labelText: 'Tên món đồ (không bắt buộc)',
+            hintText: 'Ví dụ: Tai nghe',
             prefixIcon: Icon(Icons.shopping_bag_outlined, size: 18),
             isDense: true,
           ),
@@ -352,10 +355,13 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'SỐ TIỀN DỰ KIẾN CHI (P)',
+                    'Số tiền dự tính chi',
                     style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted),
                   ),
-                  _buildStatusBadge(isGreen: isGreen, isYellow: isYellow, isRed: isRed),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: _buildStatusBadge(isGreen: isGreen, isYellow: isYellow, isRed: isRed),
+                  ),
                 ],
               ),
               const SizedBox(height: 4),
@@ -411,7 +417,7 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Món đồ này tương đương ${dCost.toStringAsFixed(1)} ngày sinh hoạt tiêu chuẩn của bạn.',
+                        'Chiếm ${((p / bFree) * 100).clamp(0, 999).toStringAsFixed(0)}% quỹ còn lại',
                         style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: isDark ? AppTokens.darkText : AppTokens.lightText),
                       ),
                     ),
@@ -425,7 +431,9 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Nếu dàn đều: Hạn mức mỗi ngày từ mai sẽ giảm từ ${_formatCurrency(sDaily)} ➔ ${_formatCurrency(sNew)}/ngày (mỗi ngày bớt ${_formatCurrency(deltaS)}).',
+                        sDaily <= 0
+                            ? 'Không còn tiền an toàn để chi'
+                            : 'Nếu dàn đều: Hạn mức mỗi ngày từ mai sẽ giảm từ ${_formatCurrency(sDaily)} ➔ ${_formatCurrency(sNew)}/ngày (mỗi ngày bớt ${_formatCurrency(deltaS)}).',
                         style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFFF59E0B)),
                       ),
                     ),
@@ -452,16 +460,13 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Khoản chi vượt quá ngân sách tự do cả chu kỳ (${_formatCurrency(bFree)})!',
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFF43F5E)),
+                        bFree <= 0
+                            ? 'Đang hết ngân sách tự do\nKhông còn tiền an toàn để chi'
+                            : 'Khoản này lớn hơn số tiền bạn còn lại trong chu kỳ. Nếu mua, bạn sẽ phải bù từ tiền sinh hoạt cố định.',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: isDark ? AppTokens.darkText : AppTokens.lightText),
                       ),
                     ),
                   ],
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Nếu chi khoản này, bạn sẽ bị thâm hụt vào tiền trả hóa đơn / tiền trọ cố định. Khuyên bạn nên trì hoãn hoặc lập ngân sách Sự Kiện / Dự Án riêng để tích lũy dần.',
-                  style: TextStyle(fontSize: 11, color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted),
                 ),
               ],
             ],
@@ -486,7 +491,7 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
                   onPressed: () => _cancelPurchase(p),
                   child: const FittedBox(
                     fit: BoxFit.scaleDown,
-                    child: Text('🙅 Thôi, không mua nữa', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                    child: Text('Để sau', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
                   ),
                 ),
               ),
@@ -507,7 +512,7 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
                   child: FittedBox(
                     fit: BoxFit.scaleDown,
                     child: Text(
-                      isGreen ? '🛍️ Thoải mái mua' : '🛍️ Vẫn mua (Dàn đều)',
+                      isGreen ? 'Ghi chép giao dịch ngay' : 'Vẫn mua (Dàn đều các ngày)',
                       style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
                     ),
                   ),
@@ -521,13 +526,13 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
   }
 
   Widget _buildStatusBadge({required bool isGreen, required bool isYellow, required bool isRed}) {
-    String text = '🟢 An Toàn Hôm Nay';
+    String text = 'Mua được!';
     Color color = const Color(0xFF10B981);
     if (isYellow) {
-      text = '🟡 Cân Nhắc (Hạ nhịp)';
+      text = 'Cân nhắc thêm: Sẽ giảm hạn mức các ngày tới';
       color = const Color(0xFFF59E0B);
     } else if (isRed) {
-      text = '🔴 Vượt Trần Tự Do';
+      text = 'Vượt ngân sách chu kỳ';
       color = const Color(0xFFF43F5E);
     }
 
@@ -545,14 +550,18 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
   }
 
   // ===========================================================================
-  // 🌟 TAB 2: SO KÈO A vs B (TOÀN BỘ TOÁN HỌC & BỐ CỤC 3 TẦNG HOÀN CHỈNH)
+  // 🌟 TAB 2: SO SÁNH 2 MÓN (TOÀN BỘ TOÁN HỌC & BỐ CỤC HOÀN CHỈNH)
   // ===========================================================================
   Widget _buildDilemmaView(bool isDark, AppAccentPreset accent) {
     final double pA = math.max(0.0, double.tryParse(_itemAAmountBuffer) ?? 0.0);
     final double pB = math.max(0.0, double.tryParse(_itemBAmountBuffer) ?? 0.0);
-    final double sDaily = math.max(1.0, widget.dailySafe);
+    final double sDaily = widget.dailySafe.isFinite
+        ? math.max(0.0, widget.dailySafe)
+        : 0.0;
     final int d = math.max(1, widget.daysRemaining);
-    final double bFree = math.max(1.0, widget.freeBudgetRemaining);
+    final double bFree = widget.freeBudgetRemaining.isFinite
+        ? widget.freeBudgetRemaining
+        : 0.0;
 
     // Xác định món đắt hơn và rẻ hơn
     final bool isAExp = pA > pB;
@@ -569,23 +578,17 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
     // 2. Tỷ lệ tiết kiệm nếu chọn món rẻ hơn (%saved)
     final double savedPct = pMax > 0 ? ((pMax - pMin) / pMax) * 100.0 : 0.0;
 
-    // 3. Tải trọng ngân sách tháng (wA, wB)
-    final double wA = (pA / bFree) * 100.0;
-    final double wB = (pB / bFree) * 100.0;
+    // 3. Tải trọng ngân sách (wA, wB) với clamp safe
+    final double wA = bFree > 0 ? ((pA / bFree) * 100.0).clamp(0.0, 999.0) : 0.0;
+    final double wB = bFree > 0 ? ((pB / bFree) * 100.0).clamp(0.0, 999.0) : 0.0;
 
     // 4. Mức giảm chi tiêu mỗi ngày nếu dàn đều
     final double deltaSA = (pA / d).floorToDouble();
     final double deltaSB = (pB / d).floorToDouble();
-    final double dropPctA = (deltaSA / sDaily) * 100.0;
-    final double dropPctB = (deltaSB / sDaily) * 100.0;
     final double sNewA = math.max(0.0, sDaily - deltaSA);
     final double sNewB = math.max(0.0, sDaily - deltaSB);
 
-    // 5. Quy đổi số ngày sống
-    final double dA = pA / sDaily;
-    final double dB = pB / sDaily;
-
-    // 6. Thặng dư tiền mặt bảo toàn
+    // 5. Thặng dư tiền mặt bảo toàn
     final double deltaP = (pA - pB).abs();
 
     final String nameA = _itemANameController.text.trim().isEmpty ? 'Món A' : _itemANameController.text.trim();
@@ -656,14 +659,16 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            nameA.toUpperCase(),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w800,
-                              color: _activeDilemmaInput == 0 ? accent.primary : (isDark ? AppTokens.darkMuted : AppTokens.lightMuted),
+                          Expanded(
+                            child: Text(
+                              nameA,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                color: _activeDilemmaInput == 0 ? accent.primary : (isDark ? AppTokens.darkMuted : AppTokens.lightMuted),
+                              ),
                             ),
                           ),
                           if (_activeDilemmaInput == 0)
@@ -701,8 +706,8 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
                           ),
                           child: Text(
                             isAExp
-                                ? 'Đắt hơn +${premiumPct.toStringAsFixed(0)}% (${kDiff.toStringAsFixed(1)}x)'
-                                : 'Tiết kiệm ${savedPct.toStringAsFixed(0)}%',
+                                ? 'Đắt hơn ${_formatCurrency(deltaP)} (+${premiumPct.toStringAsFixed(0)}%)'
+                                : 'Tiết kiệm ${_formatCurrency(deltaP)} (${savedPct.toStringAsFixed(0)}%)',
                             style: TextStyle(
                               fontSize: 9,
                               fontWeight: FontWeight.w800,
@@ -748,14 +753,16 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            nameB.toUpperCase(),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w800,
-                              color: _activeDilemmaInput == 1 ? const Color(0xFF10B981) : (isDark ? AppTokens.darkMuted : AppTokens.lightMuted),
+                          Expanded(
+                            child: Text(
+                              nameB,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                color: _activeDilemmaInput == 1 ? const Color(0xFF10B981) : (isDark ? AppTokens.darkMuted : AppTokens.lightMuted),
+                              ),
                             ),
                           ),
                           if (_activeDilemmaInput == 1)
@@ -793,8 +800,8 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
                           ),
                           child: Text(
                             isBExp
-                                ? 'Đắt hơn +${premiumPct.toStringAsFixed(0)}% (${kDiff.toStringAsFixed(1)}x)'
-                                : 'Tiết kiệm ${savedPct.toStringAsFixed(0)}%',
+                                ? 'Đắt hơn ${_formatCurrency(deltaP)} (+${premiumPct.toStringAsFixed(0)}%)'
+                                : 'Tiết kiệm ${_formatCurrency(deltaP)} (${savedPct.toStringAsFixed(0)}%)',
                             style: TextStyle(
                               fontSize: 9,
                               fontWeight: FontWeight.w800,
@@ -813,7 +820,7 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
         ),
         const SizedBox(height: 10),
 
-        // B. BẢNG LƯỚI SO SÁNH 3 TẦNG (3-ROW COMPARISON MATRIX)
+        // B. BẢNG LƯỚI SO SÁNH 2 TẦNG (CẮT BỎ HOÀN TOÀN MỤC QUY ĐỔI NGÀY SỐNG)
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
@@ -823,33 +830,22 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
           ),
           child: Column(
             children: [
-              // HÀNG 1: TẢI TRỌNG THÁNG
+              // HÀNG 1: ẢNH HƯỞNG CHU KỲ
               _buildMatrixRow(
-                title: '📉 Tải trọng chu kỳ',
-                colA: 'Chiếm ${wA.toStringAsFixed(1)}% quỹ tự do',
-                colB: 'Chiếm ${wB.toStringAsFixed(1)}% quỹ tự do',
+                title: 'Ảnh hưởng chu kỳ',
+                colA: bFree <= 0 ? 'Đang hết ngân sách tự do' : 'Chiếm ${wA.toStringAsFixed(0)}% quỹ còn lại',
+                colB: bFree <= 0 ? 'Đang hết ngân sách tự do' : 'Chiếm ${wB.toStringAsFixed(0)}% quỹ còn lại',
                 isDark: isDark,
                 highlightA: isAExp,
                 highlightB: isBExp,
               ),
               const Divider(height: 14),
 
-              // HÀNG 2: TÁC ĐỘNG HÀNG NGÀY
+              // HÀNG 2: HẠN MỨC MỖI NGÀY TỚI
               _buildMatrixRow(
-                title: '⚡ Tác động mỗi ngày',
-                colA: 'Hạ -${dropPctA.toStringAsFixed(0)}% (-${_formatCurrency(deltaSA)})\nMai còn ${_formatCurrency(sNewA)}/ngày',
-                colB: 'Hạ -${dropPctB.toStringAsFixed(0)}% (-${_formatCurrency(deltaSB)})\nMai còn ${_formatCurrency(sNewB)}/ngày',
-                isDark: isDark,
-                highlightA: isAExp,
-                highlightB: isBExp,
-              ),
-              const Divider(height: 14),
-
-              // HÀNG 3: QUY ĐỔI NGÀY TIÊU
-              _buildMatrixRow(
-                title: '⏳ Quy đổi ngày sống',
-                colA: 'Ngốn ${dA.toStringAsFixed(1)} ngày sinh hoạt',
-                colB: 'Ngốn ${dB.toStringAsFixed(1)} ngày sinh hoạt',
+                title: 'Hạn mức mỗi ngày tới',
+                colA: bFree <= 0 || sDaily <= 0 ? 'Không còn tiền an toàn để chi' : 'Mỗi ngày tới giảm -${_formatCurrency(deltaSA)}\n(còn ${_formatCurrency(sNewA)}/ngày)',
+                colB: bFree <= 0 || sDaily <= 0 ? 'Không còn tiền an toàn để chi' : 'Mỗi ngày tới giảm -${_formatCurrency(deltaSB)}\n(còn ${_formatCurrency(sNewB)}/ngày)',
                 isDark: isDark,
                 highlightA: isAExp,
                 highlightB: isBExp,
@@ -893,8 +889,8 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
                   padding: const EdgeInsets.only(left: 24),
                   child: Text(
                     isAExp
-                        ? '$nameA rút ví gấp ${kDiff.toStringAsFixed(1)} lần so với $nameB.'
-                        : '$nameB rút ví gấp ${kDiff.toStringAsFixed(1)} lần so với $nameA.',
+                        ? '$nameA phải chi gấp ${kDiff.toStringAsFixed(1)} lần so với $nameB.'
+                        : '$nameB phải chi gấp ${kDiff.toStringAsFixed(1)} lần so với $nameA.',
                     style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFFF59E0B)),
                   ),
                 ),
@@ -922,7 +918,7 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
                   onPressed: pA <= 0 ? null : () => _proceedToBuyDilemma(nameA, pA),
                   child: FittedBox(
                     fit: BoxFit.scaleDown,
-                    child: Text('Chọn $nameA (-${_formatCurrency(pA)})', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+                    child: Text('Mua $nameA (${_formatCurrency(pA)})', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
                   ),
                 ),
               ),
@@ -940,7 +936,7 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
                   onPressed: pB <= 0 ? null : () => _proceedToBuyDilemma(nameB, pB),
                   child: FittedBox(
                     fit: BoxFit.scaleDown,
-                    child: Text('Chọn $nameB (-${_formatCurrency(pB)})', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+                    child: Text('Mua $nameB (${_formatCurrency(pB)})', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
                   ),
                 ),
               ),
@@ -960,7 +956,7 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
             ),
             onPressed: () => _cancelPurchase(math.max(pA, pB)),
-            child: const Text('🙅 Không mua món nào cả', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+            child: const Text('Không mua món nào', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
           ),
         ),
       ],

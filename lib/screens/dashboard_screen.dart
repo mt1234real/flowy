@@ -732,15 +732,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with TickerPr
                       items: [
                         SlidingSegmentedItem<CycleMode>(
                           value: CycleMode.calendar,
-                          label: 'Tháng ${now.month} (01 - ${DateTime(now.year, now.month + 1, 0).day}/${now.month})',
-                          leadingText: '📅',
+                          label: 'Tháng ${now.month} (01 - ${DateTime(now.year, now.month + 1, 0).day}/${now.month.toString().padLeft(2, '0')})',
                           activeColor: isDark ? AppTokens.darkText : AppTokens.lightText,
                         ),
                         SlidingSegmentedItem<CycleMode>(
                           value: CycleMode.customCycle,
                           label:
-                          'Kỳ Lương (${DateFormat('dd/MM').format(cycleRange.startDate)} - ${DateFormat('dd/MM').format(cycleRange.endDate)})',
-                          leadingText: '🎯',
+                          'Chu kỳ (${DateFormat('dd/MM').format(cycleRange.startDate)} – ${DateFormat('dd/MM').format(cycleRange.endDate)})',
+                          leadingText: '',
                           activeColor: accent.primary,
                           trailing: dashboardMode == CycleMode.customCycle
                               ? InkWell(
@@ -979,276 +978,257 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with TickerPr
                 SliverPadding(
                   padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
                   sliver: SliverToBoxAdapter(
-                    child: Row(
-                      children: [
-                        // Cột 1: Thu Nhập
-                        Expanded(
-                          child: InkWell(
-                            onTap: () {
-                              HapticFeedback.selectionClick();
-                              setState(() {
-                                _isIncomeVisible = !_isIncomeVisible;
-                              });
-                            },
-                            borderRadius: BorderRadius.circular(18),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-                              decoration: BoxDecoration(
-                                color: isDark ? AppTokens.darkCard : Colors.white,
-                                borderRadius: BorderRadius.circular(18),
-                                border: Border.all(
-                                  color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder,
+                    child: IntrinsicHeight(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // Cột 1: Thu Nhập
+                          Expanded(
+                            child: InkWell(
+                              onTap: () {
+                                HapticFeedback.selectionClick();
+                                setState(() {
+                                  _isIncomeVisible = !_isIncomeVisible;
+                                });
+                              },
+                              borderRadius: BorderRadius.circular(18),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: isDark ? AppTokens.darkCard : Colors.white,
+                                  borderRadius: BorderRadius.circular(18),
+                                  border: Border.all(
+                                    color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder,
+                                  ),
                                 ),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Container(
-                                        width: 24,
-                                        height: 24,
-                                        decoration: BoxDecoration(
-                                          color: AppTokens.income.withValues(alpha: 0.14),
-                                          borderRadius: BorderRadius.circular(8),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Container(
+                                          width: 24,
+                                          height: 24,
+                                          decoration: BoxDecoration(
+                                            color: AppTokens.income.withValues(alpha: 0.14),
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: const Icon(
+                                            Icons.arrow_upward_rounded,
+                                            color: AppTokens.income,
+                                            size: 14,
+                                          ),
                                         ),
-                                        child: const Icon(
-                                          Icons.arrow_upward_rounded,
-                                          color: AppTokens.income,
-                                          size: 14,
+                                        const Spacer(),
+                                        Icon(
+                                          _isIncomeVisible
+                                              ? Icons.visibility_rounded
+                                              : Icons.visibility_off_rounded,
+                                          size: 13,
+                                          color: _isIncomeVisible
+                                              ? AppTokens.income
+                                              : (isDark ? Colors.white30 : Colors.black26),
                                         ),
-                                      ),
-                                      const Spacer(),
-                                      Icon(
-                                        _isIncomeVisible
-                                            ? Icons.visibility_rounded
-                                            : Icons.visibility_off_rounded,
-                                        size: 13,
-                                        color: _isIncomeVisible
-                                            ? AppTokens.income
-                                            : (isDark ? Colors.white30 : Colors.black26),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    'Thu nhập',
-                                    softWrap: true,
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w700,
-                                      color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                                      ],
                                     ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  PreservedBalanceTumbler(
-                                    isVisible: _isIncomeVisible,
-                                    realValue: '+${_formatCurrency(totalIncome)}',
-                                    maskedValue: '+•••••• ₫',
-                                    height: 20,
-                                    alignment: Alignment.centerLeft,
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w800,
-                                      fontFamily: 'monospace',
-                                      letterSpacing: -0.3,
-                                      color: AppTokens.income,
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      'Thu nhập',
+                                      softWrap: true,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                                      ),
                                     ),
-                                  ),
-                                ],
+                                    const SizedBox(height: 8),
+                                    PreservedBalanceTumbler(
+                                      isVisible: _isIncomeVisible,
+                                      realValue: '+${_formatCurrency(totalIncome)}',
+                                      maskedValue: '+•••••• ₫',
+                                      height: 20,
+                                      alignment: Alignment.centerLeft,
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w800,
+                                        fontFamily: 'monospace',
+                                        letterSpacing: -0.3,
+                                        color: AppTokens.income,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
+                          const SizedBox(width: 8),
 
-                        // Cột 2: Đã Chi
-                        Expanded(
-                          child: InkWell(
-                            onTap: () {
-                              HapticFeedback.selectionClick();
-                              setState(() {
-                                _isExpenseVisible = !_isExpenseVisible;
-                              });
-                            },
-                            borderRadius: BorderRadius.circular(18),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-                              decoration: BoxDecoration(
-                                color: isDark ? AppTokens.darkCard : Colors.white,
-                                borderRadius: BorderRadius.circular(18),
-                                border: Border.all(
-                                  color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder,
+                          // Cột 2: Đã Chi
+                          Expanded(
+                            child: InkWell(
+                              onTap: () {
+                                HapticFeedback.selectionClick();
+                                setState(() {
+                                  _isExpenseVisible = !_isExpenseVisible;
+                                });
+                              },
+                              borderRadius: BorderRadius.circular(18),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: isDark ? AppTokens.darkCard : Colors.white,
+                                  borderRadius: BorderRadius.circular(18),
+                                  border: Border.all(
+                                    color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder,
+                                  ),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Container(
+                                          width: 24,
+                                          height: 24,
+                                          decoration: BoxDecoration(
+                                            color: AppTokens.expense.withValues(alpha: 0.14),
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: const Icon(
+                                            Icons.arrow_downward_rounded,
+                                            color: AppTokens.expense,
+                                            size: 14,
+                                          ),
+                                        ),
+                                        const Spacer(),
+                                        Icon(
+                                          _isExpenseVisible
+                                              ? Icons.visibility_rounded
+                                              : Icons.visibility_off_rounded,
+                                          size: 13,
+                                          color: _isExpenseVisible
+                                              ? AppTokens.expense
+                                              : (isDark ? Colors.white30 : Colors.black26),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      'Đã chi',
+                                      softWrap: true,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    PreservedBalanceTumbler(
+                                      isVisible: _isExpenseVisible,
+                                      realValue: '-${_formatCurrency(totalExpense)}',
+                                      maskedValue: '-•••••• ₫',
+                                      height: 20,
+                                      alignment: Alignment.centerLeft,
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w800,
+                                        fontFamily: 'monospace',
+                                        letterSpacing: -0.3,
+                                        color: AppTokens.expense,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Container(
-                                        width: 24,
-                                        height: 24,
-                                        decoration: BoxDecoration(
-                                          color: AppTokens.expense.withValues(alpha: 0.14),
-                                          borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+
+                          // Cột 3: Tốc độ tiêu dùng (Burn-Rate) - TÁCH ĐỀU 2 BÊN VỚI TUMBLER ĐỒNG BỘ
+                          Expanded(
+                            child: InkWell(
+                              onTap: () {
+                                HapticFeedback.selectionClick();
+                                setState(() {
+                                  _isSpeedVisible = !_isSpeedVisible;
+                                });
+                              },
+                              borderRadius: BorderRadius.circular(18),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: isDark ? AppTokens.darkCard : Colors.white,
+                                  borderRadius: BorderRadius.circular(18),
+                                  border: Border.all(
+                                    color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder,
+                                  ),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Container(
+                                          width: 24,
+                                          height: 24,
+                                          decoration: BoxDecoration(
+                                            color: (isOverspending ? AppTokens.expense : accent.primary)
+                                                .withValues(alpha: 0.14),
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: Icon(
+                                            Icons.bolt_rounded,
+                                            color: isOverspending ? AppTokens.expense : accent.primary,
+                                            size: 15,
+                                          ),
                                         ),
-                                        child: const Icon(
-                                          Icons.arrow_downward_rounded,
-                                          color: AppTokens.expense,
-                                          size: 14,
+                                        const Spacer(),
+                                        Icon(
+                                          _isSpeedVisible
+                                              ? Icons.visibility_rounded
+                                              : Icons.visibility_off_rounded,
+                                          size: 13,
+                                          color: _isSpeedVisible
+                                              ? (isOverspending ? AppTokens.expense : accent.primary)
+                                              : (isDark ? Colors.white30 : Colors.black26),
                                         ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      'Tốc độ tiêu',
+                                      softWrap: true,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
                                       ),
-                                      const Spacer(),
-                                      Icon(
-                                        _isExpenseVisible
-                                            ? Icons.visibility_rounded
-                                            : Icons.visibility_off_rounded,
-                                        size: 13,
-                                        color: _isExpenseVisible
+                                    ),
+                                    const SizedBox(height: 8),
+
+                                    PreservedBalanceTumbler(
+                                      isVisible: _isSpeedVisible,
+                                      realValue: '${(budgetConsumedPct * 100).toStringAsFixed(0)}%',
+                                      maskedValue: '•• %',
+                                      height: 20,
+                                      alignment: Alignment.centerLeft,
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w800,
+                                        fontFamily: 'monospace',
+                                        letterSpacing: -0.3,
+                                        color: isOverspending
                                             ? AppTokens.expense
-                                            : (isDark ? Colors.white30 : Colors.black26),
+                                            : (isDark ? AppTokens.darkText : AppTokens.lightText),
                                       ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    'Đã chi',
-                                    softWrap: true,
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w700,
-                                      color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
                                     ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  PreservedBalanceTumbler(
-                                    isVisible: _isExpenseVisible,
-                                    realValue: '-${_formatCurrency(totalExpense)}',
-                                    maskedValue: '-•••••• ₫',
-                                    height: 20,
-                                    alignment: Alignment.centerLeft,
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w800,
-                                      fontFamily: 'monospace',
-                                      letterSpacing: -0.3,
-                                      color: AppTokens.expense,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-
-                        // Cột 3: Tốc độ tiêu dùng (Burn-Rate) - TÁCH ĐỀU 2 BÊN VỚI TUMBLER ĐỒNG BỘ
-                        Expanded(
-                          child: InkWell(
-                            onTap: () {
-                              HapticFeedback.selectionClick();
-                              setState(() {
-                                _isSpeedVisible = !_isSpeedVisible;
-                              });
-                            },
-                            borderRadius: BorderRadius.circular(18),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-                              decoration: BoxDecoration(
-                                color: isDark ? AppTokens.darkCard : Colors.white,
-                                borderRadius: BorderRadius.circular(18),
-                                border: Border.all(
-                                  color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder,
+                                  ],
                                 ),
                               ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Container(
-                                        width: 24,
-                                        height: 24,
-                                        decoration: BoxDecoration(
-                                          color: (isOverspending ? AppTokens.expense : accent.primary)
-                                              .withValues(alpha: 0.14),
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                        child: Icon(
-                                          Icons.bolt_rounded,
-                                          color: isOverspending ? AppTokens.expense : accent.primary,
-                                          size: 15,
-                                        ),
-                                      ),
-                                      const Spacer(),
-                                      Icon(
-                                        _isSpeedVisible
-                                            ? Icons.visibility_rounded
-                                            : Icons.visibility_off_rounded,
-                                        size: 13,
-                                        color: _isSpeedVisible
-                                            ? (isOverspending ? AppTokens.expense : accent.primary)
-                                            : (isDark ? Colors.white30 : Colors.black26),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    'Tốc độ tiêu',
-                                    softWrap: true,
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w700,
-                                      color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-
-                                  // Separate lines keep both progress and status readable on narrow cards.
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                                    children: [
-                                      PreservedBalanceTumbler(
-                                        isVisible: _isSpeedVisible,
-                                        realValue: '${(budgetConsumedPct * 100).toStringAsFixed(0)}%',
-                                        maskedValue: '••%',
-                                        height: 20,
-                                        alignment: Alignment.centerLeft,
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w800,
-                                          fontFamily: 'monospace',
-                                          letterSpacing: -0.3,
-                                          color: isOverspending
-                                              ? AppTokens.expense
-                                              : (isDark ? AppTokens.darkText : AppTokens.lightText),
-                                        ),
-                                      ),
-                                      PreservedBalanceTumbler(
-                                        isVisible: _isSpeedVisible,
-                                        realValue: isOverspending ? 'Nhanh' : 'Ổn định',
-                                        maskedValue: '•••',
-                                        height: 20,
-                                        alignment: Alignment.centerLeft,
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w800,
-                                          fontFamily: 'monospace',
-                                          letterSpacing: -0.2,
-                                          color: isOverspending
-                                              ? AppTokens.expense
-                                              : const Color(0xFF10B981),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -1530,9 +1510,22 @@ class _DashboardCycleMilestoneModalState extends ConsumerState<_DashboardCycleMi
     final store = ref.watch(cycleStartDaysByMonthProvider);
     final monthKey = DateFormat('yyyy-MM').format(widget.currentMonth);
 
+    final daysInCurMonth = DateTime(widget.currentMonth.year, widget.currentMonth.month + 1, 0).day;
     final tempStore = Map<String, int>.from(store)..[monthKey] = _selectedDay;
     final previewRange = computeMonthCycleRange(widget.currentMonth, tempStore);
-    final daysInCurMonth = DateTime(widget.currentMonth.year, widget.currentMonth.month + 1, 0).day;
+
+    final startStr = DateFormat('dd/MM').format(previewRange.startDate);
+    final endStr = DateFormat('dd/MM').format(previewRange.endDate);
+    final previewText = '$startStr – $endStr • ${previewRange.daysCount} ngày';
+
+    final chips = [
+      {'label': 'Đầu tháng', 'day': 1},
+      {'label': 'Ngày 5', 'day': 5},
+      {'label': 'Ngày 10', 'day': 10},
+      {'label': 'Ngày 15', 'day': 15},
+      {'label': 'Ngày 20', 'day': 20},
+      {'label': 'Ngày 25', 'day': 25},
+    ];
 
     return ClipRRect(
       borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
@@ -1565,31 +1558,93 @@ class _DashboardCycleMilestoneModalState extends ConsumerState<_DashboardCycleMi
                     ),
                   ),
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 16),
 
                 Text(
-                  'Thiết lập Chu kỳ Tháng ${DateFormat('MM/yyyy').format(widget.currentMonth)}',
+                  'Chu kỳ tháng ${widget.currentMonth.month}',
                   style: TextStyle(
-                    fontSize: 16,
+                    fontSize: 17,
                     fontWeight: FontWeight.w800,
                     color: widget.isDark ? AppTokens.darkText : AppTokens.lightText,
                   ),
                 ),
-                const SizedBox(height: 3),
+                const SizedBox(height: 4),
                 Text(
-                  'Chọn ngày bắt đầu chu kỳ (ngày nhận lương). Các tháng sau sẽ tự động kế thừa mốc này.',
+                  'Chọn ngày nhận lương hoặc mốc bắt đầu tính toán tài chính trong tháng.',
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 12,
                     color: widget.isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
                   ),
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 16),
+
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        widget.accent.primary.withValues(alpha: 0.16),
+                        widget.accent.primary.withValues(alpha: 0.04),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: widget.accent.primary.withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      Text(
+                        'NGÀY BẮT ĐẦU CHU KỲ',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 1.2,
+                          color: widget.accent.primary,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Ngày $_selectedDay',
+                        style: TextStyle(
+                          fontSize: 32,
+                          fontWeight: FontWeight.w900,
+                          color: widget.isDark ? AppTokens.darkText : AppTokens.lightText,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Cố định mốc tính toán ngân sách',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: widget.isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                Text(
+                  'Chọn nhanh mốc phổ biến',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: widget.isDark ? AppTokens.darkText : AppTokens.lightText,
+                  ),
+                ),
+                const SizedBox(height: 8),
 
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   physics: const BouncingScrollPhysics(),
                   child: Row(
-                    children: [1, 5, 10, 15, 20, 25].map((day) {
+                    children: chips.map((chip) {
+                      final day = chip['day'] as int;
+                      final label = chip['label'] as String;
                       final isSelected = _selectedDay == day;
                       return Padding(
                         padding: const EdgeInsets.only(right: 8.0),
@@ -1600,7 +1655,7 @@ class _DashboardCycleMilestoneModalState extends ConsumerState<_DashboardCycleMi
                           },
                           borderRadius: BorderRadius.circular(12),
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                             decoration: BoxDecoration(
                               color: isSelected
                                   ? widget.accent.primary
@@ -1613,7 +1668,7 @@ class _DashboardCycleMilestoneModalState extends ConsumerState<_DashboardCycleMi
                               ),
                             ),
                             child: Text(
-                              'Ngày ${day.toString().padLeft(2, '0')}',
+                              label,
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
@@ -1630,73 +1685,61 @@ class _DashboardCycleMilestoneModalState extends ConsumerState<_DashboardCycleMi
                 ),
                 const SizedBox(height: 14),
 
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: widget.accent.primary.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: widget.accent.primary.withValues(alpha: 0.3),
+                // ── Cycle preview pill (dd/MM – dd/MM • X ngày) ──
+                Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: widget.accent.primary.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(
+                        color: widget.accent.primary.withValues(alpha: 0.28),
+                      ),
                     ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.calendar_month_rounded, color: widget.accent.primary, size: 22),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Chu kỳ áp dụng dự kiến',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: widget.accent.primary,
-                              ),
-                            ),
-                            Text(
-                              previewRange.subRange,
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w800,
-                                color: widget.isDark ? AppTokens.darkText : AppTokens.lightText,
-                              ),
-                            ),
-                          ],
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.calendar_today_rounded,
+                          size: 13,
+                          color: widget.accent.primary,
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 6),
+                        Text(
+                          previewText,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            fontFamily: 'monospace',
+                            letterSpacing: -0.2,
+                            color: widget.isDark ? AppTokens.darkText : AppTokens.lightText,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 4),
 
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Ngày bắt đầu: Ngày $_selectedDay',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: widget.isDark ? AppTokens.darkText : AppTokens.lightText,
-                      ),
-                    ),
-                    Text(
-                      'Tối đa: $daysInCurMonth',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: widget.isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
-                      ),
-                    ),
-                  ],
-                ),
+                // ── Modernized Slider ──
                 SliderTheme(
                   data: SliderTheme.of(context).copyWith(
                     activeTrackColor: widget.accent.primary,
+                    inactiveTrackColor: widget.isDark
+                        ? Colors.white.withValues(alpha: 0.12)
+                        : Colors.black.withValues(alpha: 0.10),
                     thumbColor: widget.accent.primary,
-                    overlayColor: widget.accent.primary.withValues(alpha: 0.2),
+                    overlayColor: widget.accent.primary.withValues(alpha: 0.18),
+                    trackHeight: 5.0,
+                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 10),
+                    overlayShape: const RoundSliderOverlayShape(overlayRadius: 22),
+                    valueIndicatorShape: const PaddleSliderValueIndicatorShape(),
+                    valueIndicatorColor: widget.accent.primary,
+                    valueIndicatorTextStyle: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                   child: Slider(
                     value: _selectedDay.toDouble().clamp(1.0, daysInCurMonth.toDouble()),
@@ -1705,21 +1748,26 @@ class _DashboardCycleMilestoneModalState extends ConsumerState<_DashboardCycleMi
                     divisions: daysInCurMonth - 1,
                     label: 'Ngày $_selectedDay',
                     onChanged: (val) {
-                      setState(() => _selectedDay = val.round());
+                      final newDay = val.round();
+                      if (newDay != _selectedDay) {
+                        HapticFeedback.selectionClick();
+                        setState(() => _selectedDay = newDay);
+                      }
                     },
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 12),
 
+                // ── CTA Button ──
                 SizedBox(
                   width: double.infinity,
-                  height: 48,
+                  height: 50,
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: widget.accent.primary,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                      elevation: 1,
+                      elevation: 2,
                     ),
                     onPressed: () {
                       HapticFeedback.mediumImpact();
@@ -1728,14 +1776,14 @@ class _DashboardCycleMilestoneModalState extends ConsumerState<_DashboardCycleMi
                       });
                       AppFeedback.showSuccess(
                         context,
-                        'Đã cập nhật chu kỳ Tháng ${DateFormat('MM/yyyy').format(widget.currentMonth)}: Bắt đầu ngày $_selectedDay',
+                        'Chu kỳ tháng ${widget.currentMonth.month}: bắt đầu ngày $_selectedDay',
                         emitHaptic: false,
                       );
                       Navigator.of(context).pop();
                     },
                     child: const Text(
-                      '✓ ÁP DỤNG CHO THÁNG NÀY',
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+                      'Lưu chu kỳ',
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
                     ),
                   ),
                 ),

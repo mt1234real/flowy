@@ -204,7 +204,7 @@ class _OverrunResolutionSheetState extends ConsumerState<OverrunResolutionSheet>
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'HÔM NAY ĐÃ CHI VƯỢT MỨC: +${_formatCurrency(widget.overAmount)}',
+                                'Đã chi vượt hôm nay: +${_formatCurrency(widget.overAmount)}',
                                 style: const TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w900,
@@ -213,7 +213,7 @@ class _OverrunResolutionSheetState extends ConsumerState<OverrunResolutionSheet>
                                 ),
                               ),
                               Text(
-                                'Bạn muốn cân đối lại ngân sách thế nào?',
+                                'Bạn muốn cân đối lại thế nào?',
                                 style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w700,
@@ -227,7 +227,7 @@ class _OverrunResolutionSheetState extends ConsumerState<OverrunResolutionSheet>
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Đừng lo lắng! Khoản chi ngoài kế hoạch là hoàn toàn bình thường. Hãy chọn 1 phương án điều phối dưới đây để bảo toàn mục tiêu cuối kỳ.',
+                      'Khoản phát sinh là bình thường. Chọn cách cân đối bên dưới để giữ vững ngân sách cuối kỳ nhé.',
                       style: TextStyle(fontSize: 11, color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted),
                     ),
                     const SizedBox(height: 16),
@@ -272,7 +272,7 @@ class _OverrunResolutionSheetState extends ConsumerState<OverrunResolutionSheet>
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
-                                    'PHƯƠNG ÁN A: DÀN ĐỀU CHO CẢ KỲ',
+                                    'Phương án A: Dàn đều các ngày còn lại',
                                     style: TextStyle(
                                       fontSize: 13,
                                       fontWeight: FontWeight.w800,
@@ -297,7 +297,7 @@ class _OverrunResolutionSheetState extends ConsumerState<OverrunResolutionSheet>
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              'Phân bổ lại ngân sách tự do còn lại (${_formatCurrency(widget.freeBudgetRemaining)}) đều cho $remainingDaysAfterToday ngày còn lại.',
+                              'Dàn đều khoản vượt này vào $remainingDaysAfterToday ngày còn lại của chu kỳ.',
                               style: TextStyle(fontSize: 11, color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted),
                             ),
                             const SizedBox(height: 6),
@@ -317,10 +317,10 @@ class _OverrunResolutionSheetState extends ConsumerState<OverrunResolutionSheet>
                                         children: [
                                           const TextSpan(text: 'Mỗi ngày tới giảm: '),
                                           TextSpan(
-                                            text: '-${_formatCurrency(dailyDeduction)}/ngày\n',
+                                            text: '-${_formatCurrency(dailyDeduction)}\n',
                                             style: const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFFF59E0B)),
                                           ),
-                                          const TextSpan(text: '(Hạn mức an toàn mới: '),
+                                          const TextSpan(text: '(Hạn mức mới: '),
                                           TextSpan(
                                             text: '${_formatCurrency(newSafeDaily)}/ngày',
                                             style: const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF10B981)),
@@ -380,7 +380,7 @@ class _OverrunResolutionSheetState extends ConsumerState<OverrunResolutionSheet>
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
-                                    'PHƯƠNG ÁN B: BÙ NHANH TRONG $_kDays NGÀY',
+                                    'Cách 2: Bù lại trong $_kDays ngày',
                                     style: TextStyle(
                                       fontSize: 13,
                                       fontWeight: FontWeight.w800,
@@ -397,7 +397,7 @@ class _OverrunResolutionSheetState extends ConsumerState<OverrunResolutionSheet>
                                     borderRadius: BorderRadius.circular(6),
                                   ),
                                   child: const Text(
-                                    'Kỷ luật thép',
+                                    'Bù nhanh',
                                     style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFFF59E0B)),
                                   ),
                                 ),
@@ -405,7 +405,7 @@ class _OverrunResolutionSheetState extends ConsumerState<OverrunResolutionSheet>
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              'Thắt chặt chi tiêu trong $_kDays ngày để đưa ngân sách về mức chuẩn nhanh nhất.',
+                              'Bớt chi trong $_kDays ngày tới để hồi lại hạn mức sớm nhất.',
                               style: TextStyle(fontSize: 11, color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted),
                             ),
                             const SizedBox(height: 10),
@@ -567,7 +567,7 @@ class _OverrunResolutionSheetState extends ConsumerState<OverrunResolutionSheet>
                                                 text: '${_formatCurrency(recoveryLimit)}/ngày\n',
                                                 style: const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFFF43F5E)),
                                               ),
-                                              TextSpan(text: '(Sau $_kDays ngày sẽ hồi phục về: '),
+                                              const TextSpan(text: '(Sau đó hồi phục về: '),
                                               TextSpan(
                                                 text: '${_formatCurrency(realisticRecoveredLimit)}/ngày',
                                                 style: const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF10B981)),
@@ -587,7 +587,7 @@ class _OverrunResolutionSheetState extends ConsumerState<OverrunResolutionSheet>
                                         const SizedBox(width: 4),
                                         Expanded(
                                           child: Text(
-                                            'Hạn mức đang ở mức sàn sinh hoạt, bạn có thể tăng thêm số ngày bù để thở dễ hơn.',
+                                            'Hạn mức đang ở mức sàn sinh hoạt, bạn có thể tăng thêm ngày bù cho thoải mái hơn.',
                                             style: TextStyle(
                                               fontSize: 10,
                                               fontWeight: FontWeight.w600,
@@ -606,7 +606,7 @@ class _OverrunResolutionSheetState extends ConsumerState<OverrunResolutionSheet>
                                         const SizedBox(width: 4),
                                         Expanded(
                                           child: Text(
-                                            'Khoản chi vượt khá lớn, sau $_kDays ngày hạn mức vẫn sẽ ở mức thắt chặt (~${_formatCurrency(realisticRecoveredLimit)}/ngày). Hãy cân nhắc tăng số ngày bù hoặc nạp thêm ngân sách.',
+                                            'Khoản chi vượt khá lớn, sau $_kDays ngày hạn mức vẫn sẽ thấp (~${_formatCurrency(realisticRecoveredLimit)}/ngày). Nên tăng thêm ngày bù hoặc nạp thêm tiền nhé.',
                                             style: TextStyle(
                                               fontSize: 10,
                                               fontWeight: FontWeight.w600,
@@ -646,8 +646,8 @@ class _OverrunResolutionSheetState extends ConsumerState<OverrunResolutionSheet>
                         ),
                         child: Text(
                           _selectedStrategy == OverrunStrategy.amortizeCycle
-                              ? '✓ XÁC NHẬN DÀN ĐỀU'
-                              : '✓ XÁC NHẬN BÙ TRONG $_kDays NGÀY',
+                              ? 'Xác nhận dàn đều'
+                              : 'Xác nhận bù trong $_kDays ngày',
                           style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
                         ),
                       ),

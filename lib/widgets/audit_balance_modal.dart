@@ -237,7 +237,7 @@ class _AuditBalanceModalState extends ConsumerState<AuditBalanceModal> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'Kiểm Kê Số Dư',
+                                  'Kiểm kê số dư ví',
                                   style: TextStyle(
                                     fontSize: 17,
                                     fontWeight: FontWeight.w800,
@@ -284,7 +284,7 @@ class _AuditBalanceModalState extends ConsumerState<AuditBalanceModal> {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(
-                                'Số dư ghi nhận trên app:',
+                                'Số dư trên app:',
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
@@ -306,7 +306,7 @@ class _AuditBalanceModalState extends ConsumerState<AuditBalanceModal> {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(
-                                'Số dư thực tế ngoài đời:',
+                                'Số tiền thực tế:',
                                 style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.bold,
@@ -360,7 +360,7 @@ class _AuditBalanceModalState extends ConsumerState<AuditBalanceModal> {
 
                     // Bộ chọn Lý do chênh lệch
                     Text(
-                      'Lý do điều chỉnh số dư:',
+                      'Lý do điều chỉnh (Tùy chọn):',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
@@ -463,7 +463,7 @@ class _AuditBalanceModalState extends ConsumerState<AuditBalanceModal> {
                             Icon(Icons.check_rounded, size: 20),
                             SizedBox(width: 8),
                             Text(
-                              'XÁC NHẬN ĐIỀU CHỈNH SỐ DƯ',
+                              'Cập nhật số dư thực tế',
                               style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
                             ),
                           ],

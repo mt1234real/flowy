@@ -486,7 +486,7 @@ class DashboardHeroCard extends ConsumerWidget {
                               Text('⚠️', style: TextStyle(fontSize: 10)),
                               SizedBox(width: 4),
                               Text(
-                                'Cần bù trừ ❯',
+                                'Chạm để cân đối lại ❯',
                                 style: TextStyle(
                                   fontSize: 10,
                                   fontWeight: FontWeight.w800,
