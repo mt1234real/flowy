@@ -2535,6 +2535,26 @@ class _FilterMatrixModalState extends ConsumerState<_FilterMatrixModal> {
 // 🌟 MODAL 1: FINANCIAL CYCLE MILESTONE PICKER — HORIZON + HAPTIC WHEEL
 // ==============================================================================
 
+/// Public launcher — dùng chung cho Dashboard & Ledger
+Future<void> showEditCycleMilestoneSheet({
+  required BuildContext context,
+  required DateTime anchorMonth,
+  required bool isDark,
+  required AppAccentPreset accent,
+}) {
+  return AppAnimationPolicy.showFluidSheet(
+    context: context,
+    mode: FluidSheetMode.nestedScrollable,
+    duration: const Duration(milliseconds: 260),
+    reverseDuration: const Duration(milliseconds: 200),
+    builder: (_, __) => _EditCycleMilestoneModal(
+      anchorMonth: anchorMonth,
+      isDark: isDark,
+      accent: accent,
+    ),
+  );
+}
+
 class _EditCycleMilestoneModal extends ConsumerStatefulWidget {
   final DateTime anchorMonth;
   final bool isDark;
@@ -2858,7 +2878,7 @@ class _EditCycleMilestoneModalState
                         ),
                         const SizedBox(height: 3),
                         Text(
-                          'Nhận lương',
+                          'Bắt đầu chu kỳ',
                           style: TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.w700,
@@ -2913,7 +2933,7 @@ class _EditCycleMilestoneModalState
                         ),
                         const SizedBox(height: 3),
                         Text(
-                          'Chốt sổ kỳ',
+                          'Kết thúc chu kỳ',
                           textAlign: TextAlign.end,
                           style: TextStyle(
                             fontSize: 10,
@@ -3032,6 +3052,8 @@ class _EditCycleMilestoneModalState
                       (index) {
                     final day = index + 1;
                     final isSelected = day == _selectedDay;
+                    final appFontFamily =
+                        Theme.of(context).textTheme.bodyMedium?.fontFamily;
 
                     return Center(
                       child: Text(
@@ -3041,7 +3063,7 @@ class _EditCycleMilestoneModalState
                           fontWeight: isSelected
                               ? FontWeight.w900
                               : FontWeight.w700,
-                          fontFamily: 'monospace',
+                          fontFamily: appFontFamily,
                           color: isSelected
                               ? widget.accent.primary
                               : primaryText.withValues(alpha: 0.35),
@@ -3107,9 +3129,7 @@ class _EditCycleMilestoneModalState
 
     AppFeedback.showSuccess(
       context,
-      'Đã lưu mốc chu kỳ Tháng '
-          '${DateFormat('MM/yyyy').format(widget.anchorMonth)}: '
-          'Ngày $_selectedDay',
+      'Chu kỳ tháng ${widget.anchorMonth.month}: bắt đầu ngày $_selectedDay',
     );
 
     Navigator.of(context).pop();
@@ -3118,9 +3138,9 @@ class _EditCycleMilestoneModalState
   @override
   Widget build(BuildContext context) {
     final inheritedLabel =
-        'Áp dụng từ Tháng '
-        '${DateFormat('MM/yyyy').format(widget.anchorMonth)} '
-        '(Tự động kế thừa)';
+        'Áp dụng từ tháng '
+        '${widget.anchorMonth.month} '
+        '• Tự động kế thừa';
 
     return ClipRRect(
       borderRadius:
@@ -3167,7 +3187,7 @@ class _EditCycleMilestoneModalState
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Mốc Chu Kỳ Tài Chính',
+                          'Mốc chu kỳ tài chính',
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w900,
@@ -3222,17 +3242,17 @@ class _EditCycleMilestoneModalState
               Row(
                 children: [
                   _buildPresetButton(
-                    label: 'Mùng 1\nĐầu tháng',
+                    label: 'Đầu tháng\n(Mùng 1)',
                     day: 1,
                   ),
                   const SizedBox(width: 8),
                   _buildPresetButton(
-                    label: '★ Ngày $_salaryPresetDay\nLương',
+                    label: 'Ngày nhận lương\n(Ngày $_salaryPresetDay)',
                     day: _salaryPresetDay,
                   ),
                   const SizedBox(width: 8),
                   _buildPresetButton(
-                    label: 'Ngày 15\nGiữa tháng',
+                    label: 'Giữa tháng\n(Ngày 15)',
                     day: 15,
                   ),
                 ],
@@ -3256,10 +3276,10 @@ class _EditCycleMilestoneModalState
                   ),
                   onPressed: _saveMilestone,
                   child: const Text(
-                    '✓ LƯU MỐC CHU KỲ NÀY',
+                    'Lưu mốc chu kỳ',
                     style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w900,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
                 ),

@@ -19,7 +19,6 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
-import 'dart:ui';
 import 'package:drift/drift.dart' as drift;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -27,7 +26,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../widgets/sliding_segmented_bar.dart';
-import '../core/animation/app_animation_policy.dart';
 import '../core/feedback/app_feedback.dart';
 import '../data/database.dart';
 import '../services/auth_profile_service.dart';
@@ -46,7 +44,7 @@ import 'ledger_screen.dart'
     show
     cycleStartDaysByMonthProvider,
     computeMonthCycleRange,
-    resolveStartDayForMonth,
+    showEditCycleMilestoneSheet,
     CycleMode;
 import 'main_scaffold.dart' show bottomNavIndexProvider;
 import 'vault_auth_screen.dart';
@@ -219,7 +217,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with TickerPr
     );
   }
 
-  /// 🌟 MỞ BOTTOM SHEET MỐC CHU KỲ
+  /// 🌟 MỞ BOTTOM SHEET MỐC CHU KỲ — Dùng chung với Ledger (Haptic Wheel)
   void _openCycleMilestoneModal(
       BuildContext context,
       DateTime currentMonth,
@@ -227,17 +225,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with TickerPr
       AppAccentPreset accent,
       ) {
     HapticFeedback.selectionClick();
-
-    AppAnimationPolicy.showFluidSheet(
+    showEditCycleMilestoneSheet(
       context: context,
-      mode: FluidSheetMode.nestedScrollable,
-      duration: const Duration(milliseconds: 260),
-      reverseDuration: const Duration(milliseconds: 200),
-      builder: (_, __) => _DashboardCycleMilestoneModal(
-        currentMonth: currentMonth,
-        isDark: isDark,
-        accent: accent,
-      ),
+      anchorMonth: currentMonth,
+      isDark: isDark,
+      accent: accent,
     );
   }
 
@@ -993,7 +985,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with TickerPr
                               },
                               borderRadius: BorderRadius.circular(18),
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                                 decoration: BoxDecoration(
                                   color: isDark ? AppTokens.darkCard : Colors.white,
                                   borderRadius: BorderRadius.circular(18),
@@ -1007,10 +999,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with TickerPr
                                     Row(
                                       children: [
                                         Container(
-                                          width: 24,
-                                          height: 24,
+                                          width: 26,
+                                          height: 26,
                                           decoration: BoxDecoration(
-                                            color: AppTokens.income.withValues(alpha: 0.14),
+                                            color: AppTokens.income.withValues(alpha: 0.13),
                                             borderRadius: BorderRadius.circular(8),
                                           ),
                                           child: const Icon(
@@ -1024,7 +1016,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with TickerPr
                                           _isIncomeVisible
                                               ? Icons.visibility_rounded
                                               : Icons.visibility_off_rounded,
-                                          size: 13,
+                                          size: 14,
                                           color: _isIncomeVisible
                                               ? AppTokens.income
                                               : (isDark ? Colors.white30 : Colors.black26),
@@ -1034,26 +1026,31 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with TickerPr
                                     const SizedBox(height: 6),
                                     Text(
                                       'Thu nhập',
-                                      softWrap: true,
+                                      maxLines: 1,
                                       style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w700,
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.w600,
+                                        height: 1.22,
                                         color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
                                       ),
                                     ),
-                                    const SizedBox(height: 8),
-                                    PreservedBalanceTumbler(
-                                      isVisible: _isIncomeVisible,
-                                      realValue: '+${_formatCurrency(totalIncome)}',
-                                      maskedValue: '+•••••• ₫',
-                                      height: 20,
+                                    const SizedBox(height: 6),
+                                    FittedBox(
+                                      fit: BoxFit.scaleDown,
                                       alignment: Alignment.centerLeft,
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w800,
-                                        fontFamily: 'monospace',
-                                        letterSpacing: -0.3,
-                                        color: AppTokens.income,
+                                      child: PreservedBalanceTumbler(
+                                        isVisible: _isIncomeVisible,
+                                        realValue: '+${_formatCurrency(totalIncome)}',
+                                        maskedValue: '+•••••• ₫',
+                                        height: 20,
+                                        alignment: Alignment.centerLeft,
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w800,
+                                          fontFamily: 'monospace',
+                                          letterSpacing: -0.3,
+                                          color: AppTokens.income,
+                                        ),
                                       ),
                                     ),
                                   ],
@@ -1074,7 +1071,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with TickerPr
                               },
                               borderRadius: BorderRadius.circular(18),
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                                 decoration: BoxDecoration(
                                   color: isDark ? AppTokens.darkCard : Colors.white,
                                   borderRadius: BorderRadius.circular(18),
@@ -1088,10 +1085,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with TickerPr
                                     Row(
                                       children: [
                                         Container(
-                                          width: 24,
-                                          height: 24,
+                                          width: 26,
+                                          height: 26,
                                           decoration: BoxDecoration(
-                                            color: AppTokens.expense.withValues(alpha: 0.14),
+                                            color: AppTokens.expense.withValues(alpha: 0.13),
                                             borderRadius: BorderRadius.circular(8),
                                           ),
                                           child: const Icon(
@@ -1105,7 +1102,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with TickerPr
                                           _isExpenseVisible
                                               ? Icons.visibility_rounded
                                               : Icons.visibility_off_rounded,
-                                          size: 13,
+                                          size: 14,
                                           color: _isExpenseVisible
                                               ? AppTokens.expense
                                               : (isDark ? Colors.white30 : Colors.black26),
@@ -1115,26 +1112,31 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with TickerPr
                                     const SizedBox(height: 6),
                                     Text(
                                       'Đã chi',
-                                      softWrap: true,
+                                      maxLines: 1,
                                       style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w700,
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.w600,
+                                        height: 1.22,
                                         color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
                                       ),
                                     ),
-                                    const SizedBox(height: 8),
-                                    PreservedBalanceTumbler(
-                                      isVisible: _isExpenseVisible,
-                                      realValue: '-${_formatCurrency(totalExpense)}',
-                                      maskedValue: '-•••••• ₫',
-                                      height: 20,
+                                    const SizedBox(height: 6),
+                                    FittedBox(
+                                      fit: BoxFit.scaleDown,
                                       alignment: Alignment.centerLeft,
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w800,
-                                        fontFamily: 'monospace',
-                                        letterSpacing: -0.3,
-                                        color: AppTokens.expense,
+                                      child: PreservedBalanceTumbler(
+                                        isVisible: _isExpenseVisible,
+                                        realValue: '-${_formatCurrency(totalExpense)}',
+                                        maskedValue: '-•••••• ₫',
+                                        height: 20,
+                                        alignment: Alignment.centerLeft,
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w800,
+                                          fontFamily: 'monospace',
+                                          letterSpacing: -0.3,
+                                          color: AppTokens.expense,
+                                        ),
                                       ),
                                     ),
                                   ],
@@ -1155,7 +1157,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with TickerPr
                               },
                               borderRadius: BorderRadius.circular(18),
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                                 decoration: BoxDecoration(
                                   color: isDark ? AppTokens.darkCard : Colors.white,
                                   borderRadius: BorderRadius.circular(18),
@@ -1169,17 +1171,17 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with TickerPr
                                     Row(
                                       children: [
                                         Container(
-                                          width: 24,
-                                          height: 24,
+                                          width: 26,
+                                          height: 26,
                                           decoration: BoxDecoration(
                                             color: (isOverspending ? AppTokens.expense : accent.primary)
-                                                .withValues(alpha: 0.14),
+                                                .withValues(alpha: 0.13),
                                             borderRadius: BorderRadius.circular(8),
                                           ),
                                           child: Icon(
                                             Icons.bolt_rounded,
                                             color: isOverspending ? AppTokens.expense : accent.primary,
-                                            size: 15,
+                                            size: 14,
                                           ),
                                         ),
                                         const Spacer(),
@@ -1187,7 +1189,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with TickerPr
                                           _isSpeedVisible
                                               ? Icons.visibility_rounded
                                               : Icons.visibility_off_rounded,
-                                          size: 13,
+                                          size: 14,
                                           color: _isSpeedVisible
                                               ? (isOverspending ? AppTokens.expense : accent.primary)
                                               : (isDark ? Colors.white30 : Colors.black26),
@@ -1197,29 +1199,33 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with TickerPr
                                     const SizedBox(height: 6),
                                     Text(
                                       'Tốc độ tiêu',
-                                      softWrap: true,
+                                      maxLines: 1,
                                       style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w700,
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.w600,
+                                        height: 1.22,
                                         color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
                                       ),
                                     ),
-                                    const SizedBox(height: 8),
-
-                                    PreservedBalanceTumbler(
-                                      isVisible: _isSpeedVisible,
-                                      realValue: '${(budgetConsumedPct * 100).toStringAsFixed(0)}%',
-                                      maskedValue: '•• %',
-                                      height: 20,
+                                    const SizedBox(height: 6),
+                                    FittedBox(
+                                      fit: BoxFit.scaleDown,
                                       alignment: Alignment.centerLeft,
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w800,
-                                        fontFamily: 'monospace',
-                                        letterSpacing: -0.3,
-                                        color: isOverspending
-                                            ? AppTokens.expense
-                                            : (isDark ? AppTokens.darkText : AppTokens.lightText),
+                                      child: PreservedBalanceTumbler(
+                                        isVisible: _isSpeedVisible,
+                                        realValue: '${(budgetConsumedPct * 100).toStringAsFixed(0)}%',
+                                        maskedValue: '•••• %',
+                                        height: 20,
+                                        alignment: Alignment.centerLeft,
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w800,
+                                          fontFamily: 'monospace',
+                                          letterSpacing: -0.3,
+                                          color: isOverspending
+                                              ? AppTokens.expense
+                                              : (isDark ? AppTokens.darkText : AppTokens.lightText),
+                                        ),
                                       ),
                                     ),
                                   ],
@@ -1466,327 +1472,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with TickerPr
                 ),
 
                 const SliverToBoxAdapter(child: SizedBox(height: 96)),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ==============================================================================
-// MODAL CHỈNH SỬA MỐC CHU KỲ TRỰC TIẾP TRÊN DASHBOARD
-// ==============================================================================
-
-class _DashboardCycleMilestoneModal extends ConsumerStatefulWidget {
-  final DateTime currentMonth;
-  final bool isDark;
-  final AppAccentPreset accent;
-
-  const _DashboardCycleMilestoneModal({
-    required this.currentMonth,
-    required this.isDark,
-    required this.accent,
-  });
-
-  @override
-  ConsumerState<_DashboardCycleMilestoneModal> createState() =>
-      _DashboardCycleMilestoneModalState();
-}
-
-class _DashboardCycleMilestoneModalState extends ConsumerState<_DashboardCycleMilestoneModal> {
-  late int _selectedDay;
-
-  @override
-  void initState() {
-    super.initState();
-    final store = ref.read(cycleStartDaysByMonthProvider);
-    _selectedDay = resolveStartDayForMonth(widget.currentMonth, store);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final store = ref.watch(cycleStartDaysByMonthProvider);
-    final monthKey = DateFormat('yyyy-MM').format(widget.currentMonth);
-
-    final daysInCurMonth = DateTime(widget.currentMonth.year, widget.currentMonth.month + 1, 0).day;
-    final tempStore = Map<String, int>.from(store)..[monthKey] = _selectedDay;
-    final previewRange = computeMonthCycleRange(widget.currentMonth, tempStore);
-
-    final startStr = DateFormat('dd/MM').format(previewRange.startDate);
-    final endStr = DateFormat('dd/MM').format(previewRange.endDate);
-    final previewText = '$startStr – $endStr • ${previewRange.daysCount} ngày';
-
-    final chips = [
-      {'label': 'Đầu tháng', 'day': 1},
-      {'label': 'Ngày 5', 'day': 5},
-      {'label': 'Ngày 10', 'day': 10},
-      {'label': 'Ngày 15', 'day': 15},
-      {'label': 'Ngày 20', 'day': 20},
-      {'label': 'Ngày 25', 'day': 25},
-    ];
-
-    return ClipRRect(
-      borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-          decoration: BoxDecoration(
-            color: widget.isDark
-                ? const Color(0xFF151C28).withValues(alpha: 0.96)
-                : Colors.white.withValues(alpha: 0.98),
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-            border: Border.all(
-              color: widget.isDark ? AppTokens.darkBorder : AppTokens.lightBorder,
-            ),
-          ),
-          child: SafeArea(
-            top: false,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 42,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: widget.isDark ? Colors.white24 : Colors.black26,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                Text(
-                  'Chu kỳ tháng ${widget.currentMonth.month}',
-                  style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w800,
-                    color: widget.isDark ? AppTokens.darkText : AppTokens.lightText,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Chọn ngày nhận lương hoặc mốc bắt đầu tính toán tài chính trong tháng.',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: widget.isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        widget.accent.primary.withValues(alpha: 0.16),
-                        widget.accent.primary.withValues(alpha: 0.04),
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: widget.accent.primary.withValues(alpha: 0.3),
-                    ),
-                  ),
-                  child: Column(
-                    children: [
-                      Text(
-                        'NGÀY BẮT ĐẦU CHU KỲ',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 1.2,
-                          color: widget.accent.primary,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        'Ngày $_selectedDay',
-                        style: TextStyle(
-                          fontSize: 32,
-                          fontWeight: FontWeight.w900,
-                          color: widget.isDark ? AppTokens.darkText : AppTokens.lightText,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Cố định mốc tính toán ngân sách',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: widget.isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                Text(
-                  'Chọn nhanh mốc phổ biến',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: widget.isDark ? AppTokens.darkText : AppTokens.lightText,
-                  ),
-                ),
-                const SizedBox(height: 8),
-
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  physics: const BouncingScrollPhysics(),
-                  child: Row(
-                    children: chips.map((chip) {
-                      final day = chip['day'] as int;
-                      final label = chip['label'] as String;
-                      final isSelected = _selectedDay == day;
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 8.0),
-                        child: InkWell(
-                          onTap: () {
-                            HapticFeedback.selectionClick();
-                            setState(() => _selectedDay = day);
-                          },
-                          borderRadius: BorderRadius.circular(12),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: isSelected
-                                  ? widget.accent.primary
-                                  : (widget.isDark ? AppTokens.darkCard : AppTokens.lightCardSubtle),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: isSelected
-                                    ? widget.accent.primary
-                                    : (widget.isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
-                              ),
-                            ),
-                            child: Text(
-                              label,
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                                color: isSelected
-                                    ? Colors.white
-                                    : (widget.isDark ? AppTokens.darkText : AppTokens.lightText),
-                              ),
-                            ),
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ),
-                const SizedBox(height: 14),
-
-                // ── Cycle preview pill (dd/MM – dd/MM • X ngày) ──
-                Center(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: widget.accent.primary.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(999),
-                      border: Border.all(
-                        color: widget.accent.primary.withValues(alpha: 0.28),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.calendar_today_rounded,
-                          size: 13,
-                          color: widget.accent.primary,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          previewText,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            fontFamily: 'monospace',
-                            letterSpacing: -0.2,
-                            color: widget.isDark ? AppTokens.darkText : AppTokens.lightText,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 4),
-
-                // ── Modernized Slider ──
-                SliderTheme(
-                  data: SliderTheme.of(context).copyWith(
-                    activeTrackColor: widget.accent.primary,
-                    inactiveTrackColor: widget.isDark
-                        ? Colors.white.withValues(alpha: 0.12)
-                        : Colors.black.withValues(alpha: 0.10),
-                    thumbColor: widget.accent.primary,
-                    overlayColor: widget.accent.primary.withValues(alpha: 0.18),
-                    trackHeight: 5.0,
-                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 10),
-                    overlayShape: const RoundSliderOverlayShape(overlayRadius: 22),
-                    valueIndicatorShape: const PaddleSliderValueIndicatorShape(),
-                    valueIndicatorColor: widget.accent.primary,
-                    valueIndicatorTextStyle: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  child: Slider(
-                    value: _selectedDay.toDouble().clamp(1.0, daysInCurMonth.toDouble()),
-                    min: 1.0,
-                    max: daysInCurMonth.toDouble(),
-                    divisions: daysInCurMonth - 1,
-                    label: 'Ngày $_selectedDay',
-                    onChanged: (val) {
-                      final newDay = val.round();
-                      if (newDay != _selectedDay) {
-                        HapticFeedback.selectionClick();
-                        setState(() => _selectedDay = newDay);
-                      }
-                    },
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // ── CTA Button ──
-                SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: widget.accent.primary,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                      elevation: 2,
-                    ),
-                    onPressed: () {
-                      HapticFeedback.mediumImpact();
-                      ref.read(cycleStartDaysByMonthProvider.notifier).update((state) {
-                        return Map<String, int>.from(state)..[monthKey] = _selectedDay;
-                      });
-                      AppFeedback.showSuccess(
-                        context,
-                        'Chu kỳ tháng ${widget.currentMonth.month}: bắt đầu ngày $_selectedDay',
-                        emitHaptic: false,
-                      );
-                      Navigator.of(context).pop();
-                    },
-                    child: const Text(
-                      'Lưu chu kỳ',
-                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
-                    ),
-                  ),
-                ),
               ],
             ),
           ),

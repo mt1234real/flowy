@@ -512,7 +512,7 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
                   child: FittedBox(
                     fit: BoxFit.scaleDown,
                     child: Text(
-                      isGreen ? 'Ghi chép giao dịch ngay' : 'Vẫn mua (Dàn đều các ngày)',
+                      isGreen ? 'Ghi chép giao dịch ngay' : 'Vẫn mua (chia đều các ngày)',
                       style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
                     ),
                   ),
@@ -529,10 +529,10 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
     String text = 'Mua được!';
     Color color = const Color(0xFF10B981);
     if (isYellow) {
-      text = 'Cân nhắc thêm: Sẽ giảm hạn mức các ngày tới';
-      color = const Color(0xFFF59E0B);
+      text = 'Dễ thở nhất';
+      color = const Color(0xFF10B981); // xanh ngọc: an toàn nhất trong ngưỡng vàng
     } else if (isRed) {
-      text = 'Vượt ngân sách chu kỳ';
+      text = 'Bù nhanh';
       color = const Color(0xFFF43F5E);
     }
 

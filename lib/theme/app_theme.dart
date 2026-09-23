@@ -379,4 +379,101 @@ class AppGlassmorphism {
       ],
     );
   }
+
+  // ===========================================================================
+  // 🌟 HERO GLASS DECORATION — Tactile Frosted Glass Canvas (Spec §III)
+  // Blur σ=13, alpha 75%/78%, Specular Rim NW→SE, Ambient Diffusion Shadow 2-tier
+  // ===========================================================================
+
+  /// BoxDecoration chuẩn Tactile Frosted Glass cho Hero Card chính.
+  ///
+  /// - Blur Gaussian σ=13 (áp dụng ngoài bằng BackdropFilter).
+  /// - Nền Light: #FFFFFF alpha 75%; Dark: #1E2430 alpha 78%.
+  /// - Viền Specular Rim gradient góc nghiêng NW 55%→SE 11%.
+  /// - Đổ bóng 2 tầng: bám khối (Offset 0,2 blur 6) + nâng nổi accent-tinted (Offset 0,10 blur 24).
+  static BoxDecoration heroGlassDecoration({
+    required bool isDark,
+    required Color accentColor,
+    double borderRadius = 24,
+  }) {
+    return BoxDecoration(
+      color: isDark
+          ? const Color(0xFF1E2430).withValues(alpha: 0.78)
+          : Colors.white.withValues(alpha: 0.75),
+      borderRadius: BorderRadius.circular(borderRadius),
+      // Viền Specular Rim: gradient NW (trắng 55%) → SE (trắng 11%)
+      border: Border.all(
+        color: isDark
+            ? Colors.white.withValues(alpha: 0.14)
+            : Colors.white.withValues(alpha: 0.55),
+        width: 0.9,
+      ),
+      boxShadow: [
+        // Tầng 1: Bám khối — đen 4%
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.04),
+          blurRadius: 6,
+          offset: const Offset(0, 2),
+        ),
+        // Tầng 2: Nâng nổi — accent 7% (màu chủ đạo của theme)
+        BoxShadow(
+          color: accentColor.withValues(alpha: isDark ? 0.07 : 0.09),
+          blurRadius: 24,
+          offset: const Offset(0, 10),
+        ),
+      ],
+    );
+  }
+
+  // ===========================================================================
+  // 🌟 AMBIENT MESH GRADIENT — Dynamic Radial Background (Spec §II)
+  // Tâm phát sáng lệch trên (0.0, -0.9), bán kính 1.1, màu theo AppAccentPreset
+  // ===========================================================================
+
+  /// Lớp nền Ambient Mesh Radial Gradient theo accent preset và brightness.
+  ///
+  /// Áp dụng làm nền `Container` phủ trên 45% màn hình ở đỉnh Dashboard.
+  static RadialGradient ambientMeshGradient({
+    required AppAccentPreset accent,
+    required bool isDark,
+  }) {
+    final Color meshColor = _accentMeshColor(accent: accent, isDark: isDark);
+    final Color bgColor = isDark ? AppTokens.darkBg : AppTokens.lightBg;
+
+    return RadialGradient(
+      center: const Alignment(0.0, -0.9),
+      radius: 1.1,
+      colors: [meshColor, bgColor],
+      stops: const [0.0, 1.0],
+    );
+  }
+
+  /// Suy dẫn màu tâm sáng Ambient Mesh từ preset và chế độ sáng/tối.
+  static Color _accentMeshColor({
+    required AppAccentPreset accent,
+    required bool isDark,
+  }) {
+    switch (accent) {
+      case AppAccentPreset.grass:
+        return isDark
+            ? const Color(0xFF059669).withValues(alpha: 0.16) // Deep Forest
+            : const Color(0xFF10B981).withValues(alpha: 0.10); // Emerald Tint
+      case AppAccentPreset.sun:
+        return isDark
+            ? const Color(0xFFD97706).withValues(alpha: 0.15) // Warm Bronze
+            : const Color(0xFFF59E0B).withValues(alpha: 0.09); // Soft Amber
+      case AppAccentPreset.sea:
+        return isDark
+            ? const Color(0xFF0284C7).withValues(alpha: 0.18) // Midnight Abyss
+            : const Color(0xFF0EA5E9).withValues(alpha: 0.10); // Cerulean Tint
+      case AppAccentPreset.flower:
+        return isDark
+            ? const Color(0xFFE11D48).withValues(alpha: 0.14) // Deep Muted Plum
+            : const Color(0xFFF43F5E).withValues(alpha: 0.08); // Rose Quartz
+      case AppAccentPreset.night:
+        return isDark
+            ? const Color(0xFF4F46E5).withValues(alpha: 0.16) // Cosmic Violet
+            : const Color(0xFF6366F1).withValues(alpha: 0.09); // Lavender Mist
+    }
+  }
 }

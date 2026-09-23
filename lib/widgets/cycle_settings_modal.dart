@@ -1,9 +1,9 @@
 // ==============================================================================
 // File: lib/widgets/cycle_settings_modal.dart
-// Architecture: Financial Cycle Configuration Modal with Live Dynamic Preview
+// Architecture: Financial Cycle Configuration Modal with Drum Wheel Picker
 // Stack: flutter_riverpod, intl
-// Features: Salary Day Quick-Chips, 1-31 Interactive Slider, Real-time Cycle
-//           Recalculation, Days Remaining Counter, Dual-Mode Contrast & Haptics
+// Features: Salary Day Quick-Chips, Drum Wheel 1-31, Real-time Cycle Preview,
+//           Days Remaining Counter, Haptic per tick, System Font Inheritance
 // ==============================================================================
 
 import 'dart:ui';
@@ -13,6 +13,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../core/animation/app_animation_policy.dart';
+import '../core/feedback/app_feedback.dart';
 import '../theme/app_theme.dart';
 
 // StateProvider quản lý ngày bắt đầu chu kỳ tài chính mỗi tháng (Mặc định: ngày 10)
@@ -50,11 +51,21 @@ class CycleSettingsModal extends ConsumerStatefulWidget {
 
 class _CycleSettingsModalState extends ConsumerState<CycleSettingsModal> {
   late int _selectedStartDay;
+  late FixedExtentScrollController _wheelController;
 
   @override
   void initState() {
     super.initState();
     _selectedStartDay = ref.read(financialCycleStartDayProvider);
+    _wheelController = FixedExtentScrollController(
+      initialItem: _selectedStartDay - 1, // 0-indexed
+    );
+  }
+
+  @override
+  void dispose() {
+    _wheelController.dispose();
+    super.dispose();
   }
 
   // Thuật toán tính toán chu kỳ tài chính thực tế theo ngày bắt đầu
@@ -96,6 +107,8 @@ class _CycleSettingsModalState extends ConsumerState<CycleSettingsModal> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final accent = ref.watch(accentPresetProvider);
     final cycleResult = _calculateCycleRange(_selectedStartDay);
+    // Kế thừa fontFamily từ Theme hệ thống
+    final systemFont = Theme.of(context).textTheme.bodyMedium?.fontFamily;
 
     final dateFormat = DateFormat('dd/MM/yyyy');
     final formattedRange =
@@ -140,7 +153,7 @@ class _CycleSettingsModalState extends ConsumerState<CycleSettingsModal> {
 
                   const SizedBox(height: 14),
 
-                  // 2. Modal Header
+                  // 2. Modal Header — microcopy cập nhật
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -148,7 +161,7 @@ class _CycleSettingsModalState extends ConsumerState<CycleSettingsModal> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Cài đặt Chu kỳ Tài chính',
+                            'Mốc chu kỳ tài chính',
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w800,
@@ -157,7 +170,7 @@ class _CycleSettingsModalState extends ConsumerState<CycleSettingsModal> {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            'Chọn ngày nhận lương / ngày bắt đầu chu kỳ',
+                            'Chọn ngày bắt đầu chu kỳ hàng tháng',
                             style: TextStyle(
                               fontSize: 11,
                               color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
@@ -186,9 +199,9 @@ class _CycleSettingsModalState extends ConsumerState<CycleSettingsModal> {
 
                   const SizedBox(height: 14),
 
-                  // 3. Salary Quick-Preset Chips (Ngày 01, 05, 10, 15, 20, 25)
+                  // 3. Salary Quick-Preset Chips — microcopy cập nhật
                   Text(
-                    'GỢI Ý NGÀY NHẬN LƯƠNG TIÊU CHUẨN',
+                    'NGÀY BẮT ĐẦU PHỔ BIẾN',
                     style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w700,
@@ -207,6 +220,11 @@ class _CycleSettingsModalState extends ConsumerState<CycleSettingsModal> {
                         onTap: () {
                           HapticFeedback.selectionClick();
                           setState(() => _selectedStartDay = day);
+                          _wheelController.animateToItem(
+                            day - 1,
+                            duration: const Duration(milliseconds: 280),
+                            curve: Curves.easeOutCubic,
+                          );
                         },
                         borderRadius: BorderRadius.circular(14),
                         child: AnimatedContainer(
@@ -250,49 +268,93 @@ class _CycleSettingsModalState extends ConsumerState<CycleSettingsModal> {
 
                   const SizedBox(height: 20),
 
-                  // 4. Center Day Display & Interactive Slider (1 - 31)
+                  // 4. Drum Wheel Picker 1-31 — thay Slider cũ
                   Center(
-                    child: Column(
+                    child: Text(
+                      'Bắt đầu vào Ngày ${_selectedStartDay.toString().padLeft(2, '0')} hàng tháng',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Drum wheel container với khung kính giữa
+                  SizedBox(
+                    height: 180,
+                    child: Stack(
+                      alignment: Alignment.center,
                       children: [
-                        RichText(
-                          text: TextSpan(
-                            style: TextStyle(
-                              fontSize: 15,
-                              color: isDark ? AppTokens.darkText : AppTokens.lightText,
+                        // Khung kính nổi bật item đang chọn
+                        Container(
+                          height: 52,
+                          margin: const EdgeInsets.symmetric(horizontal: 40),
+                          decoration: BoxDecoration(
+                            color: accent.primary.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: accent.primary.withValues(alpha: 0.40),
+                              width: 1.4,
                             ),
-                            children: [
-                              const TextSpan(text: 'Bắt đầu vào '),
-                              TextSpan(
-                                text: 'Ngày ${_selectedStartDay.toString().padLeft(2, '0')}',
-                                style: TextStyle(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.w900,
-                                  fontFamily: 'monospace',
-                                  color: accent.primary,
-                                ),
-                              ),
-                              const TextSpan(text: ' hàng tháng'),
-                            ],
                           ),
                         ),
-                        const SizedBox(height: 6),
-                        SliderTheme(
-                          data: SliderTheme.of(context).copyWith(
-                            activeTrackColor: accent.primary,
-                            inactiveTrackColor: isDark ? Colors.white12 : Colors.black12,
-                            thumbColor: accent.primary,
-                            overlayColor: accent.primary.withValues(alpha: 0.2),
-                            trackHeight: 6,
+                        // Fade mask top & bottom
+                        IgnorePointer(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  (isDark ? const Color(0xFF151C28) : Colors.white).withValues(alpha: 0.82),
+                                  Colors.transparent,
+                                  Colors.transparent,
+                                  (isDark ? const Color(0xFF151C28) : Colors.white).withValues(alpha: 0.82),
+                                ],
+                                stops: const [0.0, 0.28, 0.72, 1.0],
+                              ),
+                            ),
                           ),
-                          child: Slider(
-                            value: _selectedStartDay.toDouble(),
-                            min: 1,
-                            max: 31,
-                            divisions: 30,
-                            label: 'Ngày $_selectedStartDay',
-                            onChanged: (val) {
-                              HapticFeedback.selectionClick();
-                              setState(() => _selectedStartDay = val.round());
+                        ),
+                        // ListWheelScrollView
+                        ListWheelScrollView.useDelegate(
+                          controller: _wheelController,
+                          itemExtent: 52,
+                          diameterRatio: 1.6,
+                          perspective: 0.003,
+                          physics: const FixedExtentScrollPhysics(),
+                          onSelectedItemChanged: (index) {
+                            HapticFeedback.selectionClick();
+                            setState(() => _selectedStartDay = index + 1);
+                          },
+                          childDelegate: ListWheelChildBuilderDelegate(
+                            childCount: 31,
+                            builder: (context, index) {
+                              final day = index + 1;
+                              final isSelected = _selectedStartDay == day;
+                              final distance = (day - _selectedStartDay).abs();
+                              final opacity = isSelected
+                                  ? 1.0
+                                  : (distance == 1 ? 0.55 : 0.28);
+
+                              return Center(
+                                child: AnimatedDefaultTextStyle(
+                                  duration: const Duration(milliseconds: 140),
+                                  style: TextStyle(
+                                    fontFamily: systemFont,
+                                    fontSize: isSelected ? 34 : 18,
+                                    fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
+                                    color: isSelected
+                                        ? accent.primary
+                                        : (isDark ? AppTokens.darkText : AppTokens.lightText)
+                                            .withValues(alpha: opacity),
+                                    letterSpacing: isSelected ? -0.5 : 0,
+                                  ),
+                                  child: Text(day.toString().padLeft(2, '0')),
+                                ),
+                              );
                             },
                           ),
                         ),
@@ -351,7 +413,7 @@ class _CycleSettingsModalState extends ConsumerState<CycleSettingsModal> {
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w900,
-                            fontFamily: 'monospace',
+                            fontFamily: systemFont,
                             color: isDark ? AppTokens.darkText : AppTokens.lightText,
                           ),
                         ),
@@ -369,7 +431,7 @@ class _CycleSettingsModalState extends ConsumerState<CycleSettingsModal> {
 
                   const SizedBox(height: 20),
 
-                  // 6. Persistence & Action CTA Button
+                  // 6. Persistence & Action CTA Button — microcopy cập nhật
                   SizedBox(
                     width: double.infinity,
                     height: 52,
@@ -387,21 +449,18 @@ class _CycleSettingsModalState extends ConsumerState<CycleSettingsModal> {
 
                         Navigator.of(context).pop();
 
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            behavior: SnackBarBehavior.floating,
-                            backgroundColor: AppTokens.income,
-                            content: Text(
-                              'Đã áp dụng chu kỳ tài chính từ Ngày ${_selectedStartDay.toString().padLeft(2, '0')} hàng tháng',
-                              style: const TextStyle(fontWeight: FontWeight.w700),
-                            ),
-                          ),
+                        // AppFeedback thay vì ScaffoldMessenger.showSnackBar
+                        AppFeedback.showSuccess(
+                          context,
+                          'Đã áp dụng chu kỳ từ Ngày ${_selectedStartDay.toString().padLeft(2, '0')} hàng tháng',
+                          emitHaptic: false,
+                          icon: Icons.check_circle_outline_rounded,
                         );
                       },
                       child: const FittedBox(
                         fit: BoxFit.scaleDown,
                         child: Text(
-                          '✓ Áp Dụng Chu Kỳ Này',
+                          '✓  Áp dụng chu kỳ này',
                           style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
                         ),
                       ),
