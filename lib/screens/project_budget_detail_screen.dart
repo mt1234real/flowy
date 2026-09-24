@@ -22,6 +22,7 @@ import '../core/animation/app_animation_policy.dart';
 import '../core/feedback/app_feedback.dart';
 import '../data/database.dart';
 import '../theme/app_theme.dart';
+import '../widgets/currency_text.dart';
 import '../widgets/category_icon_badge.dart';
 import '../widgets/quick_entry_sheet.dart';
 
@@ -332,12 +333,11 @@ class ProjectBudgetDetailScreen extends ConsumerWidget {
                         const SizedBox(height: 6),
                         Text(
                           _formatCurrency(project.targetAmount),
-                          style: const TextStyle(
+                          style: currencyTextStyle(context, const TextStyle(
                             fontSize: 26,
                             fontWeight: FontWeight.w900,
-                            fontFamily: 'monospace',
                             color: Colors.white,
-                          ),
+                          )),
                         ),
                         const SizedBox(height: 14),
                         Stack(
@@ -365,11 +365,11 @@ class ProjectBudgetDetailScreen extends ConsumerWidget {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(
+                            CurrencyText(
                               'Đã chi: ${_formatCurrency(totalSpent)} (${(spendRatio * 100).toStringAsFixed(0)}%)',
                               style: const TextStyle(fontSize: 12, color: Colors.white70),
                             ),
-                            Text(
+                            CurrencyText(
                               isOver ? 'Vượt: ${_formatCurrency(remaining.abs())}' : 'Còn: ${_formatCurrency(remaining)}',
                               style: TextStyle(
                                 fontSize: 12,
@@ -465,12 +465,11 @@ class ProjectBudgetDetailScreen extends ConsumerWidget {
                                 fit: BoxFit.scaleDown,
                                 child: Text(
                                   '${_formatCurrency(safeToSpendDaily)}/ngày',
-                                  style: const TextStyle(
+                                  style: currencyTextStyle(context, const TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w900,
-                                    fontFamily: 'monospace',
                                     color: Color(0xFF10B981),
-                                  ),
+                                  )),
                                 ),
                               ),
                               const SizedBox(height: 2),
@@ -532,12 +531,11 @@ class ProjectBudgetDetailScreen extends ConsumerWidget {
                                         ),
                                       ),
                                     ),
-                                    Text(
+                                    CurrencyText(
                                       '${_formatCurrency(item.amount)} (${(item.percentage * 100).toStringAsFixed(0)}%)',
                                       style: TextStyle(
                                         fontSize: 12,
                                         fontWeight: FontWeight.w700,
-                                        fontFamily: 'monospace',
                                         color: isDark ? AppTokens.darkText : AppTokens.lightText,
                                       ),
                                     ),
@@ -702,12 +700,11 @@ class ProjectBudgetDetailScreen extends ConsumerWidget {
                                   ),
                                   Text(
                                     '-${_formatCurrency(tx.amount)}',
-                                    style: const TextStyle(
+                                    style: currencyTextStyle(context, const TextStyle(
                                       fontSize: 13,
                                       fontWeight: FontWeight.w800,
-                                      fontFamily: 'monospace',
                                       color: AppTokens.expense,
-                                    ),
+                                    )),
                                   ),
                                 ],
                               ),

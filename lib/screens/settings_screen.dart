@@ -487,7 +487,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         style: TextStyle(
           fontSize: 22,
           fontWeight: FontWeight.w900,
-          fontFamily: 'monospace',
           color: color,
         ),
       ),
@@ -500,6 +499,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final currentThemeMode = ref.watch(themeModeProvider);
     final currentAccent = ref.watch(accentPresetProvider);
     final currentFont = ref.watch(fontFamilyProvider);
+    final currencyFont = ref.watch(currencyFontProvider);
     final userProfile = ref.watch(currentUserProfileProvider);
     final backupState = ref.watch(cloudBackupNotifierProvider);
     final db = ref.watch(databaseProvider);
@@ -948,6 +948,40 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     HapticFeedback.selectionClick();
                     ref.read(fontFamilyProvider.notifier).setFontFamily(name);
                   },
+                ),
+                const SizedBox(height: 24),
+
+                _buildSectionHeader('FONT TIỀN TỆ', isDark),
+                const SizedBox(height: 8),
+                Text('Chọn kiểu chữ riêng cho số tiền. Các nhãn vẫn dùng font ứng dụng.',
+                  style: TextStyle(fontSize: 12, color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted)),
+                const SizedBox(height: 10),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: isDark ? AppTokens.darkCard : Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    const Text('Xem trước', style: TextStyle(fontSize: 11)),
+                    const SizedBox(height: 6),
+                    FittedBox(fit: BoxFit.scaleDown, child: Text('12.345.678 ₫',
+                      style: currencyTextStyle(context, TextStyle(fontSize: 26, fontWeight: FontWeight.w800,
+                        color: isDark ? AppTokens.darkText : AppTokens.lightText), family: currencyFont))),
+                    const SizedBox(height: 12),
+                    Wrap(spacing: 8, runSpacing: 8, children: [
+                      for (final family in kCurrencyFontChoices)
+                        ChoiceChip(
+                          label: Text(family == kCurrencyFontFollowApp ? 'Theo font ứng dụng' : family == 'monospace' ? 'Monospace' : family),
+                          selected: currencyFont == family,
+                          onSelected: (_) {
+                            HapticFeedback.selectionClick();
+                            ref.read(currencyFontProvider.notifier).setFont(family);
+                          },
+                        ),
+                    ]),
+                  ]),
                 ),
                 const SizedBox(height: 24),
 

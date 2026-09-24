@@ -26,6 +26,7 @@ import '../core/feedback/app_feedback.dart';
 import '../data/daos/debt_dao.dart';
 import '../data/database.dart';
 import '../theme/app_theme.dart';
+import '../widgets/currency_text.dart';
 import '../widgets/debt_contact_avatar_picker.dart';
 import '../widgets/quick_entry_sheet.dart';
 import 'contact_ledger_screen.dart';
@@ -166,7 +167,7 @@ class _DebtDashboardScreenState extends ConsumerState<DebtDashboardScreen> {
               Text('Không thể xóa hồ sơ', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
             ],
           ),
-          content: Text(
+          content: CurrencyText(
             'Đối tượng "${contact.name}" vẫn còn khoản nợ chưa tất toán (${_formatCurrency(contact.netBalance.abs())}).\n\nVui lòng tất toán số dư về 0 ₫ trước khi xóa hồ sơ.',
             style: const TextStyle(fontSize: 13, height: 1.5),
           ),
@@ -587,13 +588,12 @@ class _DebtDashboardScreenState extends ConsumerState<DebtDashboardScreen> {
             fit: BoxFit.scaleDown,
             child: Text(
               '${netPositive ? '+' : ''}${_formatCurrency(summary.netWorthAdjustment)}',
-              style: TextStyle(
+              style: currencyTextStyle(context, TextStyle(
                 fontSize: 26,
                 fontWeight: FontWeight.w900,
-                fontFamily: 'monospace',
                 letterSpacing: -0.5,
                 color: netPositive ? const Color(0xFF10B981) : const Color(0xFFF43F5E),
-              ),
+              )),
             ),
           ),
           const SizedBox(height: 12),
@@ -628,12 +628,11 @@ class _DebtDashboardScreenState extends ConsumerState<DebtDashboardScreen> {
                     const SizedBox(height: 4),
                     Text(
                       _formatCurrency(summary.totalReceivable),
-                      style: const TextStyle(
+                      style: currencyTextStyle(context, const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w800,
-                        fontFamily: 'monospace',
                         color: Color(0xFF10B981),
-                      ),
+                      )),
                     ),
                   ],
                 ),
@@ -667,12 +666,11 @@ class _DebtDashboardScreenState extends ConsumerState<DebtDashboardScreen> {
                     const SizedBox(height: 4),
                     Text(
                       _formatCurrency(summary.totalPayable),
-                      style: const TextStyle(
+                      style: currencyTextStyle(context, const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w800,
-                        fontFamily: 'monospace',
                         color: Color(0xFFF43F5E),
-                      ),
+                      )),
                     ),
                   ],
                 ),
@@ -904,12 +902,11 @@ class _DebtDashboardScreenState extends ConsumerState<DebtDashboardScreen> {
                         hasDebt
                             ? '${isReceivable ? '+' : '-'}${_formatCurrency(contact.netBalance.abs())}'
                             : '0 ₫',
-                        style: TextStyle(
+                        style: currencyTextStyle(context, TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w800,
-                          fontFamily: 'monospace',
                           color: contactColor,
-                        ),
+                        )),
                       ),
                       Text(
                         hasDebt

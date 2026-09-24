@@ -292,12 +292,11 @@ class _AuditBalanceModalState extends ConsumerState<AuditBalanceModal> {
                               ),
                               Text(
                                 _formatCurrency(widget.wallet.balance),
-                                style: TextStyle(
+                                style: currencyTextStyle(context, TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w700,
-                                  fontFamily: 'monospace',
                                   color: isDark ? AppTokens.darkText : AppTokens.lightText,
-                                ),
+                                )),
                               ),
                             ],
                           ),
@@ -315,12 +314,11 @@ class _AuditBalanceModalState extends ConsumerState<AuditBalanceModal> {
                               ),
                               Text(
                                 _formatCurrency(_realBalance),
-                                style: TextStyle(
+                                style: currencyTextStyle(context, TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w900,
-                                  fontFamily: 'monospace',
                                   color: accent.primary,
-                                ),
+                                )),
                               ),
                             ],
                           ),
@@ -344,12 +342,11 @@ class _AuditBalanceModalState extends ConsumerState<AuditBalanceModal> {
                               ),
                               Text(
                                 deltaLabel,
-                                style: TextStyle(
+                                style: currencyTextStyle(context, TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w800,
-                                  fontFamily: 'monospace',
                                   color: deltaColor,
-                                ),
+                                )),
                               ),
                             ],
                           ),
@@ -521,7 +518,6 @@ class _AuditBalanceModalState extends ConsumerState<AuditBalanceModal> {
                           style: TextStyle(
                             fontSize: isSpecial ? 15 : 18,
                             fontWeight: FontWeight.bold,
-                            fontFamily: isSpecial ? null : 'monospace',
                             color: isSpecial
                                 ? (key == 'C' ? AppTokens.expense : (isDark ? AppTokens.darkMuted : AppTokens.lightMuted))
                                 : (isDark ? AppTokens.darkText : AppTokens.lightText),

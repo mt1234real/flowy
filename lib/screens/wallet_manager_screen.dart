@@ -24,6 +24,7 @@ import '../core/animation/app_animation_policy.dart';
 import '../core/feedback/app_feedback.dart';
 import '../data/database.dart';
 import '../theme/app_theme.dart';
+import '../widgets/currency_text.dart';
 import '../widgets/internal_transfer_sheet.dart';
 
 // StreamProvider lấy toàn bộ danh sách ví bao gồm cả ví lưu trữ
@@ -210,12 +211,11 @@ class _WalletManagerScreenState extends ConsumerState<WalletManagerScreen> {
                                   ),
                                   Text(
                                     _formatCurrency(wallet.balance),
-                                    style: TextStyle(
+                                    style: currencyTextStyle(context, TextStyle(
                                       fontSize: 13,
                                       fontWeight: FontWeight.w700,
-                                      fontFamily: 'monospace',
                                       color: isDark ? AppTokens.darkText : AppTokens.lightText,
-                                    ),
+                                    )),
                                   ),
                                 ],
                               ),
@@ -233,14 +233,13 @@ class _WalletManagerScreenState extends ConsumerState<WalletManagerScreen> {
                                   ),
                                   Text(
                                     '${calculatedDelta >= 0 ? '+' : ''}${_formatCurrency(calculatedDelta)}',
-                                    style: TextStyle(
+                                    style: currencyTextStyle(context, TextStyle(
                                       fontSize: 14,
                                       fontWeight: FontWeight.w800,
-                                      fontFamily: 'monospace',
                                       color: calculatedDelta == 0
                                           ? (isDark ? AppTokens.darkMuted : AppTokens.lightMuted)
                                           : (calculatedDelta > 0 ? AppTokens.income : AppTokens.expense),
-                                    ),
+                                    )),
                                   ),
                                 ],
                               ),
@@ -256,7 +255,6 @@ class _WalletManagerScreenState extends ConsumerState<WalletManagerScreen> {
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w800,
-                            fontFamily: 'monospace',
                             color: accent.primary,
                           ),
                           decoration: InputDecoration(
@@ -427,7 +425,7 @@ class _WalletManagerScreenState extends ConsumerState<WalletManagerScreen> {
                             const Icon(Icons.info_outline_rounded, color: AppTokens.expense, size: 16),
                             const SizedBox(width: 8),
                             Expanded(
-                              child: Text(
+                              child: CurrencyText(
                                 'Số dư ví hiện tại là ${_formatCurrency(wallet.balance)}. Hãy chuyển hết tiền hoặc kiểm kê về 0 ₫ trước khi lưu trữ.',
                                 style: const TextStyle(
                                   fontSize: 11,
@@ -685,7 +683,6 @@ class _WalletManagerScreenState extends ConsumerState<WalletManagerScreen> {
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w800,
-                                fontFamily: 'monospace',
                                 color: accent.primary,
                               ),
                               decoration: InputDecoration(
@@ -735,7 +732,6 @@ class _WalletManagerScreenState extends ConsumerState<WalletManagerScreen> {
                                     keyboardType: TextInputType.number,
                                     style: TextStyle(
                                       fontSize: 14,
-                                      fontFamily: 'monospace',
                                       color: isDark ? AppTokens.darkText : AppTokens.lightText,
                                     ),
                                     decoration: InputDecoration(
@@ -1221,17 +1217,16 @@ class _WalletManagerScreenState extends ConsumerState<WalletManagerScreen> {
                   children: [
                     Text(
                       _isBalanceVisible ? _formatCurrency(wallet.balance) : '•••••••• ₫',
-                      style: TextStyle(
+                      style: currencyTextStyle(context, TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w900,
-                        fontFamily: 'monospace',
                         color: isNegative
                             ? AppTokens.expense
                             : (isDark ? AppTokens.darkText : AppTokens.lightText),
-                      ),
+                      )),
                     ),
                     if (isCredit && creditLimit > 0)
-                      Text(
+                      CurrencyText(
                         'Hạn mức: ${_formatCurrency(creditLimit)}',
                         style: TextStyle(
                           fontSize: 10,
@@ -1336,12 +1331,11 @@ class _WalletManagerScreenState extends ConsumerState<WalletManagerScreen> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
+                        CurrencyText(
                           'Khả dụng: ${_formatCurrency(availableCredit)}',
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w700,
-                            fontFamily: 'monospace',
                             color: isDark ? AppTokens.darkText : AppTokens.lightText,
                           ),
                         ),
@@ -1619,13 +1613,12 @@ class _WalletManagerScreenState extends ConsumerState<WalletManagerScreen> {
                             const SizedBox(height: 6),
                             Text(
                               _isBalanceVisible ? _formatCurrency(netRealAssets) : '•••••••• ₫',
-                              style: const TextStyle(
+                              style: currencyTextStyle(context, const TextStyle(
                                 fontSize: 26,
                                 fontWeight: FontWeight.w900,
-                                fontFamily: 'monospace',
                                 color: Colors.white,
                                 letterSpacing: -0.5,
-                              ),
+                              )),
                             ),
                             const SizedBox(height: 14),
 
@@ -1650,12 +1643,11 @@ class _WalletManagerScreenState extends ConsumerState<WalletManagerScreen> {
                                       ),
                                       Text(
                                         _isBalanceVisible ? _formatCurrency(availableSpending) : '•••••• ₫',
-                                        style: const TextStyle(
+                                        style: currencyTextStyle(context, const TextStyle(
                                           fontSize: 12,
                                           fontWeight: FontWeight.w800,
-                                          fontFamily: 'monospace',
                                           color: Color(0xFF34D399),
-                                        ),
+                                        )),
                                       ),
                                     ],
                                   ),
@@ -1672,12 +1664,11 @@ class _WalletManagerScreenState extends ConsumerState<WalletManagerScreen> {
                                       ),
                                       Text(
                                         _isBalanceVisible ? _formatCurrency(excludedOrFrozen) : '•••••• ₫',
-                                        style: const TextStyle(
+                                        style: currencyTextStyle(context, const TextStyle(
                                           fontSize: 12,
                                           fontWeight: FontWeight.w800,
-                                          fontFamily: 'monospace',
                                           color: Colors.white,
-                                        ),
+                                        )),
                                       ),
                                     ],
                                   ),

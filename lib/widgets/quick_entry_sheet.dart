@@ -37,6 +37,7 @@ import '../core/feedback/app_feedback.dart';
 import '../data/database.dart';
 import '../services/cloud_backup_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/currency_text.dart';
 import 'category_tree_modal.dart';
 import 'overrun_resolution_sheet.dart';
 import 'sliding_segmented_bar.dart';
@@ -95,7 +96,6 @@ class _NumpadKey extends StatefulWidget {
   final VoidCallback onTap;
   final Color textColor;
   final Color bgColor;
-  final bool isMonospace;
 
   const _NumpadKey({
     super.key,
@@ -103,7 +103,6 @@ class _NumpadKey extends StatefulWidget {
     required this.onTap,
     required this.textColor,
     required this.bgColor,
-    this.isMonospace = true,
   });
 
   @override
@@ -158,7 +157,6 @@ class _NumpadKeyState extends State<_NumpadKey> with SingleTickerProviderStateMi
               style: TextStyle(
                 fontSize: widget.label.startsWith('+') ? 12.5 : 16,
                 fontWeight: FontWeight.bold,
-                fontFamily: widget.isMonospace ? 'monospace' : null,
                 color: widget.textColor,
               ),
             ),
@@ -760,11 +758,10 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
                                         ],
                                       ],
                                     ),
-                                    Text(
+                                    CurrencyText(
                                       'Số dư: ${_formatCurrency(w.balance)}',
                                       style: TextStyle(
                                         fontSize: 12,
-                                        fontFamily: 'monospace',
                                         color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
                                       ),
                                     ),
@@ -1451,13 +1448,12 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
                                 child: Text(
                                   _formatCurrency(calculatedAmount),
                                   key: ValueKey<String>(_expression),
-                                  style: TextStyle(
+                                  style: currencyTextStyle(context, TextStyle(
                                     fontSize: 32,
                                     fontWeight: FontWeight.w900,
-                                    fontFamily: 'monospace',
                                     letterSpacing: -0.5,
                                     color: currentSemanticColor,
-                                  ),
+                                  )),
                                 ),
                               ),
                             ],
@@ -1490,7 +1486,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
                                         const Text('⚠️', style: TextStyle(fontSize: 14)),
                                         const SizedBox(width: 6),
                                         Expanded(
-                                          child: Text(
+                                          child: CurrencyText(
                                             'Khoản này vượt mức chi hôm nay (${_formatCurrency(dailySafeLimit)}). Bạn có muốn dàn đều cho các ngày tới?',
                                             style: TextStyle(
                                               fontSize: 11,
@@ -1726,7 +1722,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
                                                       color: isDark ? AppTokens.darkText : AppTokens.lightText,
                                                     ),
                                                   ),
-                                                  Text(
+                                                  CurrencyText(
                                                     _selectedDebtContact!.netBalance > 0
                                                         ? 'Đang nợ bạn: ${_formatCurrency(_selectedDebtContact!.netBalance)}'
                                                         : (_selectedDebtContact!.netBalance < 0
@@ -1852,7 +1848,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
                                                         color: isDark ? AppTokens.darkText : AppTokens.lightText,
                                                       ),
                                                     ),
-                                                    subtitle: Text(
+                                                    subtitle: CurrencyText(
                                                       c.netBalance != 0
                                                           ? 'Dư nợ: ${_formatCurrency(c.netBalance)}'
                                                           : 'Đã tất toán',
@@ -2399,12 +2395,9 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
             children: row.map((key) {
               Color keyBg = normalKeyBg;
               Color keyText = normalKeyText;
-              bool isMonospace = true;
-
               if (key.startsWith('+')) {
                 keyBg = shortcutKeyBg;
                 keyText = currentSemanticColor;
-                isMonospace = false;
               } else if (key == 'C') {
                 final bool hasInput = _expression != '0';
                 keyBg = hasInput ? AppTokens.expense.withValues(alpha: 0.12) : normalKeyBg;
@@ -2421,7 +2414,6 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
                     label: key,
                     bgColor: keyBg,
                     textColor: keyText,
-                    isMonospace: isMonospace,
                     onTap: () => _onNumpadPress(key),
                   ),
                 ),

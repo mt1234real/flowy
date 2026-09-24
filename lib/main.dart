@@ -70,7 +70,8 @@ Future<void> main() async {
   final appDb = AppDatabase();
 
   // Chỉ gieo dữ liệu mẫu nếu người dùng cũ đã xong onboarding
-  final hasCompletedOnboarding = prefs.getBool('has_completed_onboarding') ?? false;
+  final hasCompletedOnboarding =
+      prefs.getBool('has_completed_onboarding') ?? false;
   if (hasCompletedOnboarding) {
     try {
       await DatabaseSeeder.seedInitialData(appDb);
@@ -102,6 +103,7 @@ class FlowyApp extends ConsumerWidget {
     final themeMode = ref.watch(themeModeProvider);
     final accent = ref.watch(accentPresetProvider);
     final fontName = ref.watch(fontFamilyProvider);
+    final currencyFont = ref.watch(currencyFontProvider);
     final hasCompletedOnboarding = ref.watch(hasCompletedOnboardingProvider);
 
     return KeyedSubtree(
@@ -126,11 +128,13 @@ class FlowyApp extends ConsumerWidget {
           isDark: false,
           accent: accent,
           fontName: fontName,
+          currencyFont: currencyFont,
         ),
         darkTheme: AppTheme.buildTheme(
           isDark: true,
           accent: accent,
           fontName: fontName,
+          currencyFont: currencyFont,
         ),
         themeMode: themeMode,
 

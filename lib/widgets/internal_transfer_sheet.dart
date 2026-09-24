@@ -20,6 +20,7 @@ import '../core/animation/app_animation_policy.dart';
 import '../core/feedback/app_feedback.dart';
 import '../data/database.dart';
 import '../theme/app_theme.dart';
+import '../widgets/currency_text.dart';
 
 /// StreamProvider chuyên biệt lấy danh sách ví đang hoạt động (không gồm ví lưu trữ)
 final activeWalletsStreamProvider = StreamProvider.autoDispose<List<Wallet>>((ref) {
@@ -378,7 +379,7 @@ class _InternalTransferSheetState extends ConsumerState<InternalTransferSheet> {
                                         ],
                                       ),
                                       const SizedBox(height: 2),
-                                      Text(
+                                      CurrencyText(
                                         '${_getWalletTypeName(wallet.type)} • Số dư: ${_formatCurrency(wallet.balance)}',
                                         style: TextStyle(
                                           fontSize: 12,
@@ -652,14 +653,13 @@ class _InternalTransferSheetState extends ConsumerState<InternalTransferSheet> {
                                               ),
                                               Text(
                                                 _formatCurrency(fromWallet.balance),
-                                                style: TextStyle(
+                                                style: currencyTextStyle(context, TextStyle(
                                                   fontSize: 12,
                                                   fontWeight: FontWeight.w800,
-                                                  fontFamily: 'monospace',
                                                   color: fromWallet.balance < 0
                                                       ? AppTokens.expense
                                                       : (isDark ? AppTokens.darkText : AppTokens.lightText),
-                                                ),
+                                                )),
                                               ),
                                             ],
                                           ),
@@ -767,14 +767,13 @@ class _InternalTransferSheetState extends ConsumerState<InternalTransferSheet> {
                                               ),
                                               Text(
                                                 _formatCurrency(toWallet.balance),
-                                                style: TextStyle(
+                                                style: currencyTextStyle(context, TextStyle(
                                                   fontSize: 12,
                                                   fontWeight: FontWeight.w800,
-                                                  fontFamily: 'monospace',
                                                   color: toWallet.balance < 0
                                                       ? AppTokens.expense
                                                       : (isDark ? AppTokens.darkText : AppTokens.lightText),
-                                                ),
+                                                )),
                                               ),
                                             ],
                                           ),
@@ -835,13 +834,12 @@ class _InternalTransferSheetState extends ConsumerState<InternalTransferSheet> {
                                     fit: BoxFit.scaleDown,
                                     child: Text(
                                       _formatCurrency(_currentAmount),
-                                      style: TextStyle(
+                                      style: currencyTextStyle(context, TextStyle(
                                         fontSize: 32,
                                         fontWeight: FontWeight.w900,
-                                        fontFamily: 'monospace',
                                         color: accent.primary,
                                         letterSpacing: -0.5,
-                                      ),
+                                      )),
                                     ),
                                   ),
                                   const SizedBox(height: 10),
@@ -919,7 +917,7 @@ class _InternalTransferSheetState extends ConsumerState<InternalTransferSheet> {
                                   ),
                                 ),
                                 if (_transferFee > 0)
-                                  Text(
+                                  CurrencyText(
                                     'Phí: ${_formatCurrency(_transferFee)}',
                                     style: const TextStyle(
                                       fontSize: 11,
@@ -1013,21 +1011,19 @@ class _InternalTransferSheetState extends ConsumerState<InternalTransferSheet> {
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Text(
+                                CurrencyText(
                                   'Sau chuyển: ${fromWallet.name}: ${_formatCurrency(fromAfterBalance)}',
                                   style: TextStyle(
                                     fontSize: 11,
-                                    fontFamily: 'monospace',
                                     color: fromAfterBalance < 0
                                         ? AppTokens.expense
                                         : (isDark ? AppTokens.darkMuted : AppTokens.lightMuted),
                                   ),
                                 ),
-                                Text(
+                                CurrencyText(
                                   '➔ ${toWallet.name}: ${_formatCurrency(toAfterBalance)}',
                                   style: TextStyle(
                                     fontSize: 11,
-                                    fontFamily: 'monospace',
                                     fontWeight: FontWeight.bold,
                                     color: isDark ? AppTokens.darkText : AppTokens.lightText,
                                   ),
@@ -1107,7 +1103,6 @@ class _InternalTransferSheetState extends ConsumerState<InternalTransferSheet> {
           style: TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.w700,
-            fontFamily: 'monospace',
             color: isDark ? AppTokens.darkText : AppTokens.lightText,
           ),
         ),
@@ -1156,7 +1151,6 @@ class _InternalTransferSheetState extends ConsumerState<InternalTransferSheet> {
                           style: TextStyle(
                             fontSize: isSpecial ? 15 : 18,
                             fontWeight: FontWeight.bold,
-                            fontFamily: isSpecial ? null : 'monospace',
                             color: isSpecial
                                 ? (key == 'C' ? AppTokens.expense : (isDark ? AppTokens.darkMuted : AppTokens.lightMuted))
                                 : (isDark ? AppTokens.darkText : AppTokens.lightText),

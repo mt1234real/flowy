@@ -251,7 +251,6 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
                   const Text(
                     'Flowy',
                     style: TextStyle(
-                      fontFamily: 'Comfortaa',
                       fontSize: 16,
                       fontWeight: FontWeight.w900,
                       color: Colors.white,
@@ -1424,12 +1423,12 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
                       child: Text(
                         _formatCurrency(dailySafeSpend),
                         key: ValueKey<double>(dailySafeSpend),
-                        style: const TextStyle(
+                        style: currencyTextStyle(context, const TextStyle(
                           fontSize: 26,
                           fontWeight: FontWeight.w900,
                           letterSpacing: -0.6,
                           color: Color(0xFF10B981),
-                        ),
+                        )),
                       ),
                     ),
                     const SizedBox(height: 4),

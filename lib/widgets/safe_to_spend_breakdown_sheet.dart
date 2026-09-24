@@ -288,7 +288,6 @@ class _SafeToSpendBreakdownSheetState extends State<SafeToSpendBreakdownSheet>
           style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w800,
-            fontFamily: 'monospace',
             color: textColor,
           ),
         ),
@@ -471,11 +470,10 @@ class _SafeToSpendBreakdownSheetState extends State<SafeToSpendBreakdownSheet>
                                           ),
                                           Text(
                                             _formatCurrency(item.remainingDue),
-                                            style: const TextStyle(
+                                            style: currencyTextStyle(context, const TextStyle(
                                               fontSize: 11,
                                               fontWeight: FontWeight.bold,
-                                              fontFamily: 'monospace',
-                                            ),
+                                            )),
                                           ),
                                         ],
                                       ),
@@ -556,14 +554,13 @@ class _SafeToSpendBreakdownSheetState extends State<SafeToSpendBreakdownSheet>
                               const SizedBox(height: 6),
                               Text(
                                 '${_formatCurrency(_numberAnimation.value)} / ngày',
-                                style: TextStyle(
+                                style: currencyTextStyle(context, TextStyle(
                                   fontSize: 24,
                                   fontWeight: FontWeight.w900,
-                                  fontFamily: 'monospace',
                                   color: widget.breakdown.safeToSpendDaily > 0
                                       ? const Color(0xFF10B981)
                                       : AppTokens.expense,
-                                ),
+                                )),
                               ),
                               const SizedBox(height: 4),
                               Text(

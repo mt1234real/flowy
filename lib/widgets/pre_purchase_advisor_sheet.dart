@@ -30,6 +30,7 @@ import 'package:intl/intl.dart';
 import 'sliding_segmented_bar.dart';
 import '../core/feedback/app_feedback.dart';
 import '../theme/app_theme.dart';
+import '../widgets/currency_text.dart';
 import 'quick_entry_sheet.dart';
 
 enum AdvisorTab { single, dilemma }
@@ -367,14 +368,13 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
               const SizedBox(height: 4),
               Text(
                 _formatCurrency(p),
-                style: TextStyle(
+                style: currencyTextStyle(context, TextStyle(
                   fontSize: 26,
                   fontWeight: FontWeight.w900,
-                  fontFamily: 'monospace',
                   color: isGreen
                       ? const Color(0xFF10B981)
                       : (isYellow ? const Color(0xFFF59E0B) : const Color(0xFFF43F5E)),
-                ),
+                )),
               ),
             ],
           ),
@@ -397,7 +397,7 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
                     const Icon(Icons.check_circle_outline_rounded, color: Color(0xFF10B981), size: 18),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: Text(
+                      child: CurrencyText(
                         'Khoản chi nằm trọn trong hạn mức hôm nay (${_formatCurrency(sDaily)}).',
                         style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: isDark ? AppTokens.darkText : AppTokens.lightText),
                       ),
@@ -405,7 +405,7 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
                   ],
                 ),
                 const SizedBox(height: 6),
-                Text(
+                CurrencyText(
                   'Sau khi mua, hôm nay bạn vẫn còn lại ${_formatCurrency(sDaily - p)} khả chi. Các ngày tiếp theo hoàn toàn không bị ảnh hưởng!',
                   style: TextStyle(fontSize: 11, color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted),
                 ),
@@ -430,7 +430,7 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
                     const Text('📉', style: TextStyle(fontSize: 14)),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: Text(
+                      child: CurrencyText(
                         sDaily <= 0
                             ? 'Không còn tiền an toàn để chi'
                             : 'Nếu dàn đều: Hạn mức mỗi ngày từ mai sẽ giảm từ ${_formatCurrency(sDaily)} ➔ ${_formatCurrency(sNew)}/ngày (mỗi ngày bớt ${_formatCurrency(deltaS)}).',
@@ -446,7 +446,7 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
                     const Text('🛡️', style: TextStyle(fontSize: 14)),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: Text(
+                      child: CurrencyText(
                         'Ngân sách tự do chu kỳ vẫn an toàn còn ${_formatCurrency(bFree - p)} cho $d ngày tới.',
                         style: TextStyle(fontSize: 11, color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted),
                       ),
@@ -685,12 +685,11 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
                         fit: BoxFit.scaleDown,
                         child: Text(
                           _formatCurrency(pA),
-                          style: TextStyle(
+                          style: currencyTextStyle(context, TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w900,
-                            fontFamily: 'monospace',
                             color: isDark ? AppTokens.darkText : AppTokens.lightText,
-                          ),
+                          )),
                         ),
                       ),
                       const SizedBox(height: 6),
@@ -704,7 +703,7 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
                                 : const Color(0xFF10B981).withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(6),
                           ),
-                          child: Text(
+                          child: CurrencyText(
                             isAExp
                                 ? 'Đắt hơn ${_formatCurrency(deltaP)} (+${premiumPct.toStringAsFixed(0)}%)'
                                 : 'Tiết kiệm ${_formatCurrency(deltaP)} (${savedPct.toStringAsFixed(0)}%)',
@@ -779,12 +778,11 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
                         fit: BoxFit.scaleDown,
                         child: Text(
                           _formatCurrency(pB),
-                          style: TextStyle(
+                          style: currencyTextStyle(context, TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w900,
-                            fontFamily: 'monospace',
                             color: isDark ? AppTokens.darkText : AppTokens.lightText,
-                          ),
+                          )),
                         ),
                       ),
                       const SizedBox(height: 6),
@@ -798,7 +796,7 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
                                 : const Color(0xFF10B981).withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(6),
                           ),
-                          child: Text(
+                          child: CurrencyText(
                             isBExp
                                 ? 'Đắt hơn ${_formatCurrency(deltaP)} (+${premiumPct.toStringAsFixed(0)}%)'
                                 : 'Tiết kiệm ${_formatCurrency(deltaP)} (${savedPct.toStringAsFixed(0)}%)',
@@ -872,7 +870,7 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
                   const Text('💡', style: TextStyle(fontSize: 16)),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: Text(
+                    child: CurrencyText(
                       !isEqual
                           ? (isBExp
                           ? 'Chọn $nameA giúp bạn giữ lại ${savedPct.toStringAsFixed(0)}% số tiền (${_formatCurrency(deltaP)}).'
@@ -918,7 +916,7 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
                   onPressed: pA <= 0 ? null : () => _proceedToBuyDilemma(nameA, pA),
                   child: FittedBox(
                     fit: BoxFit.scaleDown,
-                    child: Text('Mua $nameA (${_formatCurrency(pA)})', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+                    child: CurrencyText('Mua $nameA (${_formatCurrency(pA)})', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
                   ),
                 ),
               ),
@@ -936,7 +934,7 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
                   onPressed: pB <= 0 ? null : () => _proceedToBuyDilemma(nameB, pB),
                   child: FittedBox(
                     fit: BoxFit.scaleDown,
-                    child: Text('Mua $nameB (${_formatCurrency(pB)})', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+                    child: CurrencyText('Mua $nameB (${_formatCurrency(pB)})', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
                   ),
                 ),
               ),
@@ -1048,7 +1046,7 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
                             ? (k == '⌫'
                             ? const Icon(Icons.backspace_outlined, size: 16)
                             : const Text('C', style: TextStyle(fontWeight: FontWeight.bold)))
-                            : Text(k, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, fontFamily: 'monospace')),
+                            : Text(k, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
                       ),
                     ),
                   ),

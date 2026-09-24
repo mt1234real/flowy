@@ -30,6 +30,7 @@ import '../data/database.dart';
 import '../screens/contact_ledger_screen.dart';
 import '../screens/ledger_screen.dart';
 import '../theme/app_theme.dart';
+import '../widgets/currency_text.dart';
 
 // StreamProvider nội bộ lấy danh sách ví phục vụ chọn ví thanh toán
 final _detailWalletsStreamProvider = StreamProvider.autoDispose<List<Wallet>>((ref) {
@@ -204,7 +205,6 @@ class _DebtTransactionDetailSheetState extends ConsumerState<DebtTransactionDeta
                                   style: const TextStyle(
                                     fontSize: 20,
                                     fontWeight: FontWeight.w900,
-                                    fontFamily: 'monospace',
                                   ),
                                   decoration: InputDecoration(
                                     suffixText: '₫',
@@ -344,7 +344,7 @@ class _DebtTransactionDetailSheetState extends ConsumerState<DebtTransactionDeta
                               items: wallets.map((w) {
                                 return DropdownMenuItem(
                                   value: w.id,
-                                  child: Text(
+                                  child: CurrencyText(
                                     '${w.name} (${_formatCurrency(w.balance)})',
                                     style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                                   ),
@@ -812,12 +812,11 @@ class _DebtTransactionDetailSheetState extends ConsumerState<DebtTransactionDeta
                 children: [
                   Text(
                     '${isMoneyIn ? '+' : '-'}${_formatCurrency(tx.amount)}',
-                    style: TextStyle(
+                    style: currencyTextStyle(context, TextStyle(
                       fontSize: 26,
                       fontWeight: FontWeight.w900,
-                      fontFamily: 'monospace',
                       color: isMoneyIn ? AppTokens.income : AppTokens.expense,
-                    ),
+                    )),
                   ),
                   if (tx.note != null && tx.note!.isNotEmpty) ...[
                     const SizedBox(width: 10),
@@ -881,7 +880,7 @@ class _DebtTransactionDetailSheetState extends ConsumerState<DebtTransactionDeta
                         ),
                       ),
                       const SizedBox(height: 6),
-                      Text(
+                      CurrencyText(
                         isLend
                             ? 'Đã thu: ${_formatCurrency(repaidAmount)} / ${_formatCurrency(tx.amount)} (Còn nợ: ${_formatCurrency(remainingAmount)})'
                             : 'Đã trả: ${_formatCurrency(repaidAmount)} / ${_formatCurrency(tx.amount)} (Còn nợ: ${_formatCurrency(remainingAmount)})',
@@ -1222,7 +1221,6 @@ class _QuickRepayNumpadSheetState extends ConsumerState<_QuickRepayNumpadSheet> 
                             style: TextStyle(
                               fontSize: 24,
                               fontWeight: FontWeight.w900,
-                              fontFamily: 'monospace',
                               color: visual.isInvalid
                                   ? AppTokens.expense
                                   : primaryColor,
@@ -1444,7 +1442,6 @@ class _QuickRepayNumpadSheetState extends ConsumerState<_QuickRepayNumpadSheet> 
                 style: TextStyle(
                   fontSize: label.length > 2 ? 12 : 17,
                   fontWeight: FontWeight.w700,
-                  fontFamily: label.contains(RegExp(r'[0-9]')) ? 'monospace' : null,
                   color: isDark ? AppTokens.darkText : AppTokens.lightText,
                 ),
               ),

@@ -530,7 +530,7 @@ class _PreservedMetricSwitcherState extends State<_PreservedMetricSwitcher>
   @override
   Widget build(BuildContext context) {
     if (_previousValue == null) {
-      return Text(_currentValue, style: widget.style);
+      return Text(_currentValue, style: currencyTextStyle(context, widget.style));
     }
 
     return AnimatedBuilder(
@@ -550,7 +550,7 @@ class _PreservedMetricSwitcherState extends State<_PreservedMetricSwitcher>
               child: Transform.scale(
                 scale: oldScale,
                 alignment: Alignment.centerLeft,
-                child: Text(_previousValue!, style: widget.style),
+                child: Text(_previousValue!, style: currencyTextStyle(context, widget.style)),
               ),
             ),
             Opacity(
@@ -558,7 +558,7 @@ class _PreservedMetricSwitcherState extends State<_PreservedMetricSwitcher>
               child: Transform.scale(
                 scale: newScale,
                 alignment: Alignment.centerLeft,
-                child: Text(_currentValue, style: widget.style),
+                child: Text(_currentValue, style: currencyTextStyle(context, widget.style)),
               ),
             ),
           ],
@@ -1140,12 +1140,12 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> with TickerProvider
                             SlidingSegmentedItem<CycleMode>(
                               value: CycleMode.calendar,
                               label: 'Theo Tháng',
-                              leadingText: '📅',
+                              icon: Icons.calendar_month_rounded,
                             ),
                             SlidingSegmentedItem<CycleMode>(
                               value: CycleMode.customCycle,
                               label: 'Theo Chu Kỳ',
-                              leadingText: '🎯',
+                              icon: Icons.autorenew_rounded,
                             ),
                           ],
                           onValueChanged: (value) {
@@ -1444,12 +1444,11 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> with TickerProvider
                     ),
                     Text(
                       '${netDaily >= 0 ? '+' : ''}${_formatCurrency(netDaily)}',
-                      style: TextStyle(
+                      style: currencyTextStyle(context, TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
-                        fontFamily: 'monospace',
                         color: netDaily >= 0 ? AppTokens.income : AppTokens.expense,
-                      ),
+                      )),
                     ),
                   ],
                 ),
@@ -1633,12 +1632,11 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> with TickerProvider
                     children: [
                       Text(
                         '${isMoneyIn ? '+' : '-'}${_formatCurrency(item.amount)}',
-                        style: TextStyle(
+                        style: currencyTextStyle(context, TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w800,
-                          fontFamily: 'monospace',
                           color: amountColor,
-                        ),
+                        )),
                       ),
                       const SizedBox(width: 4),
                       Icon(
@@ -1911,7 +1909,6 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> with TickerProvider
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w800,
-                  fontFamily: 'monospace',
                   color: valueColor,
                 ),
               ),
@@ -2843,7 +2840,6 @@ class _EditCycleMilestoneModalState
                       textAlign: TextAlign.end,
                       style: TextStyle(
                         fontSize: 11,
-                        fontFamily: 'monospace',
                         fontWeight: FontWeight.w900,
                         color: widget.accent.primary,
                       ),
@@ -2871,7 +2867,6 @@ class _EditCycleMilestoneModalState
                           current: currentStart,
                           style: TextStyle(
                             fontSize: 13,
-                            fontFamily: 'monospace',
                             fontWeight: FontWeight.w900,
                             color: primaryText,
                           ),
@@ -2926,7 +2921,6 @@ class _EditCycleMilestoneModalState
                           textAlign: TextAlign.end,
                           style: TextStyle(
                             fontSize: 13,
-                            fontFamily: 'monospace',
                             fontWeight: FontWeight.w900,
                             color: primaryText,
                           ),

@@ -26,6 +26,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../theme/app_theme.dart';
+import '../widgets/currency_text.dart';
 import '../core/feedback/app_feedback.dart';
 
 // State lưu trữ tổng số ngày bù nhanh đã chọn (K)
@@ -203,7 +204,7 @@ class _OverrunResolutionSheetState extends ConsumerState<OverrunResolutionSheet>
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
+                              CurrencyText(
                                 'Đã chi vượt hôm nay: +${_formatCurrency(widget.overAmount)}',
                                 style: const TextStyle(
                                   fontSize: 13,
@@ -318,12 +319,12 @@ class _OverrunResolutionSheetState extends ConsumerState<OverrunResolutionSheet>
                                           const TextSpan(text: 'Mỗi ngày tới giảm: '),
                                           TextSpan(
                                             text: '-${_formatCurrency(dailyDeduction)}\n',
-                                            style: const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFFF59E0B)),
+                                            style: currencyTextStyle(context, const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFFF59E0B))),
                                           ),
                                           const TextSpan(text: '(Hạn mức mới: '),
                                           TextSpan(
                                             text: '${_formatCurrency(newSafeDaily)}/ngày',
-                                            style: const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF10B981)),
+                                            style: currencyTextStyle(context, const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF10B981))),
                                           ),
                                           const TextSpan(text: ')'),
                                         ],
@@ -508,7 +509,6 @@ class _OverrunResolutionSheetState extends ConsumerState<OverrunResolutionSheet>
                                         style: TextStyle(
                                           fontSize: 13,
                                           fontWeight: FontWeight.w800,
-                                          fontFamily: 'monospace',
                                           color: isDark ? AppTokens.darkText : AppTokens.lightText,
                                         ),
                                       ),
@@ -565,12 +565,12 @@ class _OverrunResolutionSheetState extends ConsumerState<OverrunResolutionSheet>
                                               TextSpan(text: 'Trong $_kDays ngày tới tiêu tối đa: '),
                                               TextSpan(
                                                 text: '${_formatCurrency(recoveryLimit)}/ngày\n',
-                                                style: const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFFF43F5E)),
+                                                style: currencyTextStyle(context, const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFFF43F5E))),
                                               ),
                                               const TextSpan(text: '(Sau đó hồi phục về: '),
                                               TextSpan(
                                                 text: '${_formatCurrency(realisticRecoveredLimit)}/ngày',
-                                                style: const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF10B981)),
+                                                style: currencyTextStyle(context, const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF10B981))),
                                               ),
                                               const TextSpan(text: ')'),
                                             ],
@@ -605,7 +605,7 @@ class _OverrunResolutionSheetState extends ConsumerState<OverrunResolutionSheet>
                                         const Icon(Icons.warning_amber_rounded, size: 12, color: Color(0xFFEF4444)),
                                         const SizedBox(width: 4),
                                         Expanded(
-                                          child: Text(
+                                          child: CurrencyText(
                                             'Khoản chi vượt khá lớn, sau $_kDays ngày hạn mức vẫn sẽ thấp (~${_formatCurrency(realisticRecoveredLimit)}/ngày). Nên tăng thêm ngày bù hoặc nạp thêm tiền nhé.',
                                             style: TextStyle(
                                               fontSize: 10,

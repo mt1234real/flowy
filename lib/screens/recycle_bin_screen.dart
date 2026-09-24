@@ -662,12 +662,11 @@ class RecycleBinScreen extends ConsumerWidget {
                         ),
                         Text(
                           '${item.isMoneyIn ? '+' : '-'}${_formatCurrency(item.amount)}',
-                          style: TextStyle(
+                          style: currencyTextStyle(context, TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w800,
-                            fontFamily: 'monospace',
                             color: amountColor,
-                          ),
+                          )),
                         ),
                       ],
                     ),

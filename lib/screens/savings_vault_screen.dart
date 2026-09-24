@@ -18,6 +18,7 @@ import '../core/animation/app_animation_policy.dart';
 import '../core/feedback/app_feedback.dart';
 import '../data/database.dart';
 import '../theme/app_theme.dart';
+import '../widgets/currency_text.dart';
 import '../widgets/precision_numpad.dart';
 import '../widgets/preserved_balance_tumbler.dart';
 import 'vault_auth_screen.dart';
@@ -606,7 +607,6 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                         style: TextStyle(
                           fontSize: 28,
                           fontWeight: FontWeight.w900,
-                          fontFamily: 'monospace',
                           color: primaryText,
                           letterSpacing: -0.5,
                         ),
@@ -775,7 +775,7 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                                 height: 18,
                                 style: TextStyle(
                                   fontSize: 13, fontWeight: FontWeight.w800,
-                                  fontFamily: 'monospace', letterSpacing: -0.5,
+                                  letterSpacing: -0.5,
                                   color: mutedText,
                                 ),
                               ),
@@ -866,7 +866,7 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                       height: 18,
                       style: TextStyle(
                         fontSize: 13, fontWeight: FontWeight.w800,
-                        fontFamily: 'monospace', letterSpacing: -0.5, color: primaryText,
+                        letterSpacing: -0.5, color: primaryText,
                       ),
                     ),
                   ),
@@ -881,12 +881,13 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                     child: PreservedBalanceTumbler(
                       isVisible: !_isBalanceHidden,
                       realValue: '$progressPercent% mục tiêu',
+                      isCurrency: false,
                       maskedValue: '••% mục tiêu',
                       height: 18,
                       alignment: Alignment.centerRight,
                       style: TextStyle(
                         fontSize: 11.5, fontWeight: FontWeight.w800,
-                        fontFamily: 'monospace', color: accent.primary,
+                        color: accent.primary,
                       ),
                     ),
                   ),
@@ -947,7 +948,6 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w800,
-                          fontFamily: 'monospace',
                           letterSpacing: -0.5,
                           color: isUrgent ? AppTokens.expense : mutedText,
                         ),
@@ -1422,9 +1422,7 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                                         alignment: Alignment.centerRight,
                                         child: Text(
                                           _formatCurrency(amount),
-                                          style: theme
-                                              .textTheme.headlineSmall
-                                              ?.copyWith(
+                                          style: currencyTextStyle(context, (theme.textTheme.headlineSmall ?? const TextStyle()).copyWith(
                                             fontSize: 26,
                                             fontWeight: FontWeight.w800,
                                             color: visual.isInvalid
@@ -1433,7 +1431,7 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                                             fontFeatures: const [
                                               FontFeature.tabularFigures(),
                                             ],
-                                          ),
+                                          )),
                                         ),
                                       ),
                                     ),
@@ -1737,7 +1735,7 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                                   'Rút tiền về ví',
                                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Colors.white),
                                 ),
-                                Text(
+                                CurrencyText(
                                   'Nguồn: ${goal.icon} ${goal.title} (Có: ${_formatCurrency(goal.currentAmount)})',
                                   style: const TextStyle(fontSize: 12, color: Colors.white60),
                                 ),
@@ -1808,16 +1806,16 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                             children: [
                               Text(
                                 enteredAmountStr.isEmpty ? '0 ₫' : _formatCurrency(amount),
-                                style: TextStyle(
+                                style: currencyTextStyle(context, TextStyle(
                                   fontSize: 30,
                                   fontWeight: FontWeight.w900,
                                   color: visual.isInvalid
                                       ? AppTokens.expense
                                       : const Color(0xFF38BDF8),
-                                ),
+                                )),
                               ),
                               const SizedBox(height: 4),
-                              Text(
+                              CurrencyText(
                                 'Số dư tối đa trong hũ: ${_formatCurrency(goal.currentAmount)}',
                                 style: const TextStyle(fontSize: 11, color: Colors.white54),
                               ),
@@ -2376,7 +2374,7 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
+                      CurrencyText(
                         'Hũ này đang có số dư ${_formatCurrency(goal.currentAmount)}. Vui lòng chọn ví để hoàn trả toàn bộ số tiền này trước khi xóa hũ:',
                         style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
                       ),

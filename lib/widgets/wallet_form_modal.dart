@@ -388,12 +388,11 @@ class _WalletFormModalState extends ConsumerState<WalletFormModal> {
                       TextField(
                         controller: _balanceController,
                         keyboardType: const TextInputType.numberWithOptions(signed: true),
-                        style: TextStyle(
+                        style: currencyTextStyle(context, TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w800,
-                          fontFamily: 'monospace',
                           color: accent.primary,
-                        ),
+                        )),
                         decoration: InputDecoration(
                           labelText: _selectedType == 'credit'
                               ? 'Dư nợ ban đầu (số âm vd: -5000000)'
@@ -441,11 +440,10 @@ class _WalletFormModalState extends ConsumerState<WalletFormModal> {
                             TextField(
                               controller: _creditLimitController,
                               keyboardType: TextInputType.number,
-                              style: TextStyle(
+                              style: currencyTextStyle(context, TextStyle(
                                 fontSize: 14,
-                                fontFamily: 'monospace',
                                 color: isDark ? AppTokens.darkText : AppTokens.lightText,
-                              ),
+                              )),
                               decoration: InputDecoration(
                                 labelText: 'Hạn mức tín dụng tối đa (vd: 50.000.000 ₫)',
                                 labelStyle: TextStyle(

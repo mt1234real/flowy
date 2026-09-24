@@ -35,6 +35,7 @@ import '../core/feedback/app_feedback.dart';
 import '../data/database.dart';
 import '../services/cloud_backup_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/currency_text.dart';
 
 /// DTO lưu trữ chỉ số đối soát giữa 2 CSDL
 class DatabaseInspectionMetrics {
@@ -865,7 +866,6 @@ class _RestoreDiffModalState extends ConsumerState<RestoreDiffModal> {
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w900,
-                          fontFamily: 'monospace',
                           color: isDark ? AppTokens.darkText : AppTokens.lightText,
                         ),
                       ),
@@ -875,7 +875,7 @@ class _RestoreDiffModalState extends ConsumerState<RestoreDiffModal> {
                         style: TextStyle(fontSize: 11, color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted),
                       ),
                       const SizedBox(height: 2),
-                      Text(
+                      CurrencyText(
                         'Số dư: ${_formatCurrency(local.totalBalance)}',
                         style: TextStyle(
                           fontSize: 11,
@@ -927,7 +927,6 @@ class _RestoreDiffModalState extends ConsumerState<RestoreDiffModal> {
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w900,
-                          fontFamily: 'monospace',
                           color: accent.primary,
                         ),
                       ),
@@ -937,7 +936,7 @@ class _RestoreDiffModalState extends ConsumerState<RestoreDiffModal> {
                         style: TextStyle(fontSize: 11, color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted),
                       ),
                       const SizedBox(height: 2),
-                      Text(
+                      CurrencyText(
                         'Số dư: ${_formatCurrency(backup.totalBalance)}',
                         style: TextStyle(
                           fontSize: 11,

@@ -43,8 +43,8 @@ class AppTokens {
 
   // Financial Semantic Colors
   static const Color expense = Color(0xFFF43F5E); // Rose 500
-  static const Color income = Color(0xFF10B981);  // Emerald 500
-  static const Color debt = Color(0xFFF59E0B);    // Amber 500
+  static const Color income = Color(0xFF10B981); // Emerald 500
+  static const Color debt = Color(0xFFF59E0B); // Amber 500
   static const Color savings = Color(0xFF6366F1); // Indigo 500
   static const Color warning = Color(0xFFF59E0B); // Amber
 }
@@ -52,11 +52,11 @@ class AppTokens {
 // --- 5 CUTE NATURE ACCENT PALETTES ---
 
 enum AppAccentPreset {
-  grass('Cỏ', Color(0xFF10B981), Color(0xFF059669)),   // Fresh Mint / Emerald
-  sun('Nắng', Color(0xFFF59E0B), Color(0xFFD97706)),    // Warm Amber / Orange
-  sea('Biển', Color(0xFF0EA5E9), Color(0xFF0284C7)),    // Ocean Sky / Blue
-  flower('Hoa', Color(0xFFF43F5E), Color(0xFFE11D48)),  // Sakura Blossom / Rose
-  night('Đêm', Color(0xFF6366F1), Color(0xFF4F46E5));   // Night Owl / Indigo
+  grass('Cỏ', Color(0xFF10B981), Color(0xFF059669)), // Fresh Mint / Emerald
+  sun('Nắng', Color(0xFFF59E0B), Color(0xFFD97706)), // Warm Amber / Orange
+  sea('Biển', Color(0xFF0EA5E9), Color(0xFF0284C7)), // Ocean Sky / Blue
+  flower('Hoa', Color(0xFFF43F5E), Color(0xFFE11D48)), // Sakura Blossom / Rose
+  night('Đêm', Color(0xFF6366F1), Color(0xFF4F46E5)); // Night Owl / Indigo
 
   final String label;
   final Color primary;
@@ -102,7 +102,8 @@ TextTheme buildDynamicTextTheme(String fontFamily, TextTheme baseTextTheme) {
 // --- PERSISTENT SHARED PREFERENCES PROVIDER ---
 
 final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
-  throw UnimplementedError('sharedPreferencesProvider must be overridden in main()');
+  throw UnimplementedError(
+      'sharedPreferencesProvider must be overridden in main()');
 });
 
 // --- PERSISTENT THEME MODE NOTIFIER ---
@@ -138,7 +139,8 @@ class ThemeModeNotifier extends StateNotifier<ThemeMode> {
   }
 }
 
-final themeModeProvider = StateNotifierProvider<ThemeModeNotifier, ThemeMode>((ref) {
+final themeModeProvider =
+    StateNotifierProvider<ThemeModeNotifier, ThemeMode>((ref) {
   final prefs = ref.watch(sharedPreferencesProvider);
   return ThemeModeNotifier(prefs);
 });
@@ -153,7 +155,7 @@ class AccentPresetNotifier extends StateNotifier<AppAccentPreset> {
   static AppAccentPreset _loadInitialAccent(SharedPreferences prefs) {
     final presetName = prefs.getString(kPrefKeyAccentPreset);
     return AppAccentPreset.values.firstWhere(
-          (p) => p.name == presetName,
+      (p) => p.name == presetName,
       orElse: () => AppAccentPreset.grass, // Mặc định Cỏ (Emerald/Mint)
     );
   }
@@ -164,7 +166,8 @@ class AccentPresetNotifier extends StateNotifier<AppAccentPreset> {
   }
 }
 
-final accentPresetProvider = StateNotifierProvider<AccentPresetNotifier, AppAccentPreset>((ref) {
+final accentPresetProvider =
+    StateNotifierProvider<AccentPresetNotifier, AppAccentPreset>((ref) {
   final prefs = ref.watch(sharedPreferencesProvider);
   return AccentPresetNotifier(prefs);
 });
@@ -183,10 +186,62 @@ class FontFamilyNotifier extends StateNotifier<String> {
   }
 }
 
-final fontFamilyProvider = StateNotifierProvider<FontFamilyNotifier, String>((ref) {
+final fontFamilyProvider =
+    StateNotifierProvider<FontFamilyNotifier, String>((ref) {
   final prefs = ref.watch(sharedPreferencesProvider);
   return FontFamilyNotifier(prefs);
 });
+
+const kPrefKeyCurrencyFont = 'flowy_currency_font';
+const kCurrencyFontFollowApp = 'follow_app';
+const kCurrencyFontChoices = [
+  kCurrencyFontFollowApp,
+  ...kSupportedFontFamilies,
+  'monospace'
+];
+
+class CurrencyFontNotifier extends StateNotifier<String> {
+  CurrencyFontNotifier(this._prefs)
+      : super(kCurrencyFontChoices
+                .contains(_prefs.getString(kPrefKeyCurrencyFont))
+            ? _prefs.getString(kPrefKeyCurrencyFont)!
+            : kCurrencyFontFollowApp);
+  final SharedPreferences _prefs;
+
+  Future<void> setFont(String family) async {
+    if (!kCurrencyFontChoices.contains(family)) return;
+    state = family;
+    await _prefs.setString(kPrefKeyCurrencyFont, family);
+  }
+}
+
+final currencyFontProvider =
+    StateNotifierProvider<CurrencyFontNotifier, String>((ref) {
+  return CurrencyFontNotifier(ref.watch(sharedPreferencesProvider));
+});
+
+class CurrencyTypography extends ThemeExtension<CurrencyTypography> {
+  const CurrencyTypography(this.family);
+  final String family;
+
+  @override
+  CurrencyTypography copyWith({String? family}) =>
+      CurrencyTypography(family ?? this.family);
+
+  @override
+  CurrencyTypography lerp(covariant CurrencyTypography? other, double t) =>
+      t < 0.5 ? this : (other ?? this);
+}
+
+TextStyle currencyTextStyle(BuildContext context, TextStyle base,
+    {String? family}) {
+  final selected = family ??
+      Theme.of(context).extension<CurrencyTypography>()?.family ??
+      kCurrencyFontFollowApp;
+  if (selected == kCurrencyFontFollowApp) return base;
+  if (selected == 'monospace') return base.copyWith(fontFamily: 'monospace');
+  return getDynamicTextTheme(selected, TextTheme(bodyMedium: base)).bodyMedium!;
+}
 
 // --- THEME DATA BUILDERS ---
 
@@ -212,6 +267,7 @@ class AppTheme {
     required bool isDark,
     required AppAccentPreset accent,
     String fontName = 'Plus Jakarta Sans',
+    String currencyFont = kCurrencyFontFollowApp,
   }) {
     final baseTheme = isDark ? ThemeData.dark() : ThemeData.light();
     final textColor = isDark ? AppTokens.darkText : AppTokens.lightText;
@@ -227,10 +283,14 @@ class AppTheme {
 
     return ThemeData(
       useMaterial3: true,
+      extensions: [CurrencyTypography(currencyFont)],
       brightness: isDark ? Brightness.dark : Brightness.light,
       scaffoldBackgroundColor: isDark ? AppTokens.darkBg : AppTokens.lightBg,
       cardColor: isDark ? AppTokens.darkCard : AppTokens.lightCard,
       textTheme: resolvedTextTheme,
+      primaryTextTheme:
+          getDynamicTextTheme(fontName, baseTheme.primaryTextTheme),
+      fontFamily: resolvedTextTheme.bodyMedium?.fontFamily,
       // 🌟 CẤU HÌNH TRANSITION CHUẨN FRAMEWORK AN TOÀN VÀ TƯƠNG THÍCH ĐA NỀN TẢNG
       pageTransitionsTheme: const PageTransitionsTheme(
         builders: {
@@ -252,8 +312,7 @@ class AppTheme {
         backgroundColor: isDark ? AppTokens.darkBg : AppTokens.lightBg,
         elevation: 0,
         iconTheme: IconThemeData(color: textColor),
-        titleTextStyle: TextStyle(
-          fontFamily: fontName,
+        titleTextStyle: resolvedTextTheme.titleLarge?.copyWith(
           fontSize: 18,
           fontWeight: FontWeight.w800,
           color: textColor,
@@ -266,10 +325,12 @@ class AppTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: isDark ? AppTokens.darkCardSubtle : AppTokens.lightCardSubtle,
+        fillColor:
+            isDark ? AppTokens.darkCardSubtle : AppTokens.lightCardSubtle,
         hintStyle: TextStyle(color: mutedColor, fontSize: 13),
         labelStyle: TextStyle(color: mutedColor, fontSize: 13),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide(
@@ -310,8 +371,8 @@ class AppGlassmorphism {
     final borderColor = customAccent != null
         ? customAccent.withValues(alpha: 0.28)
         : (isDark
-        ? Colors.white.withValues(alpha: 0.12)
-        : Colors.black.withValues(alpha: 0.08));
+            ? Colors.white.withValues(alpha: 0.12)
+            : Colors.black.withValues(alpha: 0.08));
 
     final surfaceColor = isDark
         ? AppTokens.darkCard.withValues(alpha: 0.85)

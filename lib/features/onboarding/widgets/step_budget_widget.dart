@@ -399,12 +399,12 @@ class _StepBudgetWidgetState extends ConsumerState<StepBudgetWidget> {
                       child: Text(
                         _formatCurrency(dailySafeSpend),
                         key: ValueKey<double>(dailySafeSpend),
-                        style: const TextStyle(
+                        style: currencyTextStyle(context, const TextStyle(
                           fontSize: 28,
                           fontWeight: FontWeight.w900,
                           letterSpacing: -0.8,
                           color: Color(0xFF10B981),
-                        ),
+                        )),
                       ),
                     ),
                     const SizedBox(height: 6),

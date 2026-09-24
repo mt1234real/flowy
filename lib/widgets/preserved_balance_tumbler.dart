@@ -7,12 +7,14 @@
 import 'package:flutter/material.dart';
 
 import '../core/animation/app_animation_policy.dart';
+import '../theme/app_theme.dart';
 
 class PreservedBalanceTumbler extends StatefulWidget {
   final bool isVisible;
   final String realValue;
   final String maskedValue;
   final TextStyle style;
+  final bool isCurrency;
   final double height;
   final Alignment alignment;
   final double travelPx;
@@ -25,6 +27,7 @@ class PreservedBalanceTumbler extends StatefulWidget {
     required this.realValue,
     this.maskedValue = '•••••• ₫',
     required this.style,
+    this.isCurrency = true,
     this.height = 40.0,
     this.alignment = Alignment.centerLeft,
     this.travelPx = 4.0,
@@ -33,7 +36,8 @@ class PreservedBalanceTumbler extends StatefulWidget {
   });
 
   @override
-  State<PreservedBalanceTumbler> createState() => _PreservedBalanceTumblerState();
+  State<PreservedBalanceTumbler> createState() =>
+      _PreservedBalanceTumblerState();
 }
 
 class _PreservedBalanceTumblerState extends State<PreservedBalanceTumbler>
@@ -81,7 +85,10 @@ class _PreservedBalanceTumblerState extends State<PreservedBalanceTumbler>
       child: Text(
         text,
         maxLines: 1,
-        style: widget.style.copyWith(letterSpacing: resolvedSpacing),
+        style: (widget.isCurrency
+                ? currencyTextStyle(context, widget.style)
+                : widget.style)
+            .copyWith(letterSpacing: resolvedSpacing),
       ),
     );
   }

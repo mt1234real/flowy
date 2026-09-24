@@ -219,7 +219,6 @@ class _AvatarCustomizationSheetState
             style: TextStyle(
               fontSize: _avatarValue.length > 1 ? 26 : 30,
               fontWeight: FontWeight.w900,
-              fontFamily: 'monospace',
               color: color,
             ),
           ),
@@ -237,7 +236,6 @@ class _AvatarCustomizationSheetState
         style: TextStyle(
           fontSize: 30,
           fontWeight: FontWeight.w900,
-          fontFamily: 'monospace',
           color: color,
         ),
       ),
@@ -875,7 +873,6 @@ class _AvatarCustomizationSheetState
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w900,
-                fontFamily: 'monospace',
                 color: isSelected
                     ? accent.primary
                     : (isDark ? AppTokens.darkText : AppTokens.lightText),

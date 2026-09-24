@@ -32,6 +32,7 @@ import '../core/feedback/app_feedback.dart';
 import '../data/daos/debt_dao.dart';
 import '../data/database.dart';
 import '../theme/app_theme.dart';
+import '../widgets/currency_text.dart';
 import '../widgets/debt_transaction_detail_sheet.dart';
 import '../widgets/preserved_sleek_dismissible.dart';
 import '../widgets/quick_entry_sheet.dart';
@@ -351,13 +352,12 @@ class _ContactLedgerScreenState extends ConsumerState<ContactLedgerScreen> {
             fit: BoxFit.scaleDown,
             child: Text(
               hasDebt ? _formatCurrency(contact.netBalance.abs()) : '0 ₫ (Đã xong)',
-              style: TextStyle(
+              style: currencyTextStyle(context, TextStyle(
                 fontSize: 30,
                 fontWeight: FontWeight.w900,
-                fontFamily: 'monospace',
                 letterSpacing: -0.5,
                 color: statusColor,
-              ),
+              )),
             ),
           ),
           const SizedBox(height: 16),
@@ -509,12 +509,11 @@ class _ContactLedgerScreenState extends ConsumerState<ContactLedgerScreen> {
                                 color: isDark ? AppTokens.darkText : AppTokens.lightText,
                               ),
                             ),
-                            Text(
+                            CurrencyText(
                               '$sign${_formatCurrency(tx.amount)}',
                               style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w800,
-                                fontFamily: 'monospace',
                                 color: typeColor,
                               ),
                             ),
@@ -681,12 +680,11 @@ class _DebtReminderModal extends StatelessWidget {
                       const SizedBox(height: 12),
                       Text(
                         netBalance > 0 ? _formatCurrency(netBalance) : _formatCurrency(netBalance.abs()),
-                        style: TextStyle(
+                        style: currencyTextStyle(context, TextStyle(
                           fontSize: 26,
                           fontWeight: FontWeight.w900,
-                          fontFamily: 'monospace',
                           color: netBalance > 0 ? const Color(0xFF10B981) : const Color(0xFFF43F5E),
-                        ),
+                        )),
                       ),
                       Text(
                         netBalance > 0 ? 'Khoản nợ chưa thanh toán' : 'Khoản bạn sẽ nhận lại',

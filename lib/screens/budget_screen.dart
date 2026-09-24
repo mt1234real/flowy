@@ -37,6 +37,7 @@ import '../core/animation/app_animation_policy.dart';
 import '../core/feedback/app_feedback.dart';
 import '../data/database.dart';
 import '../theme/app_theme.dart';
+import '../widgets/currency_text.dart';
 import '../widgets/category_icon_badge.dart';
 import '../widgets/category_tree_modal.dart';
 import '../widgets/two_stage_overscroll_header.dart';
@@ -810,12 +811,11 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen>
                                   const SizedBox(height: 6),
                                   Text(
                                     _formatCurrency(totalBudgetAmount),
-                                    style: const TextStyle(
+                                    style: currencyTextStyle(context, const TextStyle(
                                       fontSize: 26,
                                       fontWeight: FontWeight.w900,
-                                      fontFamily: 'monospace',
                                       color: Colors.white,
-                                    ),
+                                    )),
                                   ),
                                   const SizedBox(height: 12),
                                   Stack(
@@ -845,11 +845,11 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen>
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
-                                      Text(
+                                      CurrencyText(
                                         'Đã chi: ${_formatCurrency(totalSpent)} (${(spendPct * 100).toStringAsFixed(0)}%)',
                                         style: const TextStyle(fontSize: 11, color: Colors.white70),
                                       ),
-                                      Text(
+                                      CurrencyText(
                                         'Còn lại: ${_formatCurrency(remaining)}',
                                         style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
                                       ),
@@ -1114,16 +1114,15 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen>
                                           Row(
                                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                             children: [
-                                              Text(
+                                              CurrencyText(
                                                 '${_formatCurrency(spent)} / ${_formatCurrency(budget.amount)}',
                                                 style: TextStyle(
                                                   fontSize: 13,
                                                   fontWeight: FontWeight.w800,
-                                                  fontFamily: 'monospace',
                                                   color: isDark ? AppTokens.darkText : AppTokens.lightText,
                                                 ),
                                               ),
-                                              Text(
+                                              CurrencyText(
                                                 isOver
                                                     ? 'Vượt ${_formatCurrency(remaining.abs())}'
                                                     : 'Còn ${_formatCurrency(remaining)}',
@@ -1565,16 +1564,15 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen>
                                           Row(
                                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                             children: [
-                                              Text(
+                                              CurrencyText(
                                                 '${_formatCurrency(spent)} / ${_formatCurrency(p.targetAmount)}',
                                                 style: TextStyle(
                                                   fontSize: 13,
                                                   fontWeight: FontWeight.w800,
-                                                  fontFamily: 'monospace',
                                                   color: isDark ? AppTokens.darkText : AppTokens.lightText,
                                                 ),
                                               ),
-                                              Text(
+                                              CurrencyText(
                                                 isOver
                                                     ? 'Vượt ${_formatCurrency(remaining.abs())}'
                                                     : 'Còn ${_formatCurrency(remaining)}',
@@ -2388,12 +2386,11 @@ class _ProjectBudgetEditModalState extends ConsumerState<_ProjectBudgetEditModal
                             ),
                             Text(
                               _formatCurrency(displayAmount),
-                              style: TextStyle(
+                              style: currencyTextStyle(context, TextStyle(
                                 fontSize: 24,
                                 fontWeight: FontWeight.w900,
-                                fontFamily: 'monospace',
                                 color: primaryColor,
-                              ),
+                              )),
                             ),
                           ],
                         ),
@@ -2955,13 +2952,12 @@ class _BudgetSetupSheetState extends ConsumerState<_BudgetSetupSheet> {
                                 child: Text(
                                   _formatCurrency(displayAmount),
                                   maxLines: 1,
-                                  style: TextStyle(
+                                  style: currencyTextStyle(context, TextStyle(
                                     fontSize: 28,
                                     fontWeight: FontWeight.w900,
-                                    fontFamily: 'monospace',
                                     letterSpacing: -0.6,
                                     color: accent.primary,
-                                  ),
+                                  )),
                                 ),
                               ),
                             ),
@@ -3062,7 +3058,7 @@ Widget _buildNumpadGrid(
                           ? (k == 'BACK'
                           ? const Icon(Icons.backspace_outlined, size: 16)
                           : const Text('C', style: TextStyle(fontWeight: FontWeight.bold)))
-                          : Text(k, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, fontFamily: 'monospace')),
+                          : Text(k, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
                     ),
                   ),
                 ),

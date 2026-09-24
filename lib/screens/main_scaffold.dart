@@ -71,7 +71,8 @@ class MainScaffold extends ConsumerStatefulWidget {
   ConsumerState<MainScaffold> createState() => _MainScaffoldState();
 }
 
-class _MainScaffoldState extends ConsumerState<MainScaffold> with TickerProviderStateMixin {
+class _MainScaffoldState extends ConsumerState<MainScaffold>
+    with TickerProviderStateMixin {
   static const List<Widget> _screens = [
     DashboardScreen(),
     LedgerScreen(),
@@ -109,7 +110,7 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> with TickerProvider
         index: currentTabIndex,
         children: List.generate(
           _screens.length,
-              (index) {
+          (index) {
             return TickerMode(
               enabled: currentTabIndex == index,
               child: _screens[index],
@@ -122,7 +123,7 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> with TickerProvider
       // QUICK ENTRY FAB
       // ========================================================================
 
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+      floatingActionButtonLocation: const _CompactFabLocation(),
       floatingActionButton: _BouncyQuickEntryButton(
         accent: accent,
         onTriggered: _openQuickEntry,
@@ -337,7 +338,8 @@ class _PreservedNavTabItemState extends State<_PreservedNavTabItem>
   @override
   Widget build(BuildContext context) {
     final selectedColor = widget.accent.primary;
-    final mutedColor = widget.isDark ? AppTokens.darkMuted : AppTokens.lightMuted;
+    final mutedColor =
+        widget.isDark ? AppTokens.darkMuted : AppTokens.lightMuted;
 
     return InkWell(
       onTapDown: (_) {
@@ -364,10 +366,10 @@ class _PreservedNavTabItemState extends State<_PreservedNavTabItem>
             final scale = _resolveIconScale(p);
 
             final currentColor = Color.lerp(
-              mutedColor,
-              selectedColor,
-              Curves.easeOut.transform(p),
-            ) ??
+                  mutedColor,
+                  selectedColor,
+                  Curves.easeOut.transform(p),
+                ) ??
                 mutedColor;
 
             const morphEnd = 150.0 / 180.0;
@@ -376,10 +378,10 @@ class _PreservedNavTabItemState extends State<_PreservedNavTabItem>
             );
 
             final labelWeight = FontWeight.lerp(
-              FontWeight.w500,
-              FontWeight.w700,
-              p,
-            ) ??
+                  FontWeight.w500,
+                  FontWeight.w700,
+                  p,
+                ) ??
                 FontWeight.w500;
 
             return Column(
@@ -446,7 +448,8 @@ class _BouncyQuickEntryButton extends StatefulWidget {
   });
 
   @override
-  State<_BouncyQuickEntryButton> createState() => _BouncyQuickEntryButtonState();
+  State<_BouncyQuickEntryButton> createState() =>
+      _BouncyQuickEntryButtonState();
 }
 
 class _BouncyQuickEntryButtonState extends State<_BouncyQuickEntryButton>
@@ -603,8 +606,8 @@ class _BouncyQuickEntryButtonState extends State<_BouncyQuickEntryButton>
           scale: scale,
           alignment: Alignment.center,
           child: Container(
-            height: 60,
-            width: 60,
+            height: 56,
+            width: 56,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               boxShadow: [
@@ -627,8 +630,8 @@ class _BouncyQuickEntryButtonState extends State<_BouncyQuickEntryButton>
                 onTapCancel: _handleTapCancel,
                 onTap: _handleTap,
                 child: const SizedBox(
-                  width: 60,
-                  height: 60,
+                  width: 56,
+                  height: 56,
                   child: Center(
                     child: Icon(
                       Icons.add_rounded,
@@ -643,5 +646,15 @@ class _BouncyQuickEntryButtonState extends State<_BouncyQuickEntryButton>
         );
       },
     );
+  }
+}
+
+class _CompactFabLocation extends FloatingActionButtonLocation {
+  const _CompactFabLocation();
+
+  @override
+  Offset getOffset(ScaffoldPrelayoutGeometry geometry) {
+    return FloatingActionButtonLocation.centerDocked.getOffset(geometry) +
+        const Offset(0, 8);
   }
 }
