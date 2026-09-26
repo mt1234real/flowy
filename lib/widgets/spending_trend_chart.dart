@@ -17,6 +17,8 @@ import 'package:intl/intl.dart';
 import '../core/animation/app_animation_policy.dart';
 import '../data/database.dart';
 import '../theme/app_theme.dart';
+import '../features/insights/spending_insights_screen.dart';
+import 'sliding_segmented_bar.dart';
 
 enum ChartPeriod { days7, month, quarter, year }
 
@@ -44,6 +46,7 @@ final chartExpensesStreamProvider =
 
   return (db.select(db.transactions)
         ..where((t) =>
+            t.deletedAt.isNull() &
             t.type.equals(CategoryType.expense.index) &
             t.date.isBiggerOrEqualValue(oneYearAgo))
         ..orderBy([(t) => drift.OrderingTerm.asc(t.date)]))
@@ -94,6 +97,23 @@ class _SpendingTrendChartState extends ConsumerState<SpendingTrendChart>
   void _triggerBarAnimation() {
     _barAnimController.reset();
     _barAnimController.forward();
+  }
+
+  void _selectBar(int index) {
+    HapticFeedback.selectionClick();
+    setState(() => _selectedBucketIndex = index);
+  }
+
+  void _openInsights() {
+    HapticFeedback.selectionClick();
+    Navigator.of(context).push(PreservedPageRouteBuilder(
+        pageBuilder: (_, animation, secondary) =>
+            const SpendingInsightsScreen(),
+        transitionsBuilder: (_, animation, secondary, child) => SlideTransition(
+            position: Tween(begin: const Offset(1, 0), end: Offset.zero)
+                .animate(CurvedAnimation(
+                    parent: animation, curve: Curves.easeOutCubic)),
+            child: child)));
   }
 
   String _formatCurrency(double amount) {
@@ -229,7 +249,11 @@ class _SpendingTrendChartState extends ConsumerState<SpendingTrendChart>
 
     return expensesAsync.when(
       data: (allExpenses) {
-        final buckets = _buildBuckets(allExpenses, _selectedPeriod);
+        final buckets = _buildBuckets(
+            allExpenses
+                .where((t) => t.amount.isFinite && t.amount > 0)
+                .toList(),
+            _selectedPeriod);
         final totalPeriodExpense =
             buckets.fold(0.0, (sum, b) => sum + b.amount);
         final maxAmount = buckets.map((b) => b.amount).fold(0.0, math.max);
@@ -250,54 +274,57 @@ class _SpendingTrendChartState extends ConsumerState<SpendingTrendChart>
         }
 
         return SizedBox(
-            height: 190,
+            height: 258 + (MediaQuery.textScalerOf(context).scale(12) - 12) * 6,
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 1. Header & 4-Period Filter Tabs
-                  FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: Alignment.centerLeft,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'XU HƯỚNG CHI TIÊU',
+                  Row(children: [
+                    const Expanded(
+                        child: Text('XU HƯỚNG CHI TIÊU',
                             style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0.6,
-                              color: isDark
-                                  ? AppTokens.darkMuted
-                                  : AppTokens.lightMuted,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.all(2),
+                                fontSize: 11, fontWeight: FontWeight.w800))),
+                    TextButton(
+                        onPressed: _openInsights,
+                        child: Container(
+                            constraints: const BoxConstraints(minHeight: 28),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 5),
                             decoration: BoxDecoration(
-                              color: isDark
-                                  ? AppTokens.darkCardSubtle
-                                  : AppTokens.lightCardSubtle,
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Row(
-                              children: [
-                                _buildPeriodTab('7 ngày', ChartPeriod.days7,
-                                    accent, isDark),
-                                _buildPeriodTab(
-                                    'Tháng', ChartPeriod.month, accent, isDark),
-                                _buildPeriodTab(
-                                    'Quý', ChartPeriod.quarter, accent, isDark),
-                                _buildPeriodTab(
-                                    'Năm', ChartPeriod.year, accent, isDark),
-                              ],
-                            ),
-                          ),
-                        ],
-                      )),
+                                color: accent.primary.withValues(alpha: .08),
+                                borderRadius: BorderRadius.circular(14)),
+                            child: const Text('Phân tích nhóm ❯',
+                                style: TextStyle(fontSize: 11)))),
+                  ]),
+                  SlidingSegmentedBar<ChartPeriod>(
+                    height: 32,
+                    fontSize: 10,
+                    debugLabel: 'SpendingTrend.period',
+                    selectedValue: _selectedPeriod,
+                    trackColor: Colors.transparent,
+                    trackBorderColor: Colors.transparent,
+                    indicatorColor: accent.primary,
+                    indicatorBorderColor: Colors.transparent,
+                    indicatorShadowColor: Colors.transparent,
+                    selectedTextColor: Colors.white,
+                    mutedTextColor:
+                        isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                    items: [
+                      for (final period in ChartPeriod.values)
+                        SlidingSegmentedItem(
+                          value: period,
+                          label: _getPeriodLabel(period),
+                        ),
+                    ],
+                    onValueChanged: (period) {
+                      setState(() {
+                        _selectedPeriod = period;
+                        _selectedBucketIndex = null;
+                      });
+                      _triggerBarAnimation();
+                    },
+                  ),
                   const SizedBox(height: 6),
 
                   // 2. Interactive Tooltip Row (Hiển thị chi tiết mốc được chọn)
@@ -348,13 +375,15 @@ class _SpendingTrendChartState extends ConsumerState<SpendingTrendChart>
                             const SizedBox(width: 8),
                             Text(
                               widget.isVisible ? infoAmount : '•••••• ₫',
-                              style: currencyTextStyle(context, TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w900,
-                                color: isDark
-                                    ? AppTokens.darkText
-                                    : AppTokens.lightText,
-                              )),
+                              style: currencyTextStyle(
+                                  context,
+                                  TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w900,
+                                    color: isDark
+                                        ? AppTokens.darkText
+                                        : AppTokens.lightText,
+                                  )),
                             ),
                           ],
                         )),
@@ -367,7 +396,8 @@ class _SpendingTrendChartState extends ConsumerState<SpendingTrendChart>
                     animation: _barCurveAnimation,
                     builder: (context, child) {
                       return SizedBox(
-                        height: 96,
+                        height: 96 +
+                            (MediaQuery.textScalerOf(context).scale(10) - 10),
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: List.generate(buckets.length, (index) {
@@ -387,16 +417,7 @@ class _SpendingTrendChartState extends ConsumerState<SpendingTrendChart>
                             return Expanded(
                               child: GestureDetector(
                                 behavior: HitTestBehavior.opaque,
-                                onTap: () {
-                                  HapticFeedback.selectionClick();
-                                  setState(() {
-                                    if (_selectedBucketIndex == index) {
-                                      _selectedBucketIndex = null;
-                                    } else {
-                                      _selectedBucketIndex = index;
-                                    }
-                                  });
-                                },
+                                onTap: () => _selectBar(index),
                                 child: Column(
                                   mainAxisAlignment: MainAxisAlignment.end,
                                   children: [
@@ -516,10 +537,10 @@ class _SpendingTrendChartState extends ConsumerState<SpendingTrendChart>
         height: 160,
         child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
       ),
-      error: (err, _) => Padding(
-        padding: const EdgeInsets.all(16),
-        child: Text('Lỗi tải dữ liệu biểu đồ: $err',
-            style: const TextStyle(color: AppTokens.expense)),
+      error: (err, _) => const Padding(
+        padding: EdgeInsets.all(16),
+        child: Text('Không thể tải biểu đồ. Vui lòng thử lại.',
+            style: TextStyle(color: AppTokens.expense)),
       ),
     );
   }
@@ -535,38 +556,5 @@ class _SpendingTrendChartState extends ConsumerState<SpendingTrendChart>
       case ChartPeriod.year:
         return 'Năm nay';
     }
-  }
-
-  Widget _buildPeriodTab(
-      String label, ChartPeriod target, AppAccentPreset accent, bool isDark) {
-    final isSelected = _selectedPeriod == target;
-    return InkWell(
-      onTap: () {
-        HapticFeedback.selectionClick();
-        setState(() {
-          _selectedPeriod = target;
-          _selectedBucketIndex = null;
-        });
-        _triggerBarAnimation();
-      },
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(
-          color: isSelected ? accent.primary : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 10,
-            fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-            color: isSelected
-                ? Colors.white
-                : (isDark ? AppTokens.darkMuted : AppTokens.lightMuted),
-          ),
-        ),
-      ),
-    );
   }
 }

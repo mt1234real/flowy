@@ -11,7 +11,6 @@
 // ==============================================================================
 
 import 'dart:math' as math;
-import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
@@ -285,32 +284,29 @@ class _PrecisionNumpadKeyState extends State<PrecisionNumpadKey>
                 child: Transform.scale(
                   scale: scale,
                   child: ClipOval(
-                    child: BackdropFilter(
-                      enabled: widget.isNumber,
-                      filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: widget.isNumber
-                              ? Colors.white.withValues(
-                                  alpha: _down ? 0.32 : 0.06 + 0.26 * t)
-                              : Colors.transparent,
-                          border: widget.isNumber
-                              ? Border.all(
-                                  width: 0.8,
-                                  color: Colors.white.withValues(alpha: 0.14))
-                              : null,
-                        ),
-                        child: Center(
-                            child: widget.label != null
-                                ? Text(widget.label!, style: style)
-                                : Icon(widget.icon,
-                                    size:
-                                        widget.icon == Icons.backspace_outlined
-                                            ? 22
-                                            : 26,
-                                    color: widget.color)),
+                    // A painted translucent disc avoids ten backdrop passes
+                    // while the keypad moves with its route or bottom sheet.
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: widget.isNumber
+                            ? Colors.white.withValues(
+                                alpha: _down ? 0.32 : 0.06 + 0.26 * t)
+                            : Colors.transparent,
+                        border: widget.isNumber
+                            ? Border.all(
+                                width: 0.8,
+                                color: Colors.white.withValues(alpha: 0.14))
+                            : null,
                       ),
+                      child: Center(
+                          child: widget.label != null
+                              ? Text(widget.label!, style: style)
+                              : Icon(widget.icon,
+                                  size: widget.icon == Icons.backspace_outlined
+                                      ? 22
+                                      : 26,
+                                  color: widget.color)),
                     ),
                   ),
                 ),

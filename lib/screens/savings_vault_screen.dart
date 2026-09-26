@@ -38,7 +38,7 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
   bool _isUnlockFlowActive = false;
 
   static const Duration _privacyShieldFadeDuration =
-  Duration(milliseconds: 150);
+      Duration(milliseconds: 150);
 
   static const Map<String, IconData> _vaultGoalIcons = {
     'general': Icons.savings_outlined,
@@ -111,7 +111,7 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
         transitionDuration: const Duration(milliseconds: 180),
         reverseTransitionDuration: const Duration(milliseconds: 150),
         pageBuilder: (context, animation, secondaryAnimation) =>
-        const VaultAuthScreen(
+            const VaultAuthScreen(
           unlockOnly: true,
           autoStartBiometrics: true,
         ),
@@ -169,7 +169,8 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
   }
 
   String _formatCurrency(double amount) {
-    return NumberFormat.currency(locale: 'vi_VN', symbol: '₫', decimalDigits: 0).format(amount);
+    return NumberFormat.currency(locale: 'vi_VN', symbol: '₫', decimalDigits: 0)
+        .format(amount);
   }
 
   Color _parseColor(String hex) {
@@ -190,11 +191,9 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
     final accent = ref.watch(accentPresetProvider);
 
     final screenBackground =
-    isDark ? const Color(0xFF0B0F17) : AppTokens.lightBg;
-    final primaryText =
-    isDark ? const Color(0xFFF8FAFC) : AppTokens.lightText;
-    final mutedText =
-    isDark ? const Color(0xFF94A3B8) : AppTokens.lightMuted;
+        isDark ? const Color(0xFF0B0F17) : AppTokens.lightBg;
+    final primaryText = isDark ? const Color(0xFFF8FAFC) : AppTokens.lightText;
+    final mutedText = isDark ? const Color(0xFF94A3B8) : AppTokens.lightMuted;
 
     return AppFeedbackDismissRegion(
       child: PopScope(
@@ -283,7 +282,7 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                   data: (goals) {
                     final totalProtected = goals.fold<double>(
                       0.0,
-                          (sum, g) => sum + g.currentAmount,
+                      (sum, g) => sum + g.currentAmount,
                     );
 
                     return SingleChildScrollView(
@@ -335,7 +334,7 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                               physics: const NeverScrollableScrollPhysics(),
                               itemCount: goals.length,
                               separatorBuilder: (_, __) =>
-                              const SizedBox(height: 14),
+                                  const SizedBox(height: 14),
                               itemBuilder: (ctx, index) {
                                 return _buildLiquidGoalCard(
                                   goals[index],
@@ -377,9 +376,9 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
   }
 
   Widget _buildPrivacyShield(
-      BuildContext context, {
-        required AppAccentPreset accent,
-      }) {
+    BuildContext context, {
+    required AppAccentPreset accent,
+  }) {
     final theme = Theme.of(context);
 
     return BackdropFilter(
@@ -468,21 +467,19 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
   // A. THẺ HERO TỔNG TÀI SẢN ĐANG ĐÓNG BĂNG (LUXURY VAULT THEME)
   // ============================================================================
   Widget _buildHeroVaultCard(
-      double totalBalance,
-      int totalGoals, {
-        required bool isDark,
-        required AppAccentPreset accent,
-      }) {
+    double totalBalance,
+    int totalGoals, {
+    required bool isDark,
+    required AppAccentPreset accent,
+  }) {
     final theme = Theme.of(context);
-    final surface = isDark
-        ? const Color(0xEB1E2430)
-        : Colors.white.withValues(alpha: 0.90);
-    final border =
-    isDark ? const Color(0xFF2E384D) : const Color(0xFFE2E8F0);
+    final surface =
+        isDark ? const Color(0xEB1E2430) : Colors.white.withValues(alpha: 0.90);
+    final border = isDark ? const Color(0xFF2E384D) : const Color(0xFFE2E8F0);
     final primaryText =
-    isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A);
+        isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A);
     final mutedText =
-    isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+        isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(22),
@@ -538,24 +535,28 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                            'TỔNG TÍCH LŨY HIỆN CÓ',
-                            style: theme.textTheme.labelLarge?.copyWith(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0.9,
-                              color: mutedText,
-                            ),
-                          ),
+                                'TỔNG TÍCH LŨY HIỆN CÓ',
+                                style: theme.textTheme.labelLarge?.copyWith(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.9,
+                                  color: mutedText,
+                                ),
+                              ),
                               const SizedBox(height: 6),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 3),
                                 decoration: BoxDecoration(
                                   color: accent.primary.withValues(alpha: 0.10),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
-                                child: Text('Riêng tư', style: TextStyle(
-                                  fontSize: 11, fontWeight: FontWeight.w600, color: accent.primary,
-                                )),
+                                child: Text('Riêng tư',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: accent.primary,
+                                    )),
                               ),
                             ],
                           ),
@@ -566,16 +567,19 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                             button: true,
                             label: _isBalanceHidden ? 'Hiện số dư' : 'Ẩn số dư',
                             child: Listener(
-                              onPointerDown: (_) => HapticFeedback.selectionClick(),
+                              onPointerDown: (_) =>
+                                  HapticFeedback.selectionClick(),
                               child: InkWell(
                                 borderRadius: BorderRadius.circular(12),
-                                onTap: () => setState(() => _isBalanceHidden = !_isBalanceHidden),
+                                onTap: () => setState(
+                                    () => _isBalanceHidden = !_isBalanceHidden),
                                 child: SizedBox(
                                   width: 44,
                                   height: 44,
                                   child: Center(
                                     child: AnimatedSwitcher(
-                                      duration: const Duration(milliseconds: 180),
+                                      duration:
+                                          const Duration(milliseconds: 180),
                                       switchInCurve: Curves.easeOutCubic,
                                       switchOutCurve: Curves.easeInCubic,
                                       child: Icon(
@@ -625,8 +629,7 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                             shape: BoxShape.circle,
                             boxShadow: [
                               BoxShadow(
-                                color:
-                                accent.primary.withValues(alpha: 0.35),
+                                color: accent.primary.withValues(alpha: 0.35),
                                 blurRadius: 8,
                               ),
                             ],
@@ -662,11 +665,11 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
   // B. THẺ BÌNH CHẤT LỎNG CHO MỖI HŨ MỤC TIÊU (LIQUID FILL CARD)
   // ============================================================================
   Widget _buildLiquidGoalCard(
-      SavingsGoal goal,
-      AppDatabase db, {
-        required bool isDark,
-        required AppAccentPreset accent,
-      }) {
+    SavingsGoal goal,
+    AppDatabase db, {
+    required bool isDark,
+    required AppAccentPreset accent,
+  }) {
     final theme = Theme.of(context);
     final progress = goal.targetAmount > 0
         ? (goal.currentAmount / goal.targetAmount).clamp(0.0, 1.0)
@@ -674,15 +677,13 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
     final progressPercent = (progress * 100).round();
     final goalColor = _parseColor(goal.colorHex);
 
-    final surface = isDark
-        ? const Color(0xE61E2430)
-        : Colors.white.withValues(alpha: 0.92);
-    final border =
-    isDark ? const Color(0xFF2E384D) : const Color(0xFFE2E8F0);
+    final surface =
+        isDark ? const Color(0xE61E2430) : Colors.white.withValues(alpha: 0.92);
+    final border = isDark ? const Color(0xFF2E384D) : const Color(0xFFE2E8F0);
     final primaryText =
-    isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A);
+        isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A);
     final mutedText =
-    isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+        isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
 
     String? paceText;
     bool isUrgent = false;
@@ -696,13 +697,12 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
         paceText = 'Đã hoàn thành mục tiêu';
       } else if (diffDays <= 0) {
         paceText =
-        'Đã đến hạn • còn ${_formatCurrency(goal.targetAmount - goal.currentAmount)}';
+            'Đã đến hạn • còn ${_formatCurrency(goal.targetAmount - goal.currentAmount)}';
         isUrgent = true;
       } else {
         final remaining = goal.targetAmount - goal.currentAmount;
         final dailyNeeded = (remaining / diffDays).ceilToDouble();
-        paceText =
-        '~${_formatCurrency(dailyNeeded)}/ngày • còn $diffDays ngày';
+        paceText = '~${_formatCurrency(dailyNeeded)}/ngày • còn $diffDays ngày';
       }
     }
 
@@ -764,9 +764,11 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                         const SizedBox(height: 3),
                         Row(
                           children: [
-                            Text('Mục tiêu: ', style: theme.textTheme.bodySmall?.copyWith(
-                              fontSize: 11.5, color: mutedText,
-                            )),
+                            Text('Mục tiêu: ',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  fontSize: 11.5,
+                                  color: mutedText,
+                                )),
                             Expanded(
                               child: PreservedBalanceTumbler(
                                 isVisible: !_isBalanceHidden,
@@ -774,7 +776,8 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                                 maskedValue: '● ● ● ● ● ●',
                                 height: 18,
                                 style: TextStyle(
-                                  fontSize: 13, fontWeight: FontWeight.w800,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w800,
                                   letterSpacing: -0.5,
                                   color: mutedText,
                                 ),
@@ -791,9 +794,7 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                       color: mutedText,
                       size: 20,
                     ),
-                    color: isDark
-                        ? const Color(0xFF1E2430)
-                        : Colors.white,
+                    color: isDark ? const Color(0xFF1E2430) : Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
                     ),
@@ -855,9 +856,12 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
               const SizedBox(height: 17),
               Row(
                 children: [
-                  Text('Hiện có: ', style: theme.textTheme.bodyMedium?.copyWith(
-                    fontSize: 12.5, fontWeight: FontWeight.w700, color: primaryText,
-                  )),
+                  Text('Hiện có: ',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
+                        color: primaryText,
+                      )),
                   Expanded(
                     child: PreservedBalanceTumbler(
                       isVisible: !_isBalanceHidden,
@@ -865,8 +869,10 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                       maskedValue: '● ● ● ● ● ●',
                       height: 18,
                       style: TextStyle(
-                        fontSize: 13, fontWeight: FontWeight.w800,
-                        letterSpacing: -0.5, color: primaryText,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.5,
+                        color: primaryText,
                       ),
                     ),
                   ),
@@ -877,7 +883,8 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                 alignment: Alignment.centerRight,
                 child: IntrinsicWidth(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     child: PreservedBalanceTumbler(
                       isVisible: !_isBalanceHidden,
                       realValue: '$progressPercent% mục tiêu',
@@ -886,7 +893,8 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                       height: 18,
                       alignment: Alignment.centerRight,
                       style: TextStyle(
-                        fontSize: 11.5, fontWeight: FontWeight.w800,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w800,
                         color: accent.primary,
                       ),
                     ),
@@ -972,8 +980,7 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                             borderRadius: BorderRadius.circular(14),
                           ),
                         ),
-                        onPressed: () =>
-                            _showDepositSheet(context, goal, db),
+                        onPressed: () => _showDepositSheet(context, goal, db),
                         icon: const Icon(
                           Icons.arrow_downward_rounded,
                           size: 16,
@@ -1028,15 +1035,15 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
   }
 
   Widget _buildEmptyGoalsState(
-      BuildContext context, {
-        required bool isDark,
-        required AppAccentPreset accent,
-      }) {
+    BuildContext context, {
+    required bool isDark,
+    required AppAccentPreset accent,
+  }) {
     final theme = Theme.of(context);
     final primaryText =
-    isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A);
+        isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A);
     final mutedText =
-    isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+        isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
 
     return Container(
       width: double.infinity,
@@ -1047,9 +1054,7 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
             : Colors.white.withValues(alpha: 0.92),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: isDark
-              ? const Color(0xFF2E384D)
-              : const Color(0xFFE2E8F0),
+          color: isDark ? const Color(0xFF2E384D) : const Color(0xFFE2E8F0),
           width: 0.8,
         ),
       ),
@@ -1110,556 +1115,18 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
   }
 
   void _showDepositSheet(
-      BuildContext context,
-      SavingsGoal goal,
-      AppDatabase db,
-      ) {
-    final amountValidation = AppValidationFeedbackController();
-
+    BuildContext context,
+    SavingsGoal goal,
+    AppDatabase db,
+  ) {
     AppAnimationPolicy.showFluidSheet<void>(
       context: context,
       mode: FluidSheetMode.scrollable,
       backgroundColor: Colors.transparent,
-      builder: (sheetCtx, scrollController) {
-        String enteredAmountStr = '';
-        String? selectedWalletId;
-        bool isSubmitting = false;
-
-        return StatefulBuilder(
-          builder: (ctx, setSheetState) {
-            final theme = Theme.of(ctx);
-            final isDark = theme.brightness == Brightness.dark;
-            final accent = ref.read(accentPresetProvider);
-
-            final sheetSurface = isDark
-                ? const Color(0xFF111827)
-                : const Color(0xFFF8FAFC);
-            final cardSurface = isDark
-                ? const Color(0xFF1E2430)
-                : Colors.white;
-            final borderColor = isDark
-                ? const Color(0xFF2E384D)
-                : const Color(0xFFE2E8F0);
-            final primaryText =
-            isDark ? Colors.white : const Color(0xFF0F172A);
-            final mutedText = isDark
-                ? const Color(0xFF94A3B8)
-                : const Color(0xFF64748B);
-
-            return StreamBuilder<List<Wallet>>(
-              stream: db.watchAllWallets(),
-              builder: (context, snapshot) {
-                final wallets = snapshot.data ?? const <Wallet>[];
-
-                if (selectedWalletId == null && wallets.isNotEmpty) {
-                  selectedWalletId = wallets.first.id;
-                }
-
-                final selectedWallet = wallets.cast<Wallet?>().firstWhere(
-                      (wallet) => wallet?.id == selectedWalletId,
-                  orElse: () => null,
-                );
-
-                final amount = double.tryParse(enteredAmountStr) ?? 0.0;
-
-                void setAmount(double value) {
-                  setSheetState(() {
-                    enteredAmountStr = value <= 0
-                        ? ''
-                        : value.floorToDouble().toStringAsFixed(0);
-                    amountValidation.clear();
-                  });
-                }
-
-                void addQuickAmount(double increment) {
-                  setAmount(amount + increment);
-                }
-
-                return ClipRRect(
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(28),
-                  ),
-                  child: Container(
-                    color: sheetSurface,
-                    child: SafeArea(
-                      top: false,
-                      child: SingleChildScrollView(
-                        controller: scrollController,
-                        physics: const ClampingScrollPhysics(),
-                        padding: EdgeInsets.fromLTRB(
-                          20,
-                          12,
-                          20,
-                          MediaQuery.paddingOf(ctx).bottom + 18,
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Center(
-                              child: Container(
-                                width: 42,
-                                height: 4,
-                                decoration: BoxDecoration(
-                                  color: mutedText.withValues(alpha: 0.38),
-                                  borderRadius: BorderRadius.circular(999),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 14),
-
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                    CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'Nạp tiền vào quỹ',
-                                        style: theme.textTheme.titleMedium
-                                            ?.copyWith(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w800,
-                                          color: primaryText,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        'Dành cho mục tiêu: ${goal.title}',
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style:
-                                        theme.textTheme.bodySmall?.copyWith(
-                                          fontSize: 11.5,
-                                          fontWeight: FontWeight.w600,
-                                          color: mutedText,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                SizedBox(
-                                  width: 44,
-                                  height: 44,
-                                  child: IconButton(
-                                    tooltip: 'Đóng',
-                                    onPressed: () {
-                                      HapticFeedback.selectionClick();
-                                      Navigator.of(sheetCtx).pop();
-                                    },
-                                    icon: Icon(
-                                      Icons.close_rounded,
-                                      size: 21,
-                                      color: mutedText,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.fromLTRB(
-                                14,
-                                12,
-                                12,
-                                10,
-                              ),
-                              decoration: BoxDecoration(
-                                color: cardSurface,
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: borderColor,
-                                  width: 0.8,
-                                ),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Nguồn tiền trích',
-                                    style:
-                                    theme.textTheme.labelSmall?.copyWith(
-                                      fontSize: 10.5,
-                                      fontWeight: FontWeight.w800,
-                                      letterSpacing: 0.7,
-                                      color: mutedText,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 3),
-                                  DropdownButtonHideUnderline(
-                                    child: DropdownButton<String>(
-                                      value: selectedWalletId,
-                                      dropdownColor: isDark
-                                          ? const Color(0xFF1E2430)
-                                          : Colors.white,
-                                      isExpanded: true,
-                                      borderRadius: BorderRadius.circular(16),
-                                      icon: Icon(
-                                        Icons.chevron_right_rounded,
-                                        color: mutedText,
-                                      ),
-                                      hint: Text(
-                                        'Chọn nguồn tiền',
-                                        style: theme.textTheme.bodyMedium
-                                            ?.copyWith(
-                                          color: mutedText,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                      items: wallets.map((wallet) {
-                                        return DropdownMenuItem<String>(
-                                          value: wallet.id,
-                                          child: Row(
-                                            children: [
-                                              Container(
-                                                width: 30,
-                                                height: 30,
-                                                decoration: BoxDecoration(
-                                                  color: accent.primary
-                                                      .withValues(alpha: 0.10),
-                                                  borderRadius:
-                                                  BorderRadius.circular(9),
-                                                ),
-                                                child: Icon(
-                                                  Icons
-                                                      .account_balance_wallet_outlined,
-                                                  size: 16,
-                                                  color: accent.primary,
-                                                ),
-                                              ),
-                                              const SizedBox(width: 9),
-                                              Expanded(
-                                                child: Text(
-                                                  wallet.name,
-                                                  maxLines: 1,
-                                                  overflow:
-                                                  TextOverflow.ellipsis,
-                                                  style: theme
-                                                      .textTheme.bodyMedium
-                                                      ?.copyWith(
-                                                    fontSize: 12.5,
-                                                    fontWeight:
-                                                    FontWeight.w700,
-                                                    color: primaryText,
-                                                  ),
-                                                ),
-                                              ),
-                                              const SizedBox(width: 8),
-                                              Flexible(
-                                                child: Text(
-                                                'Khả dụng: ${_formatCurrency(wallet.balance)}',
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: theme
-                                                    .textTheme.labelSmall
-                                                    ?.copyWith(
-                                                  fontSize: 10.5,
-                                                  fontWeight:
-                                                  FontWeight.w700,
-                                                  color: accent.primary,
-                                                ),
-                                              ),
-                                              ),
-                                            ],
-                                          ),
-                                        );
-                                      }).toList(),
-                                      onChanged: (value) {
-                                        if (value == null) return;
-                                        setSheetState(() {
-                                          selectedWalletId = value;
-                                          enteredAmountStr = '';
-                                          amountValidation.clear();
-                                        });
-                                      },
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-
-                            const SizedBox(height: 12),
-
-                            AppValidationFeedback(
-                              controller: amountValidation,
-                              builder: (context, visual) => Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 14,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: cardSurface,
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(
-                                    color: visual.borderColor(borderColor),
-                                    width: visual.isInvalid ? 1.8 : 0.8,
-                                  ),
-                                ),
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        'Số tiền muốn tích lũy',
-                                        style: theme.textTheme.labelSmall
-                                            ?.copyWith(
-                                          fontSize: 10.5,
-                                          fontWeight: FontWeight.w800,
-                                          letterSpacing: 0.7,
-                                          color: mutedText,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Flexible(
-                                      flex: 2,
-                                      child: FittedBox(
-                                        fit: BoxFit.scaleDown,
-                                        alignment: Alignment.centerRight,
-                                        child: Text(
-                                          _formatCurrency(amount),
-                                          style: currencyTextStyle(context, (theme.textTheme.headlineSmall ?? const TextStyle()).copyWith(
-                                            fontSize: 26,
-                                            fontWeight: FontWeight.w800,
-                                            color: visual.isInvalid
-                                                ? AppTokens.expense
-                                                : primaryText,
-                                            fontFeatures: const [
-                                              FontFeature.tabularFigures(),
-                                            ],
-                                          )),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-
-                            const SizedBox(height: 12),
-
-                            Row(
-                              children: [
-                                _buildVaultQuickFillChip(
-                                  context: ctx,
-                                  label: '+50k',
-                                  onTap: () => addQuickAmount(50000),
-                                  isDark: isDark,
-                                ),
-                                const SizedBox(width: 8),
-                                _buildVaultQuickFillChip(
-                                  context: ctx,
-                                  label: '+100k',
-                                  onTap: () => addQuickAmount(100000),
-                                  isDark: isDark,
-                                ),
-                                const SizedBox(width: 8),
-                                _buildVaultQuickFillChip(
-                                  context: ctx,
-                                  label: '+200k',
-                                  onTap: () => addQuickAmount(200000),
-                                  isDark: isDark,
-                                ),
-                                const SizedBox(width: 8),
-                                _buildVaultQuickFillChip(
-                                  context: ctx,
-                                  label: 'Tất cả ví',
-                                  onTap: selectedWallet == null
-                                      ? null
-                                      : () => setAmount(
-                                    selectedWallet.balance
-                                        .clamp(0.0, double.infinity)
-                                        .toDouble(),
-                                  ),
-                                  isDark: isDark,
-                                ),
-                              ],
-                            ),
-
-                            const SizedBox(height: 10),
-
-                            _buildInlineNumpad(
-                              onPress: (digit) {
-                                setSheetState(() {
-                                  if (enteredAmountStr.length >= 11) return;
-                                  enteredAmountStr = enteredAmountStr.isEmpty ||
-                                      enteredAmountStr == '0'
-                                      ? digit
-                                      : '$enteredAmountStr$digit';
-                                  amountValidation.clear();
-                                });
-                              },
-                              onBackspace: () {
-                                setSheetState(() {
-                                  if (enteredAmountStr.isEmpty) return;
-                                  enteredAmountStr = enteredAmountStr.substring(
-                                    0,
-                                    enteredAmountStr.length - 1,
-                                  );
-                                  amountValidation.clear();
-                                });
-                              },
-                              onClear: () {
-                                setSheetState(() {
-                                  enteredAmountStr = '';
-                                  amountValidation.clear();
-                                });
-                              },
-                            ),
-
-                            const SizedBox(height: 14),
-
-                            SizedBox(
-                              width: double.infinity,
-                              height: 50,
-                              child: ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: accent.primary,
-                                  foregroundColor: Colors.white,
-                                  disabledBackgroundColor: accent.primary,
-                                  disabledForegroundColor:
-                                  Colors.white,
-                                  elevation: 1,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(14),
-                                  ),
-                                ),
-                                onPressed: isSubmitting
-                                    ? null
-                                    : () async {
-                                  if (selectedWallet == null) {
-                                    AppFeedback.showInfo(
-                                      context,
-                                      'Chưa có nguồn tiền khả dụng.',
-                                    );
-                                    return;
-                                  }
-
-                                  if (amount <= 0 ||
-                                      amount >
-                                          selectedWallet.balance) {
-                                    amountValidation.reject();
-                                    return;
-                                  }
-
-                                  setSheetState(
-                                        () => isSubmitting = true,
-                                  );
-
-                                  try {
-                                    await db.depositToGoal(
-                                      goalId: goal.id,
-                                      walletId: selectedWallet.id,
-                                      amount: amount,
-                                    );
-
-                                    if (context.mounted) {
-                                      AppFeedback.showSuccess(
-                                        context,
-                                        'Đã nạp ${_formatCurrency(amount)} vào "${goal.title}".',
-                                      );
-                                    }
-
-                                    if (sheetCtx.mounted) {
-                                      Navigator.of(sheetCtx).pop();
-                                    }
-                                  } catch (e) {
-                                    debugPrint(
-                                      'SavingsVault deposit failed: $e',
-                                    );
-
-                                    if (sheetCtx.mounted) {
-                                      setSheetState(
-                                            () => isSubmitting = false,
-                                      );
-                                    }
-
-                                    if (context.mounted) {
-                                      AppFeedback.showError(
-                                        context,
-                                        'Không thể nạp tiền vào hũ. Vui lòng thử lại.',
-                                      );
-                                    }
-                                  }
-                                },
-                                child: isSubmitting
-                                    ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
-                                  ),
-                                )
-                                    : const Text(
-                                  'Xác nhận nạp tiền',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w800,
-                                    color: Colors.white,
-                                    letterSpacing: 0.2,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              },
-            );
-          },
-        );
-      },
-    ).whenComplete(amountValidation.dispose);
-  }
-
-  Widget _buildVaultQuickFillChip({
-    required BuildContext context,
-    required String label,
-    required VoidCallback? onTap,
-    required bool isDark,
-  }) {
-    final theme = Theme.of(context);
-
-    return Expanded(
-      child: SizedBox(
-        height: 32,
-        child: Material(
-          color: isDark
-              ? const Color(0xFF1E2430)
-              : const Color(0xFFEFF3F8),
-          borderRadius: BorderRadius.circular(11),
-          child: InkWell(
-            onTap: onTap == null
-                ? null
-                : () {
-              HapticFeedback.selectionClick();
-              onTap();
-            },
-            borderRadius: BorderRadius.circular(11),
-            child: Center(
-              child: Text(
-                label,
-                style: theme.textTheme.labelMedium?.copyWith(
-                  fontSize: 10.8,
-                  fontWeight: FontWeight.w700,
-                  color: onTap == null
-                      ? (isDark ? Colors.white24 : Colors.black26)
-                      : (isDark
-                      ? Colors.white
-                      : const Color(0xFF0F172A)),
-                ),
-              ),
-            ),
-          ),
-        ),
+      builder: (_, scrollController) => _VaultDepositSheet(
+        goal: goal,
+        db: db,
+        scrollController: scrollController!,
       ),
     );
   }
@@ -1667,7 +1134,8 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
   // ============================================================================
   // E. BOTTOM SHEET RÚT TIỀN TỪ HŨ VỀ VÍ (WITHDRAW - ACID TRANSACTION)
   // ============================================================================
-  void _showWithdrawSheet(BuildContext context, SavingsGoal goal, AppDatabase db) {
+  void _showWithdrawSheet(
+      BuildContext context, SavingsGoal goal, AppDatabase db) {
     final amountValidation = AppValidationFeedbackController();
     AppAnimationPolicy.showFluidSheet<void>(
       context: context,
@@ -1721,10 +1189,12 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                           Container(
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF38BDF8).withValues(alpha: 0.2),
+                              color: const Color(0xFF38BDF8)
+                                  .withValues(alpha: 0.2),
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(Icons.arrow_upward_rounded, color: Color(0xFF38BDF8), size: 20),
+                            child: const Icon(Icons.arrow_upward_rounded,
+                                color: Color(0xFF38BDF8), size: 20),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
@@ -1733,11 +1203,15 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                               children: [
                                 const Text(
                                   'Rút tiền về ví',
-                                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Colors.white),
+                                  style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w800,
+                                      color: Colors.white),
                                 ),
                                 CurrencyText(
                                   'Nguồn: ${goal.icon} ${goal.title} (Có: ${_formatCurrency(goal.currentAmount)})',
-                                  style: const TextStyle(fontSize: 12, color: Colors.white60),
+                                  style: const TextStyle(
+                                      fontSize: 12, color: Colors.white60),
                                 ),
                               ],
                             ),
@@ -1749,11 +1223,15 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                       // CHỌN VÍ NHẬN TIỀN
                       const Text(
                         'Chuyển tiền vào ví',
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.white54),
+                        style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white54),
                       ),
                       const SizedBox(height: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 4),
                         decoration: BoxDecoration(
                           color: const Color(0xFF1F2937),
                           borderRadius: BorderRadius.circular(16),
@@ -1764,11 +1242,16 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                             value: selectedWalletId,
                             dropdownColor: const Color(0xFF1F2937),
                             isExpanded: true,
-                            icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white70),
+                            icon: const Icon(Icons.keyboard_arrow_down_rounded,
+                                color: Colors.white70),
                             items: wallets.map((w) {
                               return DropdownMenuItem<String>(
                                 value: w.id,
-                                child: Text(w.name, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700)),
+                                child: Text(w.name,
+                                    style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w700)),
                               );
                             }).toList(),
                             onChanged: (val) {
@@ -1791,7 +1274,8 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                         controller: amountValidation,
                         builder: (context, visual) => Container(
                           width: double.infinity,
-                          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                          padding: const EdgeInsets.symmetric(
+                              vertical: 16, horizontal: 16),
                           decoration: BoxDecoration(
                             color: const Color(0xFF1F2937),
                             borderRadius: BorderRadius.circular(18),
@@ -1805,19 +1289,24 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                           child: Column(
                             children: [
                               Text(
-                                enteredAmountStr.isEmpty ? '0 ₫' : _formatCurrency(amount),
-                                style: currencyTextStyle(context, TextStyle(
-                                  fontSize: 30,
-                                  fontWeight: FontWeight.w900,
-                                  color: visual.isInvalid
-                                      ? AppTokens.expense
-                                      : const Color(0xFF38BDF8),
-                                )),
+                                enteredAmountStr.isEmpty
+                                    ? '0 ₫'
+                                    : _formatCurrency(amount),
+                                style: currencyTextStyle(
+                                    context,
+                                    TextStyle(
+                                      fontSize: 30,
+                                      fontWeight: FontWeight.w900,
+                                      color: visual.isInvalid
+                                          ? AppTokens.expense
+                                          : const Color(0xFF38BDF8),
+                                    )),
                               ),
                               const SizedBox(height: 4),
                               CurrencyText(
                                 'Số dư tối đa trong hũ: ${_formatCurrency(goal.currentAmount)}',
-                                style: const TextStyle(fontSize: 11, color: Colors.white54),
+                                style: const TextStyle(
+                                    fontSize: 11, color: Colors.white54),
                               ),
                             ],
                           ),
@@ -1828,7 +1317,10 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                         const SizedBox(height: 8),
                         Text(
                           errorMessage!,
-                          style: const TextStyle(fontSize: 11, color: Colors.redAccent, fontWeight: FontWeight.bold),
+                          style: const TextStyle(
+                              fontSize: 11,
+                              color: Colors.redAccent,
+                              fontWeight: FontWeight.bold),
                         ),
                       ],
 
@@ -1842,27 +1334,36 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                             onTap: () {
                               HapticFeedback.selectionClick();
                               setSheetState(() {
-                                enteredAmountStr = goal.currentAmount.toInt().toString();
+                                enteredAmountStr =
+                                    goal.currentAmount.toInt().toString();
                                 errorMessage = null;
                                 amountValidation.clear();
                               });
                             },
                             borderRadius: BorderRadius.circular(10),
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 6),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF38BDF8).withValues(alpha: 0.2),
+                                color: const Color(0xFF38BDF8)
+                                    .withValues(alpha: 0.2),
                                 borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.4)),
+                                border: Border.all(
+                                    color: const Color(0xFF38BDF8)
+                                        .withValues(alpha: 0.4)),
                               ),
                               child: const Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Icons.all_inclusive_rounded, size: 14, color: Color(0xFF38BDF8)),
+                                  Icon(Icons.all_inclusive_rounded,
+                                      size: 14, color: Color(0xFF38BDF8)),
                                   SizedBox(width: 4),
                                   Text(
                                     'Rút hết số dư',
-                                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF38BDF8)),
+                                    style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w800,
+                                        color: Color(0xFF38BDF8)),
                                   ),
                                 ],
                               ),
@@ -1875,6 +1376,7 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
 
                       // BÀN PHÍM NUMPAD TÍCH HỢP
                       _buildInlineNumpad(
+                        context: context,
                         onPress: (digit) {
                           setSheetState(() {
                             if (enteredAmountStr.length < 11) {
@@ -1887,7 +1389,8 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                         onBackspace: () {
                           setSheetState(() {
                             if (enteredAmountStr.isNotEmpty) {
-                              enteredAmountStr = enteredAmountStr.substring(0, enteredAmountStr.length - 1);
+                              enteredAmountStr = enteredAmountStr.substring(
+                                  0, enteredAmountStr.length - 1);
                               errorMessage = null;
                               amountValidation.clear();
                             }
@@ -1913,43 +1416,56 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                             backgroundColor: const Color(0xFF38BDF8),
                             foregroundColor: Colors.black,
                             elevation: 0,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16)),
                           ),
-                          onPressed: (isSubmitting || amount <= 0 || selectedWalletId == null)
+                          onPressed: (isSubmitting ||
+                                  amount <= 0 ||
+                                  selectedWalletId == null)
                               ? null
                               : () async {
-                            if (amount > goal.currentAmount) {
-                              amountValidation.reject();
-                              setSheetState(() {
-                                errorMessage = 'Số tiền rút vượt quá số dư trong hũ (${_formatCurrency(goal.currentAmount)})!';
-                              });
-                              return;
-                            }
+                                  if (amount > goal.currentAmount) {
+                                    amountValidation.reject();
+                                    setSheetState(() {
+                                      errorMessage =
+                                          'Số tiền rút vượt quá số dư trong hũ (${_formatCurrency(goal.currentAmount)})!';
+                                    });
+                                    return;
+                                  }
 
-                            setSheetState(() => isSubmitting = true);
-                            try {
-                              await db.withdrawFromGoal(
-                                goalId: goal.id,
-                                walletId: selectedWalletId!,
-                                amount: amount,
-                              );
-                              if (context.mounted) {
-                                AppFeedback.showSuccess(
-                                  context,
-                                  'Đã rút thành công ${_formatCurrency(amount)} về ví',
-                                );
-                              }
-                              if (sheetCtx.mounted) Navigator.of(sheetCtx).pop();
-                            } catch (e) {
-                              setSheetState(() {
-                                isSubmitting = false;
-                                errorMessage = 'Lỗi rút tiền: $e';
-                              });
-                            }
-                          },
+                                  setSheetState(() => isSubmitting = true);
+                                  try {
+                                    await db.withdrawFromGoal(
+                                      goalId: goal.id,
+                                      walletId: selectedWalletId!,
+                                      amount: amount,
+                                    );
+                                    if (context.mounted) {
+                                      AppFeedback.showSuccess(
+                                        context,
+                                        'Đã rút thành công ${_formatCurrency(amount)} về ví',
+                                      );
+                                    }
+                                    if (sheetCtx.mounted) {
+                                      Navigator.of(sheetCtx).pop();
+                                    }
+                                  } catch (e) {
+                                    setSheetState(() {
+                                      isSubmitting = false;
+                                      errorMessage = 'Lỗi rút tiền: $e';
+                                    });
+                                  }
+                                },
                           child: isSubmitting
-                              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
-                              : const Text('Xác nhận rút tiền', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2, color: Colors.black))
+                              : const Text('Xác nhận rút tiền',
+                                  style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w800)),
                         ),
                       ),
                     ],
@@ -1966,12 +1482,17 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
   // ============================================================================
   // F. MODAL TẠO / SỬA HŨ TIẾT KIỆM (CREATE / EDIT GOAL)
   // ============================================================================
-  void _showCreateOrEditGoalModal(BuildContext context, {SavingsGoal? existingGoal}) {
-    final titleController = TextEditingController(text: existingGoal?.title ?? '');
+  void _showCreateOrEditGoalModal(BuildContext context,
+      {SavingsGoal? existingGoal}) {
+    final titleController =
+        TextEditingController(text: existingGoal?.title ?? '');
     final targetController = TextEditingController(
-      text: existingGoal != null ? existingGoal.targetAmount.toInt().toString() : '',
+      text: existingGoal != null
+          ? existingGoal.targetAmount.toInt().toString()
+          : '',
     );
-    String selectedIcon = _normalizeGoalIconKey(existingGoal?.icon ?? 'general');
+    String selectedIcon =
+        _normalizeGoalIconKey(existingGoal?.icon ?? 'general');
     String selectedColor = existingGoal?.colorHex ?? '#10B981';
     DateTime? selectedTargetDate = existingGoal?.targetDate;
     final titleValidation = AppValidationFeedbackController();
@@ -1979,7 +1500,14 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
     final accent = ref.read(accentPresetProvider);
 
     final icons = _vaultGoalIcons.keys.toList(growable: false);
-    final colors = ['#10B981', '#0EA5E9', '#F59E0B', '#F43F5E', '#8B5CF6', '#14B8A6'];
+    final colors = [
+      '#10B981',
+      '#0EA5E9',
+      '#F59E0B',
+      '#F43F5E',
+      '#8B5CF6',
+      '#14B8A6'
+    ];
 
     AppAnimationPolicy.showFluidSheet<void>(
       context: context,
@@ -2007,31 +1535,46 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                       child: Container(
                         width: 42,
                         height: 4,
-                        decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)),
+                        decoration: BoxDecoration(
+                            color: Colors.white24,
+                            borderRadius: BorderRadius.circular(2)),
                       ),
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      existingGoal == null ? 'Tạo Mục Tiêu Tích Lũy' : 'Chỉnh Sửa Mục Tiêu',
-                      style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: Colors.white),
+                      existingGoal == null
+                          ? 'Tạo Mục Tiêu Tích Lũy'
+                          : 'Chỉnh Sửa Mục Tiêu',
+                      style: const TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white),
                     ),
                     const SizedBox(height: 18),
 
                     // TÊN MỤC TIÊU
-                    const Text('TÊN MỤC TIÊU', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.white54)),
+                    const Text('TÊN MỤC TIÊU',
+                        style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white54)),
                     const SizedBox(height: 6),
                     AppValidationFeedback(
                       controller: titleValidation,
                       builder: (context, visual) => TextField(
                         controller: titleController,
                         onChanged: (_) => titleValidation.clear(),
-                        style: const TextStyle(color: Colors.white, fontSize: 14),
+                        style:
+                            const TextStyle(color: Colors.white, fontSize: 14),
                         decoration: InputDecoration(
-                          hintText: 'Ví dụ: Đàn Guitar, Mua MacBook, Quỹ khẩn cấp',
-                          hintStyle: const TextStyle(color: Colors.white38, fontSize: 13),
+                          hintText:
+                              'Ví dụ: Đàn Guitar, Mua MacBook, Quỹ khẩn cấp',
+                          hintStyle: const TextStyle(
+                              color: Colors.white38, fontSize: 13),
                           filled: true,
                           fillColor: const Color(0xFF1F2937),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 12),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(14),
                             borderSide: BorderSide(
@@ -2060,7 +1603,11 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                     const SizedBox(height: 14),
 
                     // CHỌN BIỂU TƯỢNG EMOJI
-                    const Text('CHỌN BIỂU TƯỢNG', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.white54)),
+                    const Text('CHỌN BIỂU TƯỢNG',
+                        style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white54)),
                     const SizedBox(height: 8),
                     SizedBox(
                       height: 44,
@@ -2081,9 +1628,14 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                               width: 44,
                               height: 44,
                               decoration: BoxDecoration(
-                                color: isSelected ? accent.primary.withValues(alpha: 0.16) : const Color(0xFF1F2937),
+                                color: isSelected
+                                    ? accent.primary.withValues(alpha: 0.16)
+                                    : const Color(0xFF1F2937),
                                 borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: isSelected ? accent.primary : Colors.transparent),
+                                border: Border.all(
+                                    color: isSelected
+                                        ? accent.primary
+                                        : Colors.transparent),
                               ),
                               alignment: Alignment.center,
                               child: Icon(
@@ -2102,7 +1654,11 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                     const SizedBox(height: 14),
 
                     // CHỌN MÀU SẮC
-                    const Text('CHỌN MÀU CHỦ ĐẠO', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.white54)),
+                    const Text('CHỌN MÀU CHỦ ĐẠO',
+                        style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white54)),
                     const SizedBox(height: 8),
                     Row(
                       children: colors.map((hex) {
@@ -2120,9 +1676,16 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                             decoration: BoxDecoration(
                               color: color,
                               shape: BoxShape.circle,
-                              border: Border.all(color: isSelected ? Colors.white : Colors.transparent, width: 2),
+                              border: Border.all(
+                                  color: isSelected
+                                      ? Colors.white
+                                      : Colors.transparent,
+                                  width: 2),
                             ),
-                            child: isSelected ? const Icon(Icons.check, size: 16, color: Colors.black) : null,
+                            child: isSelected
+                                ? const Icon(Icons.check,
+                                    size: 16, color: Colors.black)
+                                : null,
                           ),
                         );
                       }).toList(),
@@ -2131,7 +1694,11 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                     const SizedBox(height: 14),
 
                     // SỐ TIỀN MỤC TIÊU
-                    const Text('SỐ TIỀN MỤC TIÊU (₫)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.white54)),
+                    const Text('SỐ TIỀN MỤC TIÊU (₫)',
+                        style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white54)),
                     const SizedBox(height: 6),
                     AppValidationFeedback(
                       controller: targetValidation,
@@ -2140,16 +1707,20 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                         onChanged: (_) => targetValidation.clear(),
                         keyboardType: TextInputType.number,
                         style: TextStyle(
-                          color: visual.isInvalid ? AppTokens.expense : Colors.white,
+                          color: visual.isInvalid
+                              ? AppTokens.expense
+                              : Colors.white,
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
                         ),
                         decoration: InputDecoration(
                           hintText: 'Ví dụ: 25000000',
-                          hintStyle: const TextStyle(color: Colors.white38, fontSize: 14),
+                          hintStyle: const TextStyle(
+                              color: Colors.white38, fontSize: 14),
                           filled: true,
                           fillColor: const Color(0xFF1F2937),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 12),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(14),
                             borderSide: BorderSide(
@@ -2178,23 +1749,31 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                     const SizedBox(height: 14),
 
                     // CHỌN HẠN CHÓT (TARGET DATE)
-                    const Text('HẠN CHÓT ĐẠT MỤC TIÊU (TÙY CHỌN)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.white54)),
+                    const Text('HẠN CHÓT ĐẠT MỤC TIÊU (TÙY CHỌN)',
+                        style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white54)),
                     const SizedBox(height: 6),
                     Row(
                       children: [
                         Expanded(
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 12),
                             decoration: BoxDecoration(
                               color: const Color(0xFF1F2937),
                               borderRadius: BorderRadius.circular(14),
                             ),
                             child: Text(
                               selectedTargetDate != null
-                                  ? DateFormat('dd/MM/yyyy').format(selectedTargetDate!)
+                                  ? DateFormat('dd/MM/yyyy')
+                                      .format(selectedTargetDate!)
                                   : 'Chưa đặt hạn chót',
                               style: TextStyle(
-                                color: selectedTargetDate != null ? Colors.white : Colors.white38,
+                                color: selectedTargetDate != null
+                                    ? Colors.white
+                                    : Colors.white38,
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -2203,14 +1782,18 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                         ),
                         const SizedBox(width: 8),
                         IconButton(
-                          style: IconButton.styleFrom(backgroundColor: const Color(0xFF1F2937)),
-                          icon: const Icon(Icons.calendar_month_rounded, color: Color(0xFF10B981)),
+                          style: IconButton.styleFrom(
+                              backgroundColor: const Color(0xFF1F2937)),
+                          icon: const Icon(Icons.calendar_month_rounded,
+                              color: Color(0xFF10B981)),
                           onPressed: () async {
                             final picked = await showDatePicker(
                               context: context,
-                              initialDate: selectedTargetDate ?? DateTime.now().add(const Duration(days: 90)),
+                              initialDate: selectedTargetDate ??
+                                  DateTime.now().add(const Duration(days: 90)),
                               firstDate: DateTime.now(),
-                              lastDate: DateTime.now().add(const Duration(days: 3650)),
+                              lastDate: DateTime.now()
+                                  .add(const Duration(days: 3650)),
                               builder: (ctx, child) {
                                 return Theme(
                                   data: ThemeData.dark().copyWith(
@@ -2230,8 +1813,10 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                         ),
                         if (selectedTargetDate != null)
                           IconButton(
-                            icon: const Icon(Icons.clear_rounded, color: Colors.white38, size: 18),
-                            onPressed: () => setModalState(() => selectedTargetDate = null),
+                            icon: const Icon(Icons.clear_rounded,
+                                color: Colors.white38, size: 18),
+                            onPressed: () =>
+                                setModalState(() => selectedTargetDate = null),
                           ),
                       ],
                     ),
@@ -2247,11 +1832,14 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                           backgroundColor: accent.primary,
                           foregroundColor: Colors.black,
                           elevation: 0,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16)),
                         ),
                         onPressed: () async {
                           final title = titleController.text.trim();
-                          final targetAmount = double.tryParse(targetController.text.trim()) ?? 0.0;
+                          final targetAmount =
+                              double.tryParse(targetController.text.trim()) ??
+                                  0.0;
 
                           final titleInvalid = title.isEmpty;
                           final targetInvalid = targetAmount <= 0;
@@ -2299,8 +1887,11 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                           if (modalCtx.mounted) Navigator.of(modalCtx).pop();
                         },
                         child: Text(
-                          existingGoal == null ? 'Tạo Hũ Tiết Kiệm' : 'Lưu Thay Đổi',
-                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+                          existingGoal == null
+                              ? 'Tạo Hũ Tiết Kiệm'
+                              : 'Lưu Thay Đổi',
+                          style: const TextStyle(
+                              fontSize: 14, fontWeight: FontWeight.w800),
                         ),
                       ),
                     ),
@@ -2322,14 +1913,17 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
   // ============================================================================
   // G. DIALOG XÓA HŨ AN TOÀN (CÓ HOÀN TRẢ TIỀN NẾU CÒN SỐ DƯ)
   // ============================================================================
-  void _showDeleteGoalDialog(BuildContext context, SavingsGoal goal, AppDatabase db) {
+  void _showDeleteGoalDialog(
+      BuildContext context, SavingsGoal goal, AppDatabase db) {
     if (goal.currentAmount <= 0) {
       showDialog<void>(
         context: context,
         builder: (ctx) => AlertDialog(
           backgroundColor: const Color(0xFF1F2937),
-          title: const Text('Xác nhận xóa hũ', style: TextStyle(color: Colors.white, fontSize: 16)),
-          content: Text('Bạn có chắc muốn xóa hũ "${goal.title}" không?', style: const TextStyle(color: Colors.white70, fontSize: 13)),
+          title: const Text('Xác nhận xóa hũ',
+              style: TextStyle(color: Colors.white, fontSize: 16)),
+          content: Text('Bạn có chắc muốn xóa hũ "${goal.title}" không?',
+              style: const TextStyle(color: Colors.white70, fontSize: 13)),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(),
@@ -2340,7 +1934,9 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                 await db.deleteSavingsGoal(goal.id);
                 if (ctx.mounted) Navigator.of(ctx).pop();
               },
-              child: const Text('Xóa', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+              child: const Text('Xóa',
+                  style: TextStyle(
+                      color: Colors.redAccent, fontWeight: FontWeight.bold)),
             ),
           ],
         ),
@@ -2365,10 +1961,14 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
               builder: (ctx, setDialogState) {
                 return AlertDialog(
                   backgroundColor: const Color(0xFF1F2937),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20)),
                   title: const Text(
                     'Hoàn trả số dư trước khi xóa',
-                    style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800),
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800),
                   ),
                   content: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -2376,11 +1976,13 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                     children: [
                       CurrencyText(
                         'Hũ này đang có số dư ${_formatCurrency(goal.currentAmount)}. Vui lòng chọn ví để hoàn trả toàn bộ số tiền này trước khi xóa hũ:',
-                        style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
+                        style: const TextStyle(
+                            color: Colors.white70, fontSize: 13, height: 1.4),
                       ),
                       const SizedBox(height: 14),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 2),
                         decoration: BoxDecoration(
                           color: const Color(0xFF111827),
                           borderRadius: BorderRadius.circular(12),
@@ -2394,11 +1996,15 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                             items: wallets.map((w) {
                               return DropdownMenuItem<String>(
                                 value: w.id,
-                                child: Text(w.name, style: const TextStyle(color: Colors.white, fontSize: 13)),
+                                child: Text(w.name,
+                                    style: const TextStyle(
+                                        color: Colors.white, fontSize: 13)),
                               );
                             }).toList(),
                             onChanged: (val) {
-                              if (val != null) setDialogState(() => refundWalletId = val);
+                              if (val != null) {
+                                setDialogState(() => refundWalletId = val);
+                              }
                             },
                           ),
                         ),
@@ -2408,23 +2014,31 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.of(dialogCtx).pop(),
-                      child: const Text('Hủy', style: TextStyle(color: Colors.white54)),
+                      child: const Text('Hủy',
+                          style: TextStyle(color: Colors.white54)),
                     ),
                     ElevatedButton(
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+                      style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.redAccent),
                       onPressed: refundWalletId == null
                           ? null
                           : () async {
-                        await db.deleteSavingsGoal(goal.id, refundWalletId: refundWalletId);
-                        if (dialogCtx.mounted) Navigator.of(dialogCtx).pop();
-                        if (context.mounted) {
-                          AppFeedback.showSuccess(
-                            context,
-                            'Đã xóa hũ và hoàn ${_formatCurrency(goal.currentAmount)} về ví',
-                          );
-                        }
-                      },
-                      child: const Text('Hoàn tiền & Xóa', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                              await db.deleteSavingsGoal(goal.id,
+                                  refundWalletId: refundWalletId);
+                              if (dialogCtx.mounted) {
+                                Navigator.of(dialogCtx).pop();
+                              }
+                              if (context.mounted) {
+                                AppFeedback.showSuccess(
+                                  context,
+                                  'Đã xóa hũ và hoàn ${_formatCurrency(goal.currentAmount)} về ví',
+                                );
+                              }
+                            },
+                      child: const Text('Hoàn tiền & Xóa',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold)),
                     ),
                   ],
                 );
@@ -2439,29 +2053,572 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
   // ============================================================================
   // H. NUMPAD TIỆN LỢI CHO BOTTOM SHEET
   // ============================================================================
-  Widget _buildInlineNumpad({
-    required ValueChanged<String> onPress,
-    required VoidCallback onBackspace,
-    required VoidCallback onClear,
-  }) {
-    return PrecisionNumpad(
-      onDigit: onPress,
-      onBackspace: onBackspace,
-      onBackspaceLongPress: onClear,
-      leadingAction: PrecisionNumpadAction(
-        label: 'C',
-        onPressed: onClear,
-        color: AppTokens.expense,
-        semanticLabel: 'Xóa toàn bộ',
-      ),
-      digitColor: Theme.of(context).brightness == Brightness.light
-          ? const Color(0xFF0F172A) : Colors.white,
-      digitFontWeight: FontWeight.w700,
-      actionColor: Theme.of(context).brightness == Brightness.light
-          ? const Color(0xFF0F172A) : Colors.white70,
-      horizontalPadding: 18,
-      rowSpacing: 6,
-    );
+}
+
+class _VaultDepositSheet extends ConsumerStatefulWidget {
+  final SavingsGoal goal;
+  final AppDatabase db;
+  final ScrollController scrollController;
+  const _VaultDepositSheet(
+      {required this.goal, required this.db, required this.scrollController});
+
+  @override
+  ConsumerState<_VaultDepositSheet> createState() => _VaultDepositSheetState();
+}
+
+class _VaultDepositSheetState extends ConsumerState<_VaultDepositSheet> {
+  final amountValidation = AppValidationFeedbackController();
+  late final Stream<List<Wallet>> _walletsStream;
+  String enteredAmountStr = '';
+  String? selectedWalletId;
+  bool isSubmitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _walletsStream = widget.db.watchAllWallets();
   }
 
+  @override
+  void dispose() {
+    amountValidation.dispose();
+    super.dispose();
+  }
+
+  String _formatCurrency(double amount) =>
+      NumberFormat.currency(locale: 'vi_VN', symbol: '₫', decimalDigits: 0)
+          .format(amount);
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final accent = ref.read(accentPresetProvider);
+
+    final sheetSurface =
+        isDark ? const Color(0xFF111827) : const Color(0xFFF8FAFC);
+    final cardSurface = isDark ? const Color(0xFF1E2430) : Colors.white;
+    final borderColor =
+        isDark ? const Color(0xFF2E384D) : const Color(0xFFE2E8F0);
+    final primaryText = isDark ? Colors.white : const Color(0xFF0F172A);
+    final mutedText =
+        isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+
+    return StreamBuilder<List<Wallet>>(
+      stream: _walletsStream,
+      builder: (context, snapshot) {
+        final wallets = snapshot.data ?? const <Wallet>[];
+
+        if (selectedWalletId == null && wallets.isNotEmpty) {
+          selectedWalletId = wallets.first.id;
+        }
+
+        final selectedWallet = wallets.cast<Wallet?>().firstWhere(
+              (wallet) => wallet?.id == selectedWalletId,
+              orElse: () => null,
+            );
+
+        final amount = double.tryParse(enteredAmountStr) ?? 0.0;
+
+        void setAmount(double value) {
+          setState(() {
+            enteredAmountStr =
+                value <= 0 ? '' : value.floorToDouble().toStringAsFixed(0);
+            amountValidation.clear();
+          });
+        }
+
+        void addQuickAmount(double increment) {
+          setAmount(amount + increment);
+        }
+
+        return ClipRRect(
+          borderRadius: const BorderRadius.vertical(
+            top: Radius.circular(28),
+          ),
+          child: Container(
+            color: sheetSurface,
+            child: SafeArea(
+              top: false,
+              child: SingleChildScrollView(
+                controller: widget.scrollController,
+                physics: const ClampingScrollPhysics(),
+                padding: EdgeInsets.fromLTRB(
+                  20,
+                  12,
+                  20,
+                  MediaQuery.paddingOf(context).bottom + 18,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 42,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: mutedText.withValues(alpha: 0.38),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Nạp tiền vào quỹ',
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w800,
+                                  color: primaryText,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Dành cho mục tiêu: ${widget.goal.title}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: mutedText,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        SizedBox(
+                          width: 44,
+                          height: 44,
+                          child: IconButton(
+                            tooltip: 'Đóng',
+                            onPressed: () {
+                              HapticFeedback.selectionClick();
+                              Navigator.of(context).pop();
+                            },
+                            icon: Icon(
+                              Icons.close_rounded,
+                              size: 21,
+                              color: mutedText,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.fromLTRB(
+                        14,
+                        12,
+                        12,
+                        10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: cardSurface,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: borderColor,
+                          width: 0.8,
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Nguồn tiền trích',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.7,
+                              color: mutedText,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              value: selectedWalletId,
+                              dropdownColor: isDark
+                                  ? const Color(0xFF1E2430)
+                                  : Colors.white,
+                              isExpanded: true,
+                              borderRadius: BorderRadius.circular(16),
+                              icon: Icon(
+                                Icons.chevron_right_rounded,
+                                color: mutedText,
+                              ),
+                              hint: Text(
+                                'Chọn nguồn tiền',
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: mutedText,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              items: wallets.map((wallet) {
+                                return DropdownMenuItem<String>(
+                                  value: wallet.id,
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        width: 30,
+                                        height: 30,
+                                        decoration: BoxDecoration(
+                                          color: accent.primary
+                                              .withValues(alpha: 0.10),
+                                          borderRadius:
+                                              BorderRadius.circular(9),
+                                        ),
+                                        child: Icon(
+                                          Icons.account_balance_wallet_outlined,
+                                          size: 16,
+                                          color: accent.primary,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 9),
+                                      Expanded(
+                                        child: Text(
+                                          wallet.name,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: theme.textTheme.bodyMedium
+                                              ?.copyWith(
+                                            fontSize: 12.5,
+                                            fontWeight: FontWeight.w700,
+                                            color: primaryText,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Flexible(
+                                        child: Text(
+                                          'Khả dụng: ${_formatCurrency(wallet.balance)}',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: theme.textTheme.labelSmall
+                                              ?.copyWith(
+                                            fontSize: 10.5,
+                                            fontWeight: FontWeight.w700,
+                                            color: accent.primary,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }).toList(),
+                              onChanged: (value) {
+                                if (value == null) return;
+                                setState(() {
+                                  selectedWalletId = value;
+                                  enteredAmountStr = '';
+                                  amountValidation.clear();
+                                });
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    AppValidationFeedback(
+                      controller: amountValidation,
+                      builder: (context, visual) => Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 14,
+                        ),
+                        decoration: BoxDecoration(
+                          color: cardSurface,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: visual.borderColor(borderColor),
+                            width: visual.isInvalid ? 1.8 : 0.8,
+                          ),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Số tiền muốn tích lũy',
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.7,
+                                  color: mutedText,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Flexible(
+                              flex: 2,
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.centerRight,
+                                child: Text(
+                                  _formatCurrency(amount),
+                                  style: currencyTextStyle(
+                                      context,
+                                      (theme.textTheme.headlineSmall ??
+                                              const TextStyle())
+                                          .copyWith(
+                                        fontSize: 26,
+                                        fontWeight: FontWeight.w800,
+                                        color: visual.isInvalid
+                                            ? AppTokens.expense
+                                            : primaryText,
+                                        fontFeatures: const [
+                                          FontFeature.tabularFigures(),
+                                        ],
+                                      )),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        _buildVaultQuickFillChip(
+                          context: context,
+                          label: '+50k',
+                          onTap: () => addQuickAmount(50000),
+                          isDark: isDark,
+                        ),
+                        const SizedBox(width: 8),
+                        _buildVaultQuickFillChip(
+                          context: context,
+                          label: '+100k',
+                          onTap: () => addQuickAmount(100000),
+                          isDark: isDark,
+                        ),
+                        const SizedBox(width: 8),
+                        _buildVaultQuickFillChip(
+                          context: context,
+                          label: '+200k',
+                          onTap: () => addQuickAmount(200000),
+                          isDark: isDark,
+                        ),
+                        const SizedBox(width: 8),
+                        _buildVaultQuickFillChip(
+                          context: context,
+                          label: 'Tất cả ví',
+                          onTap: selectedWallet == null
+                              ? null
+                              : () => setAmount(
+                                    selectedWallet.balance
+                                        .clamp(0.0, double.infinity)
+                                        .toDouble(),
+                                  ),
+                          isDark: isDark,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    _buildInlineNumpad(
+                      context: context,
+                      onPress: (digit) {
+                        setState(() {
+                          if (enteredAmountStr.length >= 11) return;
+                          enteredAmountStr = enteredAmountStr.isEmpty ||
+                                  enteredAmountStr == '0'
+                              ? digit
+                              : '$enteredAmountStr$digit';
+                          amountValidation.clear();
+                        });
+                      },
+                      onBackspace: () {
+                        setState(() {
+                          if (enteredAmountStr.isEmpty) return;
+                          enteredAmountStr = enteredAmountStr.substring(
+                            0,
+                            enteredAmountStr.length - 1,
+                          );
+                          amountValidation.clear();
+                        });
+                      },
+                      onClear: () {
+                        setState(() {
+                          enteredAmountStr = '';
+                          amountValidation.clear();
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 14),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: accent.primary,
+                          foregroundColor: Colors.white,
+                          disabledBackgroundColor: accent.primary,
+                          disabledForegroundColor: Colors.white,
+                          elevation: 1,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        onPressed: isSubmitting
+                            ? null
+                            : () async {
+                                if (selectedWallet == null) {
+                                  AppFeedback.showInfo(
+                                    context,
+                                    'Chưa có nguồn tiền khả dụng.',
+                                  );
+                                  return;
+                                }
+
+                                if (amount <= 0 ||
+                                    amount > selectedWallet.balance) {
+                                  amountValidation.reject();
+                                  return;
+                                }
+
+                                setState(
+                                  () => isSubmitting = true,
+                                );
+
+                                try {
+                                  await widget.db.depositToGoal(
+                                    goalId: widget.goal.id,
+                                    walletId: selectedWallet.id,
+                                    amount: amount,
+                                  );
+
+                                  if (context.mounted) {
+                                    AppFeedback.showSuccess(
+                                      context,
+                                      'Đã nạp ${_formatCurrency(amount)} vào "${widget.goal.title}".',
+                                    );
+                                  }
+
+                                  if (context.mounted) {
+                                    Navigator.of(context).pop();
+                                  }
+                                } catch (e) {
+                                  debugPrint(
+                                    'SavingsVault deposit failed: $e',
+                                  );
+
+                                  if (context.mounted) {
+                                    setState(
+                                      () => isSubmitting = false,
+                                    );
+                                  }
+
+                                  if (context.mounted) {
+                                    AppFeedback.showError(
+                                      context,
+                                      'Không thể nạp tiền vào hũ. Vui lòng thử lại.',
+                                    );
+                                  }
+                                }
+                              },
+                        child: isSubmitting
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text(
+                                'Xác nhận nạp tiền',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white,
+                                  letterSpacing: 0.2,
+                                ),
+                              ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+Widget _buildVaultQuickFillChip({
+  required BuildContext context,
+  required String label,
+  required VoidCallback? onTap,
+  required bool isDark,
+}) {
+  final theme = Theme.of(context);
+
+  return Expanded(
+    child: SizedBox(
+      height: 32,
+      child: Material(
+        color: isDark ? const Color(0xFF1E2430) : const Color(0xFFEFF3F8),
+        borderRadius: BorderRadius.circular(11),
+        child: InkWell(
+          onTap: onTap == null
+              ? null
+              : () {
+                  HapticFeedback.selectionClick();
+                  onTap();
+                },
+          borderRadius: BorderRadius.circular(11),
+          child: Center(
+            child: Text(
+              label,
+              style: theme.textTheme.labelMedium?.copyWith(
+                fontSize: 10.8,
+                fontWeight: FontWeight.w700,
+                color: onTap == null
+                    ? (isDark ? Colors.white24 : Colors.black26)
+                    : (isDark ? Colors.white : const Color(0xFF0F172A)),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+Widget _buildInlineNumpad({
+  required BuildContext context,
+  required ValueChanged<String> onPress,
+  required VoidCallback onBackspace,
+  required VoidCallback onClear,
+}) {
+  return PrecisionNumpad(
+    onDigit: onPress,
+    onBackspace: onBackspace,
+    onBackspaceLongPress: onClear,
+    leadingAction: PrecisionNumpadAction(
+      label: 'C',
+      onPressed: onClear,
+      color: AppTokens.expense,
+      semanticLabel: 'Xóa toàn bộ',
+    ),
+    digitColor: Theme.of(context).brightness == Brightness.light
+        ? const Color(0xFF0F172A)
+        : Colors.white,
+    digitFontWeight: FontWeight.w700,
+    actionColor: Theme.of(context).brightness == Brightness.light
+        ? const Color(0xFF0F172A)
+        : Colors.white70,
+    horizontalPadding: 18,
+    rowSpacing: 6,
+  );
 }

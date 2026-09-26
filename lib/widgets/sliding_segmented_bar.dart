@@ -95,7 +95,8 @@ class SlidingSegmentedBar<T> extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<SlidingSegmentedBar<T>> createState() => _SlidingSegmentedBarState<T>();
+  ConsumerState<SlidingSegmentedBar<T>> createState() =>
+      _SlidingSegmentedBarState<T>();
 }
 
 class _SlidingSegmentedBarState<T> extends ConsumerState<SlidingSegmentedBar<T>>
@@ -104,6 +105,7 @@ class _SlidingSegmentedBarState<T> extends ConsumerState<SlidingSegmentedBar<T>>
   late double _fromVisualIndex;
   late int _targetIndex;
   late int _visualTargetIndex;
+  double _segmentWidth = 0;
 
   @override
   void initState() {
@@ -175,28 +177,22 @@ class _SlidingSegmentedBarState<T> extends ConsumerState<SlidingSegmentedBar<T>>
       return _lerp(_fromVisualIndex, overshootTarget, eased);
     }
 
-    final localT = ((rawT - approachFraction) / (1.0 - approachFraction))
-        .clamp(0.0, 1.0);
+    final localT =
+        ((rawT - approachFraction) / (1.0 - approachFraction)).clamp(0.0, 1.0);
     final eased = Curves.easeOutQuad.transform(localT);
     final overshootTarget = _targetIndex + overshootInIndex;
     return _lerp(overshootTarget, _targetIndex.toDouble(), eased);
   }
 
   void _startMove(
-      int index, {
-        required bool notifyParent,
-        required bool haptic,
-      }) {
+    int index, {
+    required bool notifyParent,
+    required bool haptic,
+  }) {
     if (index == _targetIndex && !_controller.isAnimating) return;
 
-    // Retarget từ đúng vị trí visual hiện tại nếu user chạm liên tiếp.
-    // Segment width thật được cập nhật trong build; dùng index interpolation hiện tại
-    // ở đây để không teleport về target cũ.
-    final rawT = _controller.value;
-    final settledGuess = _controller.isAnimating
-        ? _lerp(_fromVisualIndex, _targetIndex.toDouble(), Curves.easeOutCubic.transform(rawT))
-        : _targetIndex.toDouble();
-    _fromVisualIndex = settledGuess;
+    // Continue from the exact rendered position, including the settle phase.
+    _fromVisualIndex = _resolveVisualIndex(_segmentWidth);
     _targetIndex = index;
     _visualTargetIndex = index;
 
@@ -208,7 +204,8 @@ class _SlidingSegmentedBarState<T> extends ConsumerState<SlidingSegmentedBar<T>>
     }
   }
 
-  Color _resolveActiveColor(SlidingSegmentedItem<T> item, AppAccentPreset accent) {
+  Color _resolveActiveColor(
+      SlidingSegmentedItem<T> item, AppAccentPreset accent) {
     return item.activeColor ?? accent.primary;
   }
 
@@ -238,15 +235,18 @@ class _SlidingSegmentedBarState<T> extends ConsumerState<SlidingSegmentedBar<T>>
       height: widget.height,
       padding: const EdgeInsets.all(3.0),
       decoration: BoxDecoration(
-        color: widget.trackColor ?? (isDark ? AppTokens.darkCard : AppTokens.lightCardSubtle),
+        color: widget.trackColor ??
+            (isDark ? AppTokens.darkCard : AppTokens.lightCardSubtle),
         borderRadius: BorderRadius.circular(14.0),
         border: Border.all(
-          color: widget.trackBorderColor ?? (isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
+          color: widget.trackBorderColor ??
+              (isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
           width: 1.0,
         ),
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
+          _segmentWidth = constraints.maxWidth / count;
           return AnimatedBuilder(
             animation: _controller,
             builder: (context, _) {
@@ -254,21 +254,22 @@ class _SlidingSegmentedBarState<T> extends ConsumerState<SlidingSegmentedBar<T>>
               final double segmentWidth = constraints.maxWidth / count;
               final double visualIndex = _resolveVisualIndex(segmentWidth);
 
-              final double alignX = count > 1
-                  ? -1.0 + (visualIndex / (count - 1)) * 2.0
-                  : 0.0;
+              final double alignX =
+                  count > 1 ? -1.0 + (visualIndex / (count - 1)) * 2.0 : 0.0;
 
               final Color currentBorderColor = Color.lerp(
-                fromColor,
-                targetColor,
-                Curves.easeOut.transform(t),
-              ) ?? targetColor;
+                    fromColor,
+                    targetColor,
+                    Curves.easeOut.transform(t),
+                  ) ??
+                  targetColor;
 
               final Color currentBgColor = Color.lerp(
-                fromBg,
-                targetBg,
-                Curves.easeOut.transform(t),
-              ) ?? targetBg;
+                    fromBg,
+                    targetBg,
+                    Curves.easeOut.transform(t),
+                  ) ??
+                  targetBg;
 
               return Stack(
                 children: [
@@ -285,12 +286,17 @@ class _SlidingSegmentedBarState<T> extends ConsumerState<SlidingSegmentedBar<T>>
                           color: widget.indicatorColor ?? currentBgColor,
                           borderRadius: BorderRadius.circular(11.0),
                           border: Border.all(
-                            color: widget.indicatorBorderColor ?? currentBorderColor,
-                            width: widget.indicatorBorderColor == Colors.transparent ? 0.0 : 1.2,
+                            color: widget.indicatorBorderColor ??
+                                currentBorderColor,
+                            width: widget.indicatorBorderColor ==
+                                    Colors.transparent
+                                ? 0.0
+                                : 1.2,
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: widget.indicatorShadowColor ?? currentBorderColor.withValues(alpha: 0.12),
+                              color: widget.indicatorShadowColor ??
+                                  currentBorderColor.withValues(alpha: 0.12),
                               blurRadius: 4.0,
                               offset: const Offset(0.0, 1.0),
                             ),
@@ -306,24 +312,35 @@ class _SlidingSegmentedBarState<T> extends ConsumerState<SlidingSegmentedBar<T>>
                   Row(
                     children: List.generate(count, (index) {
                       final item = widget.items[index];
-                      final bool isSelected = item.value == widget.selectedValue;
+                      final bool isSelected =
+                          item.value == widget.selectedValue;
 
                       // Tính khoảng cách thị giác từ viên thuốc đến tab hiện tại
                       final double distance = (visualIndex - index).abs();
-                      final double activeProgress = (1.0 - distance).clamp(0.0, 1.0);
+                      final double activeProgress =
+                          (1.0 - distance).clamp(0.0, 1.0);
 
-                      final Color itemActiveColor = _resolveActiveColor(item, accent);
+                      final Color itemActiveColor =
+                          _resolveActiveColor(item, accent);
                       final Color mutedColor = widget.mutedTextColor ??
                           (isDark ? AppTokens.darkMuted : AppTokens.lightMuted);
 
                       // 🌟 TỰ ĐỘNG ĐỔI MÀU CHỮ NẾU NỀN LÀ MÀU ĐẶC (SOLID BACKGROUND DETECTION)
-                      final bool isSolidBg = item.activeBackgroundColor != null &&
-                          item.activeBackgroundColor!.a > 0.6;
-                      final Color selectedTextColor = widget.selectedTextColor ??
-                          (isSolidBg ? Colors.white : itemActiveColor);
+                      final bool isSolidBg =
+                          item.activeBackgroundColor != null &&
+                              item.activeBackgroundColor!.a > 0.6;
+                      final Color selectedTextColor =
+                          widget.selectedTextColor ??
+                              (isSolidBg ? Colors.white : itemActiveColor);
 
-                      final Color textColor = Color.lerp(mutedColor, selectedTextColor, activeProgress) ?? mutedColor;
-                      final FontWeight fontWeight = FontWeight.lerp(FontWeight.w600, FontWeight.w800, activeProgress) ?? FontWeight.w600;
+                      final Color textColor = Color.lerp(
+                              mutedColor, selectedTextColor, activeProgress) ??
+                          mutedColor;
+                      final FontWeight fontWeight = FontWeight.lerp(
+                              FontWeight.w600,
+                              FontWeight.w800,
+                              activeProgress) ??
+                          FontWeight.w600;
 
                       return Expanded(
                         child: InkWell(
@@ -332,7 +349,8 @@ class _SlidingSegmentedBarState<T> extends ConsumerState<SlidingSegmentedBar<T>>
                           borderRadius: BorderRadius.circular(11.0),
                           onTap: () {
                             if (!isSelected) {
-                              _startMove(index, notifyParent: true, haptic: true);
+                              _startMove(index,
+                                  notifyParent: true, haptic: true);
                             }
                           },
                           child: Center(

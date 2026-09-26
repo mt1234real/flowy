@@ -2432,12 +2432,21 @@ class _ProjectBudgetEditModalState extends ConsumerState<_ProjectBudgetEditModal
 // 🌟 BOTTOM SHEET: THIẾT LẬP HẠN MỨC ĐỊNH KỲ RIÊNG CHO THÁNG HIỆN TẠI
 // ==============================================================================
 
+Future<void> showInsightsBudgetEditor(BuildContext context, {required Category category, required DateTime anchor, Budget? budget}) {
+  return AppAnimationPolicy.showFluidSheet<void>(context: context, mode: FluidSheetMode.nestedScrollable,
+    builder: (_, __) => _BudgetSetupSheet(editBudget: budget, initialCategory: category, initialAnchor: anchor));
+}
+
 class _BudgetSetupSheet extends ConsumerStatefulWidget {
   final Budget? editBudget;
+  final Category? initialCategory;
+  final DateTime? initialAnchor;
 
   const _BudgetSetupSheet({
     super.key,
     this.editBudget,
+    this.initialCategory,
+    this.initialAnchor,
   });
 
   @override
@@ -2467,7 +2476,7 @@ class _BudgetSetupSheetState extends ConsumerState<_BudgetSetupSheet> {
   @override
   void initState() {
     super.initState();
-    final anchorMonth = ref.read(budgetAnchorMonthProvider);
+    final DateTime anchorMonth = widget.initialAnchor ?? ref.read(budgetAnchorMonthProvider);
     final cycleStore = ref.read(cycleStartDaysByMonthProvider);
     final cycleRange = computeMonthCycleRange(anchorMonth, cycleStore);
 
@@ -2477,6 +2486,8 @@ class _BudgetSetupSheetState extends ConsumerState<_BudgetSetupSheet> {
       _cycleStartDay = b.cycleStartDay;
       _amountBuffer = b.amount.toStringAsFixed(0);
     } else {
+      _selectedCategoryId = widget.initialCategory?.id;
+      _selectedCategoryObject = widget.initialCategory;
       _cycleStartDay = cycleRange.startDay;
     }
   }
@@ -2553,7 +2564,7 @@ class _BudgetSetupSheetState extends ConsumerState<_BudgetSetupSheet> {
     }
 
     final db = ref.read(databaseProvider);
-    final anchorMonth = ref.read(budgetAnchorMonthProvider);
+    final DateTime anchorMonth = widget.initialAnchor ?? ref.read(budgetAnchorMonthProvider);
     final monthKey = DateFormat('yyyy-MM').format(anchorMonth);
 
     final budgetId =
@@ -2584,7 +2595,7 @@ class _BudgetSetupSheetState extends ConsumerState<_BudgetSetupSheet> {
 
   Future<void> _deleteBudget() async {
     if (widget.editBudget == null) return;
-    final anchorMonth = ref.read(budgetAnchorMonthProvider);
+    final DateTime anchorMonth = widget.initialAnchor ?? ref.read(budgetAnchorMonthProvider);
 
     final confirm = await showDialog<bool>(
       context: context,
@@ -2654,7 +2665,7 @@ class _BudgetSetupSheetState extends ConsumerState<_BudgetSetupSheet> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final accent = ref.watch(accentPresetProvider);
-    final anchorMonth = ref.watch(budgetAnchorMonthProvider);
+    final DateTime anchorMonth = widget.initialAnchor ?? ref.watch(budgetAnchorMonthProvider);
     final allCategories =
         ref.watch(allCategoriesStreamProvider).valueOrNull ?? <Category>[];
 

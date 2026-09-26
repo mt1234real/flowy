@@ -39,6 +39,7 @@ import '../widgets/preserved_balance_tumbler.dart';
 import '../widgets/quick_entry_sheet.dart';
 import '../widgets/safe_to_spend_breakdown_sheet.dart';
 import '../widgets/spending_trend_chart.dart';
+import '../features/insights/insights_data.dart';
 import '../widgets/two_stage_overscroll_header.dart';
 import 'ledger_screen.dart'
     show
@@ -118,11 +119,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
   // =========================================================================
   // 🔒 GLOBAL PRIVACY STATE (Mặc định ẩn toàn bộ = false khi mở app)
   // =========================================================================
-  bool _balancesVisible = false;
+  bool get _balancesVisible => ref.watch(balancesVisibleProvider);
 
   void _toggleAllVisibility() {
     HapticFeedback.selectionClick();
-    setState(() => _balancesVisible = !_balancesVisible);
+    ref.read(balancesVisibleProvider.notifier).state = !ref.read(balancesVisibleProvider);
   }
 
   String _formatCurrency(double amount, [String currency = '₫']) {

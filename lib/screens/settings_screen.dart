@@ -29,6 +29,9 @@ import '../core/animation/app_animation_policy.dart';
 import '../core/feedback/app_feedback.dart';
 import '../data/database.dart';
 import '../data/database_seeder.dart';
+import '../data/demo_data_seeder.dart';
+import '../features/insights/insights_data.dart';
+import 'ledger_screen.dart' show cycleStartDaysByMonthProvider, resolveStartDayForMonth;
 import '../main.dart';
 import '../services/auth_profile_service.dart';
 import '../services/cloud_backup_service.dart';
@@ -64,6 +67,49 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+  bool _creatingDemoData = false;
+
+  Future<void> _createFullDemoData() async {
+    if (_creatingDemoData) return;
+    final accepted = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
+      title: const Text('Dữ liệu trải nghiệm đầy đủ'),
+      content: const SingleChildScrollView(child: Text(
+        'Thêm 13 tháng sinh hoạt tài chính với 6 ví, 32 danh mục, 104 hạn mức, 3 dự án, 4 liên hệ nợ, 5 hũ tiết kiệm và 3 góc nhìn phân tích.\n\n'
+        'Có thu nhập, chi thường ngày, chuyển ví, thẻ tín dụng, nợ quá hạn, nợ đã trả, giao dịch trong thùng rác và dữ liệu hóa đơn mẫu.\n\n'
+        'Các ví có nhãn “Mẫu”. Dữ liệu hiện có được giữ nguyên; báo cáo sẽ bao gồm cả dữ liệu mới. Bộ mẫu chỉ được thêm một lần.')),
+      actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Để sau')),
+        FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Thêm dữ liệu mẫu'))],
+    ));
+    if (accepted != true || !mounted) return;
+    setState(() => _creatingDemoData = true);
+    final db = ref.read(databaseProvider);
+    final cycles = Map<String,int>.from(ref.read(cycleStartDaysByMonthProvider));
+    final schemeStore = ref.read(classificationSchemesProvider.notifier);
+    final existingSchemeIds = ref.read(classificationSchemesProvider).map((s) => s.id).toSet();
+    try {
+      final result = await DemoDataSeeder.seed(db, cycleDay: (month) => resolveStartDayForMonth(month, cycles));
+      for (final json in DemoDataSeeder.schemes) {
+        final scheme = ClassificationScheme.fromJson(json);
+        if (!existingSchemeIds.contains(scheme.id)) await schemeStore.save(scheme);
+      }
+      if (!mounted) return;
+      HapticFeedback.mediumImpact();
+      await showDialog<void>(context: context, builder: (ctx) => AlertDialog(
+        title: Text(result.alreadyExists ? 'Bộ mẫu đã có sẵn' : 'Đã tạo dữ liệu trải nghiệm'),
+        content: SingleChildScrollView(child: Text(
+          '${result.wallets} ví • ${result.categories} danh mục\n'
+          '${result.transactions} giao dịch • ${result.budgets} hạn mức\n'
+          '${result.debts} giao dịch nợ • ${result.goals} hũ tiết kiệm\n\n'
+          'Mở Tổng quan → Phân tích để xem 3 góc nhìn mẫu. Bạn có thể lọc các ví có nhãn “Mẫu”.\n\n'
+          'PIN và sinh trắc học giữ nguyên. AI và sao lưu đám mây cần tài khoản/API riêng; hóa đơn mẫu chỉ minh họa kết quả đã nhập.')),
+        actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Đã hiểu'))],
+      ));
+    } catch (error, stack) {
+      debugPrint('Demo data setup failed: $error\n$stack');
+      if (mounted) AppFeedback.showError(context, 'Chưa hoàn tất dữ liệu mẫu. Bạn có thể thử lại; không tạo trùng bộ đã có.');
+    } finally { if (mounted) setState(() => _creatingDemoData = false); }
+  }
+
   static final List<FontItemDef> _fontDefinitions = [
     FontItemDef(
       name: 'Comfortaa',
@@ -700,14 +746,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 _buildSectionHeader('ĐỒNG BỘ ĐÁM MÂY (GOOGLE DRIVE APPDATA)', isDark),
                 const SizedBox(height: 8),
 
-                Container(
-                  decoration: BoxDecoration(
-                    color: isDark ? AppTokens.darkCard : Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder,
-                    ),
-                  ),
+                _SettingsTileSurface(
+                  isDark: isDark,
                   child: Column(
                     children: [
                       ListTile(
@@ -991,14 +1031,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 _buildSectionHeader('QUẢN LÝ DỮ LIỆU & BẢO MẬT', isDark),
                 const SizedBox(height: 8),
 
-                Container(
-                  decoration: BoxDecoration(
-                    color: isDark ? AppTokens.darkCard : Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder,
-                    ),
-                  ),
+                _SettingsTileSurface(
+                  isDark: isDark,
                   child: Column(
                     children: [
                       ListTile(
@@ -1122,15 +1156,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 _buildSectionHeader('LƯU TRỮ CƠ SỞ DỮ LIỆU CỤC BỘ', isDark),
                 const SizedBox(height: 8),
 
-                Container(
+                _SettingsTileSurface(
+                  isDark: isDark,
                   padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: isDark ? AppTokens.darkCard : Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder,
-                    ),
-                  ),
                   child: Column(
                     children: [
                       Row(
@@ -1149,7 +1177,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'Drift SQLite Engine (Schema v7)',
+                                  'Drift SQLite Engine (Schema v8)',
                                   style: TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w700,
@@ -1169,6 +1197,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ],
                       ),
                       const Divider(height: 22),
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: Icon(Icons.dataset_outlined, color: currentAccent.primary),
+                        title: Text(_creatingDemoData ? 'Đang tạo dữ liệu…' : 'Tạo dữ liệu trải nghiệm đầy đủ'),
+                        subtitle: const Text('13 tháng • nhiều ví, ngân sách, nợ, tiết kiệm và phân tích'),
+                        trailing: _creatingDemoData ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.chevron_right_rounded),
+                        onTap: _creatingDemoData ? null : _createFullDemoData,
+                      ),
+                      const Divider(),
 
                       ListTile(
                         dense: true,
@@ -1419,4 +1456,31 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ),
     );
   }
+}
+
+
+/// ListTile paints its ink on this surface, without an opaque decoration above it.
+class _SettingsTileSurface extends StatelessWidget {
+  final bool isDark;
+  final EdgeInsetsGeometry padding;
+  final Widget child;
+
+  const _SettingsTileSurface({
+    required this.isDark,
+    this.padding = EdgeInsets.zero,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) => Material(
+        color: isDark ? AppTokens.darkCard : Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(
+            color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder,
+          ),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Padding(padding: padding, child: child),
+      );
 }
