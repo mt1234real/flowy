@@ -1,3 +1,6 @@
+import '../widgets/currency_text.dart';
+import '../features/notifications/notification_center_screen.dart';
+import '../features/notifications/notification_host.dart';
 // ==============================================================================
 // File: lib/screens/dashboard_screen.dart
 // Architecture: Executive Real-Time Financial Dashboard with Preserved Motion Transitions
@@ -39,13 +42,9 @@ import '../widgets/preserved_balance_tumbler.dart';
 import '../widgets/quick_entry_sheet.dart';
 import '../widgets/safe_to_spend_breakdown_sheet.dart';
 import '../widgets/spending_trend_chart.dart';
-import '../features/insights/insights_data.dart';
 import '../widgets/two_stage_overscroll_header.dart';
 import 'ledger_screen.dart'
-    show
-        cycleStartDaysByMonthProvider,
-        computeMonthCycleRange,
-        CycleMode;
+    show cycleStartDaysByMonthProvider, computeMonthCycleRange, CycleMode;
 import 'main_scaffold.dart' show bottomNavIndexProvider;
 import 'vault_auth_screen.dart';
 import 'wallet_manager_screen.dart';
@@ -117,13 +116,13 @@ class DashboardScreen extends ConsumerStatefulWidget {
 class _DashboardScreenState extends ConsumerState<DashboardScreen>
     with TickerProviderStateMixin {
   // =========================================================================
-  // 🔒 GLOBAL PRIVACY STATE (Mặc định ẩn toàn bộ = false khi mở app)
+  // 🔒 DASHBOARD PRIVACY STATE (Chỉ áp dụng trong màn hình Tổng quan)
   // =========================================================================
-  bool get _balancesVisible => ref.watch(balancesVisibleProvider);
+  bool _balancesVisible = false;
 
   void _toggleAllVisibility() {
     HapticFeedback.selectionClick();
-    ref.read(balancesVisibleProvider.notifier).state = !ref.read(balancesVisibleProvider);
+    setState(() => _balancesVisible = !_balancesVisible);
   }
 
   String _formatCurrency(double amount, [String currency = '₫']) {
@@ -514,6 +513,22 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
 
     final double safeToSpendToday =
         math.max(0.0, effectiveDailyLimit - todaySpent);
+    if (txsAsync.hasValue &&
+        walletsAsync.hasValue &&
+        budgetsAsync.hasValue &&
+        categoriesAsync.hasValue) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final previous = ref.read(notificationDailySnapshotProvider);
+        final day = DateTime(now.year, now.month, now.day);
+        if (previous?.safe != safeToSpendToday ||
+            previous?.spent != todaySpent ||
+            previous?.day != day) {
+          ref.read(notificationDailySnapshotProvider.notifier).state =
+              (safe: safeToSpendToday, spent: todaySpent, day: day);
+        }
+      });
+    }
     final double dailyProgressRatio = effectiveDailyLimit > 0
         ? (todaySpent / effectiveDailyLimit).clamp(0.0, 1.0)
         : 1.0;
@@ -555,580 +570,615 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
 
     final cardInk = isDark ? Colors.white : AppTokens.lightText;
 
-    return AppFeedbackDismissRegion(
-      child: Container(
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF7FAF9),
-          gradient: RadialGradient(
-            center: const Alignment(0.0, -0.95),
-            radius: 1.2,
-            colors: [
-              accent.primary.withValues(alpha: isDark ? 0.12 : 0.06),
-              isDark ? const Color(0xFF0F172A) : const Color(0xFFF7FAF9),
-            ],
-            stops: const [0.0, 1.0],
-          ),
-        ),
-        child: Scaffold(
-          backgroundColor: Colors.transparent,
-          body: SafeArea(
-            child: TwoStageOverscrollHeader(
-              onRefresh: _handleRefreshDashboard,
-              onSecretVaultTrigger: _openSecretVaultWithSlideDownTransition,
-              glowColor: accent.primary,
-              child: CustomScrollView(
-                physics: const BouncingScrollPhysics(
-                    parent: AlwaysScrollableScrollPhysics()),
-                slivers: [
-                  // ===============================================================
-                  // [KHỐI 1]: HEADER (AVATAR + LỜI CHÀO + GLOBAL PRIVACY)
-                  // ===============================================================
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(18, 14, 18, 6),
-                    sliver: SliverToBoxAdapter(
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(
-                            child: InkWell(
-                              onTap: () =>
-                                  AvatarCustomizationSheet.show(context),
-                              borderRadius: BorderRadius.circular(16),
-                              child: Padding(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 2.0),
-                                child: Row(
-                                  children: [
-                                    _buildProfileAvatar(userProfile, isDark),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            'Xin chào,',
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.w500,
-                                              color: isDark
-                                                  ? AppTokens.darkMuted
-                                                  : AppTokens.lightMuted,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 1),
-                                          Row(
+    return BalancePrivacyScope(
+        visible: _balancesVisible,
+        child: AppFeedbackDismissRegion(
+          child: Container(
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF7FAF9),
+              gradient: RadialGradient(
+                center: const Alignment(0.0, -0.95),
+                radius: 1.2,
+                colors: [
+                  accent.primary.withValues(alpha: isDark ? 0.12 : 0.06),
+                  isDark ? const Color(0xFF0F172A) : const Color(0xFFF7FAF9),
+                ],
+                stops: const [0.0, 1.0],
+              ),
+            ),
+            child: Scaffold(
+              backgroundColor: Colors.transparent,
+              body: SafeArea(
+                child: TwoStageOverscrollHeader(
+                  onRefresh: _handleRefreshDashboard,
+                  onSecretVaultTrigger: _openSecretVaultWithSlideDownTransition,
+                  glowColor: accent.primary,
+                  child: CustomScrollView(
+                    physics: const BouncingScrollPhysics(
+                        parent: AlwaysScrollableScrollPhysics()),
+                    slivers: [
+                      // ===============================================================
+                      // [KHỐI 1]: HEADER (AVATAR + LỜI CHÀO + GLOBAL PRIVACY)
+                      // ===============================================================
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(18, 14, 18, 6),
+                        sliver: SliverToBoxAdapter(
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: InkWell(
+                                  onTap: () =>
+                                      AvatarCustomizationSheet.show(context),
+                                  borderRadius: BorderRadius.circular(16),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 2.0),
+                                    child: Row(
+                                      children: [
+                                        _buildProfileAvatar(
+                                            userProfile, isDark),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
                                             children: [
-                                              Flexible(
-                                                child: Text(
-                                                  userProfile.displayName,
-                                                  maxLines: 1,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                  style: TextStyle(
-                                                    fontSize: 15,
-                                                    fontWeight: FontWeight.w800,
-                                                    letterSpacing: -0.3,
-                                                    color: isDark
-                                                        ? AppTokens.darkText
-                                                        : AppTokens.lightText,
-                                                  ),
+                                              Text(
+                                                'Xin chào,',
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w500,
+                                                  color: isDark
+                                                      ? AppTokens.darkMuted
+                                                      : AppTokens.lightMuted,
                                                 ),
                                               ),
-                                              const SizedBox(width: 4),
-                                              Icon(
-                                                Icons.expand_more_rounded,
-                                                size: 16,
-                                                color: isDark
-                                                    ? AppTokens.darkMuted
-                                                    : AppTokens.lightMuted,
+                                              const SizedBox(height: 1),
+                                              Row(
+                                                children: [
+                                                  Flexible(
+                                                    child: Text(
+                                                      userProfile.displayName,
+                                                      maxLines: 1,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                      style: TextStyle(
+                                                        fontSize: 15,
+                                                        fontWeight:
+                                                            FontWeight.w800,
+                                                        letterSpacing: -0.3,
+                                                        color: isDark
+                                                            ? AppTokens.darkText
+                                                            : AppTokens
+                                                                .lightText,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 4),
+                                                  Icon(
+                                                    Icons.expand_more_rounded,
+                                                    size: 16,
+                                                    color: isDark
+                                                        ? AppTokens.darkMuted
+                                                        : AppTokens.lightMuted,
+                                                  ),
+                                                ],
                                               ),
                                             ],
                                           ),
-                                        ],
-                                      ),
+                                        ),
+                                      ],
                                     ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              InkWell(
-                                onTap: _toggleAllVisibility,
-                                borderRadius: BorderRadius.circular(10),
-                                child: Container(
-                                  width: 36,
-                                  height: 36,
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: isDark
-                                        ? AppTokens.darkCard
-                                        : AppTokens.lightCardSubtle,
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                      color: isDark
-                                          ? AppTokens.darkBorder
-                                          : AppTokens.lightBorder,
-                                    ),
-                                  ),
-                                  child: Icon(
-                                    _balancesVisible
-                                        ? Icons.visibility_rounded
-                                        : Icons.visibility_off_rounded,
-                                    size: 16,
-                                    color: _balancesVisible
-                                        ? accent.primary
-                                        : (isDark
-                                            ? AppTokens.darkMuted
-                                            : AppTokens.lightMuted),
                                   ),
                                 ),
                               ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  // BỘ CHỌN CHU KỲ THỜI GIAN THỰC — shared preserved sliding engine
-                  SliverPadding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
-                    sliver: SliverToBoxAdapter(
-                      child: SlidingSegmentedBar<CycleMode>(
-                        height: 44,
-                        duration: const Duration(milliseconds: 185),
-                        overshootPx: 1.8,
-                        debugLabel: 'Dashboard.cycleMode',
-                        selectedValue: dashboardMode,
-                        trackColor: isDark
-                            ? AppTokens.darkCard
-                            : AppTokens.lightCardSubtle,
-                        trackBorderColor: isDark
-                            ? AppTokens.darkBorder
-                            : AppTokens.lightBorder,
-                        indicatorColor:
-                            isDark ? AppTokens.darkCardSubtle : Colors.white,
-                        indicatorBorderColor: Colors.transparent,
-                        mutedTextColor:
-                            isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
-                        indicatorShadowColor:
-                            Colors.black.withValues(alpha: 0.05),
-                        fontSize: 11,
-                        items: [
-                          SlidingSegmentedItem<CycleMode>(
-                            value: CycleMode.calendar,
-                            icon: Icons.calendar_month_rounded,
-                            label:
-                                'Tháng ${now.month} (01 – ${DateTime(now.year, now.month + 1, 0).day}/${now.month.toString().padLeft(2, '0')})',
-                            activeColor: isDark
-                                ? AppTokens.darkText
-                                : AppTokens.lightText,
-                          ),
-                          SlidingSegmentedItem<CycleMode>(
-                            value: CycleMode.customCycle,
-                            label:
-                                'Chu kỳ (${DateFormat('dd/MM').format(cycleRange.startDate)} – ${DateFormat('dd/MM').format(cycleRange.endDate)})',
-                            icon: Icons.autorenew_rounded,
-                            activeColor: accent.primary,
-                          ),
-                        ],
-                        onValueChanged: (mode) {
-                          ref.read(dashboardCycleModeProvider.notifier).state =
-                              mode;
-                        },
-                      ),
-                    ),
-                  ),
-
-                  // ===============================================================
-                  // [KHỐI 2]: THẺ TỔNG SỐ DƯ KHẢ DỤNG (FULL-WIDTH CARD VỚI TUMBLER)
-                  // ===============================================================
-                  SliverPadding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
-                    sliver: SliverToBoxAdapter(
-                      child: _ThemedAssetCard(
-                        accent: accent,
-                        visible: _balancesVisible,
-                        balance: _formatCurrency(totalWalletBalance),
-                        cashflow:
-                            '${netSavings >= 0 ? '+' : ''}${_formatCurrency(netSavings)}',
-                        walletCount: walletsMap.length,
-                        onWalletTap: () {
-                          HapticFeedback.selectionClick();
-                          Navigator.of(context).push(MaterialPageRoute(
-                              builder: (_) => const WalletManagerScreen()));
-                        },
-                      ),
-                    ),
-                  ),
-                  SliverPadding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
-                    sliver: SliverToBoxAdapter(
-                      child: DashboardHeroCard(
-                        breakdown: safeToSpendBreakdown,
-                        safeToSpendToday: safeToSpendToday,
-                        effectiveDailyLimit: effectiveDailyLimit,
-                        todaySpent: todaySpent,
-                        dailyProgressRatio: dailyProgressRatio,
-                        activeColor: activeColor,
-                        daysRemaining: daysRemaining,
-                        anchorMonth: currentMonth,
-                        isVisible: _balancesVisible,
-                        isOverSpentToday: isOverSpentToday,
-                        overAmount: overAmount,
-                        baseDailyLimit: originalBaseLimit,
-                        freeBudgetRemaining: freeBudgetRemaining,
-                        fastRecoveryTotalDays: fastRecoveryTotalDays,
-                        fastRecoveryDaysRemaining: fastRecoveryDaysRemaining,
-                        fastRecoveryDailyLimit: fastRecoveryLimit,
-                        amortizedDailyDeduction: amortizedDeduction,
-                      ),
-                    ),
-                  ),
-
-                  // ===============================================================
-                  // [KHỐI 4]: HÀNG THỐNG KÊ PHỤ 3 CỘT (SUB-METRICS VỚI TUMBLER ĐỒNG BỘ)
-                  // ===============================================================
-                  SliverPadding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
-                    sliver: SliverToBoxAdapter(
-                      child: SizedBox(
-                          height: 80,
-                          child: IntrinsicHeight(
-                            child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                              const SizedBox(width: 8),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Expanded(
-                                      child: _CompactMetric(
-                                          label: 'Thu nhập',
-                                          icon: Icons.arrow_upward_rounded,
-                                          value:
-                                              '+${NumberFormat.compact(locale: 'en').format(totalIncome)}',
-                                          detail: 'Chưa đủ dữ liệu kỳ trước',
-                                          visible: _balancesVisible,
-                                          color: totalIncome > 0
-                                              ? accent.primary
-                                              : cardInk,
-                                          isDark: isDark)),
+                                  const NotificationBell(),
                                   const SizedBox(width: 8),
-                                  Expanded(
-                                      child: _CompactMetric(
-                                          label: 'Đã chi',
-                                          icon: Icons.arrow_downward_rounded,
-                                          value:
-                                              '-${NumberFormat.compact(locale: 'en').format(totalExpense)}',
-                                          detail: 'Chưa đủ dữ liệu kỳ trước',
-                                          visible: _balancesVisible,
-                                          color: totalExpense > 0
-                                              ? AppTokens.expense
-                                              : cardInk,
-                                          isDark: isDark)),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                      child: _CompactMetric(
-                                          label: 'Tốc độ',
-                                          icon: Icons.bolt_rounded,
-                                          value:
-                                              '${(budgetConsumedPct * 100).toStringAsFixed(0)}%',
-                                          detail: isOverspending
-                                              ? 'Nhanh'
-                                              : 'Ổn định',
-                                          visible: _balancesVisible,
-                                          color:
-                                              isOverspending && totalExpense > 0
-                                                  ? AppTokens.expense
-                                                  : cardInk,
-                                          isDark: isDark)),
-                                ]),
-                          )),
-                    ),
-                  ),
-
-                  // ===============================================================
-                  // [KHỐI 5]: THẺ XU HƯỚNG CHI TIÊU (SPENDING TREND CHART)
-                  // ===============================================================
-                  SliverPadding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
-                    sliver: SliverToBoxAdapter(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: isDark ? AppTokens.darkCard : Colors.white,
-                          borderRadius: BorderRadius.circular(22),
-                          border: Border.all(
-                            color: isDark
-                                ? AppTokens.darkBorder
-                                : AppTokens.lightBorder,
-                          ),
-                        ),
-                        child: SpendingTrendChart(isVisible: _balancesVisible),
-                      ),
-                    ),
-                  ),
-
-                  // ===============================================================
-                  // [KHỐI 6]: DANH SÁCH GIAO DỊCH GẦN ĐÂY
-                  // ===============================================================
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(18, 14, 18, 8),
-                    sliver: SliverToBoxAdapter(
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'Giao Dịch Gần Đây',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w800,
-                              color: isDark
-                                  ? AppTokens.darkText
-                                  : AppTokens.lightText,
-                            ),
-                          ),
-                          InkWell(
-                            onTap: () {
-                              HapticFeedback.selectionClick();
-                              ref.read(bottomNavIndexProvider.notifier).state =
-                                  1;
-                            },
-                            borderRadius: BorderRadius.circular(8),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 6, vertical: 4),
-                              child: Row(
-                                children: [
-                                  Text(
-                                    'Xem tất cả',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w700,
-                                      color: accent.primary,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 2),
-                                  Icon(Icons.chevron_right_rounded,
-                                      size: 16, color: accent.primary),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  txsAsync.when(
-                    data: (txs) {
-                      if (txs.isEmpty) {
-                        return SliverToBoxAdapter(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                                vertical: 36, horizontal: 20),
-                            child: Center(
-                              child: Column(
-                                children: [
-                                  Icon(
-                                    Icons.receipt_long_rounded,
-                                    size: 44,
-                                    color: isDark
-                                        ? AppTokens.darkMuted
-                                        : AppTokens.lightMuted,
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    'Chưa có giao dịch nào được ghi chép',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      color: isDark
-                                          ? AppTokens.darkMuted
-                                          : AppTokens.lightMuted,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        );
-                      }
-
-                      return SliverPadding(
-                        padding: const EdgeInsets.symmetric(horizontal: 18),
-                        sliver: SliverList(
-                          delegate: SliverChildBuilderDelegate(
-                            (context, index) {
-                              final tx = txs[index];
-                              final isExpense = tx.type == CategoryType.expense;
-                              final wallet = walletsMap[tx.walletId];
-                              final category = categoriesMap[tx.categoryId];
-
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 8.0),
-                                child: Material(
-                                  color: Colors.transparent,
-                                  child: InkWell(
-                                    onTap: () => _openQuickEntrySheet(context,
-                                        tx: tx, dailySafe: effectiveDailyLimit),
-                                    borderRadius: BorderRadius.circular(16),
+                                  InkWell(
+                                    onTap: _toggleAllVisibility,
+                                    borderRadius: BorderRadius.circular(10),
                                     child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 14,
-                                        vertical: 12,
-                                      ),
+                                      width: 36,
+                                      height: 36,
+                                      padding: const EdgeInsets.all(8),
                                       decoration: BoxDecoration(
                                         color: isDark
                                             ? AppTokens.darkCard
-                                            : Colors.white,
-                                        borderRadius: BorderRadius.circular(16),
+                                            : AppTokens.lightCardSubtle,
+                                        borderRadius: BorderRadius.circular(12),
                                         border: Border.all(
                                           color: isDark
                                               ? AppTokens.darkBorder
                                               : AppTokens.lightBorder,
                                         ),
                                       ),
-                                      child: Row(
-                                        children: [
-                                          CategoryIconBadge(
-                                            category: category,
-                                            isExpense: isExpense,
-                                            size: 38,
-                                            iconSize: 18,
-                                          ),
-                                          const SizedBox(width: 12),
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                Row(
-                                                  children: [
-                                                    Expanded(
-                                                      child: Text(
-                                                        tx.note ??
-                                                            tx.merchant ??
-                                                            category?.name ??
-                                                            'Giao dịch',
-                                                        maxLines: 1,
-                                                        overflow: TextOverflow
-                                                            .ellipsis,
-                                                        style: TextStyle(
-                                                          fontSize: 13,
-                                                          fontWeight:
-                                                              FontWeight.w700,
-                                                          color: isDark
-                                                              ? AppTokens
-                                                                  .darkText
-                                                              : AppTokens
-                                                                  .lightText,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                    if (tx.isAiParsed ==
-                                                        true) ...[
-                                                      const SizedBox(width: 6),
-                                                      Container(
-                                                        padding:
-                                                            const EdgeInsets
-                                                                .symmetric(
-                                                          horizontal: 5,
-                                                          vertical: 1.5,
-                                                        ),
-                                                        decoration:
-                                                            BoxDecoration(
-                                                          color: accent.primary
-                                                              .withValues(
-                                                                  alpha: 0.16),
-                                                          borderRadius:
-                                                              BorderRadius
-                                                                  .circular(5),
-                                                        ),
-                                                        child: Text(
-                                                          'AI',
-                                                          style: TextStyle(
-                                                            fontSize: 9,
-                                                            fontWeight:
-                                                                FontWeight.w900,
-                                                            color:
-                                                                accent.primary,
-                                                          ),
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ],
-                                                ),
-                                                const SizedBox(height: 3),
-                                                Text(
-                                                  '${DateFormat('dd/MM HH:mm').format(tx.date)} • ${wallet?.name ?? 'Ví'} • ${category?.name ?? 'Chung'}',
-                                                  maxLines: 1,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                  style: TextStyle(
-                                                    fontSize: 11,
-                                                    color: isDark
-                                                        ? AppTokens.darkMuted
-                                                        : AppTokens.lightMuted,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            '${isExpense ? '-' : '+'}${_formatCurrency(tx.amount)}',
-                                            style: currencyTextStyle(context, TextStyle(
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w800,
-                                              color: isExpense
-                                                  ? AppTokens.expense
-                                                  : AppTokens.income,
-                                            )),
-                                          ),
-                                        ],
+                                      child: Icon(
+                                        _balancesVisible
+                                            ? Icons.visibility_rounded
+                                            : Icons.visibility_off_rounded,
+                                        size: 16,
+                                        color: _balancesVisible
+                                            ? accent.primary
+                                            : (isDark
+                                                ? AppTokens.darkMuted
+                                                : AppTokens.lightMuted),
                                       ),
                                     ),
                                   ),
-                                ),
-                              );
-                            },
-                            childCount: txs.length,
+                                ],
+                              ),
+                            ],
                           ),
                         ),
-                      );
-                    },
-                    loading: () => const SliverToBoxAdapter(
-                      child: Padding(
-                        padding: EdgeInsets.all(32),
-                        child: Center(
-                            child: CircularProgressIndicator(strokeWidth: 2)),
                       ),
-                    ),
-                    error: (err, _) => SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Text(
-                          'Lỗi tải giao dịch: $err',
-                          style: const TextStyle(color: AppTokens.expense),
+
+                      // BỘ CHỌN CHU KỲ THỜI GIAN THỰC — shared preserved sliding engine
+                      SliverPadding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 18, vertical: 4),
+                        sliver: SliverToBoxAdapter(
+                          child: SlidingSegmentedBar<CycleMode>(
+                            height: 44,
+                            duration: const Duration(milliseconds: 185),
+                            overshootPx: 1.8,
+                            debugLabel: 'Dashboard.cycleMode',
+                            selectedValue: dashboardMode,
+                            trackColor: isDark
+                                ? AppTokens.darkCard
+                                : AppTokens.lightCardSubtle,
+                            trackBorderColor: isDark
+                                ? AppTokens.darkBorder
+                                : AppTokens.lightBorder,
+                            indicatorColor: isDark
+                                ? AppTokens.darkCardSubtle
+                                : Colors.white,
+                            indicatorBorderColor: Colors.transparent,
+                            mutedTextColor: isDark
+                                ? AppTokens.darkMuted
+                                : AppTokens.lightMuted,
+                            indicatorShadowColor:
+                                Colors.black.withValues(alpha: 0.05),
+                            fontSize: 11,
+                            items: [
+                              SlidingSegmentedItem<CycleMode>(
+                                value: CycleMode.calendar,
+                                icon: Icons.calendar_month_rounded,
+                                label:
+                                    'Tháng ${now.month} (01 – ${DateTime(now.year, now.month + 1, 0).day}/${now.month.toString().padLeft(2, '0')})',
+                                activeColor: isDark
+                                    ? AppTokens.darkText
+                                    : AppTokens.lightText,
+                              ),
+                              SlidingSegmentedItem<CycleMode>(
+                                value: CycleMode.customCycle,
+                                label:
+                                    'Chu kỳ (${DateFormat('dd/MM').format(cycleRange.startDate)} – ${DateFormat('dd/MM').format(cycleRange.endDate)})',
+                                icon: Icons.autorenew_rounded,
+                                activeColor: accent.primary,
+                              ),
+                            ],
+                            onValueChanged: (mode) {
+                              ref
+                                  .read(dashboardCycleModeProvider.notifier)
+                                  .state = mode;
+                            },
+                          ),
                         ),
                       ),
-                    ),
-                  ),
 
-                  const SliverToBoxAdapter(child: SizedBox(height: 96)),
-                ],
+                      // ===============================================================
+                      // [KHỐI 2]: THẺ TỔNG SỐ DƯ KHẢ DỤNG (FULL-WIDTH CARD VỚI TUMBLER)
+                      // ===============================================================
+                      SliverPadding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 18, vertical: 4),
+                        sliver: SliverToBoxAdapter(
+                          child: _ThemedAssetCard(
+                            accent: accent,
+                            visible: _balancesVisible,
+                            balance: _formatCurrency(totalWalletBalance),
+                            cashflow:
+                                '${netSavings >= 0 ? '+' : ''}${_formatCurrency(netSavings)}',
+                            walletCount: walletsMap.length,
+                            onWalletTap: () {
+                              HapticFeedback.selectionClick();
+                              Navigator.of(context).push(MaterialPageRoute(
+                                  builder: (_) => const WalletManagerScreen()));
+                            },
+                          ),
+                        ),
+                      ),
+                      SliverPadding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 18, vertical: 6),
+                        sliver: SliverToBoxAdapter(
+                          child: DashboardHeroCard(
+                            breakdown: safeToSpendBreakdown,
+                            safeToSpendToday: safeToSpendToday,
+                            effectiveDailyLimit: effectiveDailyLimit,
+                            todaySpent: todaySpent,
+                            dailyProgressRatio: dailyProgressRatio,
+                            activeColor: activeColor,
+                            daysRemaining: daysRemaining,
+                            anchorMonth: currentMonth,
+                            isVisible: _balancesVisible,
+                            isOverSpentToday: isOverSpentToday,
+                            overAmount: overAmount,
+                            baseDailyLimit: originalBaseLimit,
+                            freeBudgetRemaining: freeBudgetRemaining,
+                            fastRecoveryTotalDays: fastRecoveryTotalDays,
+                            fastRecoveryDaysRemaining:
+                                fastRecoveryDaysRemaining,
+                            fastRecoveryDailyLimit: fastRecoveryLimit,
+                            amortizedDailyDeduction: amortizedDeduction,
+                          ),
+                        ),
+                      ),
+
+                      // ===============================================================
+                      // [KHỐI 4]: HÀNG THỐNG KÊ PHỤ 3 CỘT (SUB-METRICS VỚI TUMBLER ĐỒNG BỘ)
+                      // ===============================================================
+                      SliverPadding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 18, vertical: 4),
+                        sliver: SliverToBoxAdapter(
+                          child: SizedBox(
+                              height: 80,
+                              child: IntrinsicHeight(
+                                child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      Expanded(
+                                          child: _CompactMetric(
+                                              label: 'Thu nhập',
+                                              icon: Icons.arrow_upward_rounded,
+                                              value:
+                                                  '+${NumberFormat.compact(locale: 'en').format(totalIncome)}',
+                                              detail:
+                                                  'Chưa đủ dữ liệu kỳ trước',
+                                              visible: _balancesVisible,
+                                              color: totalIncome > 0
+                                                  ? accent.primary
+                                                  : cardInk,
+                                              isDark: isDark)),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                          child: _CompactMetric(
+                                              label: 'Đã chi',
+                                              icon:
+                                                  Icons.arrow_downward_rounded,
+                                              value:
+                                                  '-${NumberFormat.compact(locale: 'en').format(totalExpense)}',
+                                              detail:
+                                                  'Chưa đủ dữ liệu kỳ trước',
+                                              visible: _balancesVisible,
+                                              color: totalExpense > 0
+                                                  ? AppTokens.expense
+                                                  : cardInk,
+                                              isDark: isDark)),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                          child: _CompactMetric(
+                                              label: 'Tốc độ',
+                                              icon: Icons.bolt_rounded,
+                                              value:
+                                                  '${(budgetConsumedPct * 100).toStringAsFixed(0)}%',
+                                              detail: isOverspending
+                                                  ? 'Nhanh'
+                                                  : 'Ổn định',
+                                              visible: _balancesVisible,
+                                              color: isOverspending &&
+                                                      totalExpense > 0
+                                                  ? AppTokens.expense
+                                                  : cardInk,
+                                              isDark: isDark)),
+                                    ]),
+                              )),
+                        ),
+                      ),
+
+                      // ===============================================================
+                      // [KHỐI 5]: THẺ XU HƯỚNG CHI TIÊU (SPENDING TREND CHART)
+                      // ===============================================================
+                      SliverPadding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 18, vertical: 8),
+                        sliver: SliverToBoxAdapter(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: isDark ? AppTokens.darkCard : Colors.white,
+                              borderRadius: BorderRadius.circular(22),
+                              border: Border.all(
+                                color: isDark
+                                    ? AppTokens.darkBorder
+                                    : AppTokens.lightBorder,
+                              ),
+                            ),
+                            child:
+                                SpendingTrendChart(isVisible: _balancesVisible),
+                          ),
+                        ),
+                      ),
+
+                      // ===============================================================
+                      // [KHỐI 6]: DANH SÁCH GIAO DỊCH GẦN ĐÂY
+                      // ===============================================================
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(18, 14, 18, 8),
+                        sliver: SliverToBoxAdapter(
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Giao Dịch Gần Đây',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w800,
+                                  color: isDark
+                                      ? AppTokens.darkText
+                                      : AppTokens.lightText,
+                                ),
+                              ),
+                              InkWell(
+                                onTap: () {
+                                  HapticFeedback.selectionClick();
+                                  ref
+                                      .read(bottomNavIndexProvider.notifier)
+                                      .state = 1;
+                                },
+                                borderRadius: BorderRadius.circular(8),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 6, vertical: 4),
+                                  child: Row(
+                                    children: [
+                                      Text(
+                                        'Xem tất cả',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w700,
+                                          color: accent.primary,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 2),
+                                      Icon(Icons.chevron_right_rounded,
+                                          size: 16, color: accent.primary),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      txsAsync.when(
+                        data: (txs) {
+                          if (txs.isEmpty) {
+                            return SliverToBoxAdapter(
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                    vertical: 36, horizontal: 20),
+                                child: Center(
+                                  child: Column(
+                                    children: [
+                                      Icon(
+                                        Icons.receipt_long_rounded,
+                                        size: 44,
+                                        color: isDark
+                                            ? AppTokens.darkMuted
+                                            : AppTokens.lightMuted,
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        'Chưa có giao dịch nào được ghi chép',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          color: isDark
+                                              ? AppTokens.darkMuted
+                                              : AppTokens.lightMuted,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+                          }
+
+                          return SliverPadding(
+                            padding: const EdgeInsets.symmetric(horizontal: 18),
+                            sliver: SliverList(
+                              delegate: SliverChildBuilderDelegate(
+                                (context, index) {
+                                  final tx = txs[index];
+                                  final isExpense =
+                                      tx.type == CategoryType.expense;
+                                  final wallet = walletsMap[tx.walletId];
+                                  final category = categoriesMap[tx.categoryId];
+
+                                  return Padding(
+                                    padding: const EdgeInsets.only(bottom: 8.0),
+                                    child: Material(
+                                      color: Colors.transparent,
+                                      child: InkWell(
+                                        onTap: () => _openQuickEntrySheet(
+                                            context,
+                                            tx: tx,
+                                            dailySafe: effectiveDailyLimit),
+                                        borderRadius: BorderRadius.circular(16),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 14,
+                                            vertical: 12,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: isDark
+                                                ? AppTokens.darkCard
+                                                : Colors.white,
+                                            borderRadius:
+                                                BorderRadius.circular(16),
+                                            border: Border.all(
+                                              color: isDark
+                                                  ? AppTokens.darkBorder
+                                                  : AppTokens.lightBorder,
+                                            ),
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              CategoryIconBadge(
+                                                category: category,
+                                                isExpense: isExpense,
+                                                size: 38,
+                                                iconSize: 18,
+                                              ),
+                                              const SizedBox(width: 12),
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    Row(
+                                                      children: [
+                                                        Expanded(
+                                                          child: Text(
+                                                            tx.note ??
+                                                                tx.merchant ??
+                                                                category
+                                                                    ?.name ??
+                                                                'Giao dịch',
+                                                            maxLines: 1,
+                                                            overflow:
+                                                                TextOverflow
+                                                                    .ellipsis,
+                                                            style: TextStyle(
+                                                              fontSize: 13,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w700,
+                                                              color: isDark
+                                                                  ? AppTokens
+                                                                      .darkText
+                                                                  : AppTokens
+                                                                      .lightText,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                        if (tx.isAiParsed ==
+                                                            true) ...[
+                                                          const SizedBox(
+                                                              width: 6),
+                                                          Container(
+                                                            padding:
+                                                                const EdgeInsets
+                                                                    .symmetric(
+                                                              horizontal: 5,
+                                                              vertical: 1.5,
+                                                            ),
+                                                            decoration:
+                                                                BoxDecoration(
+                                                              color: accent
+                                                                  .primary
+                                                                  .withValues(
+                                                                      alpha:
+                                                                          0.16),
+                                                              borderRadius:
+                                                                  BorderRadius
+                                                                      .circular(
+                                                                          5),
+                                                            ),
+                                                            child: Text(
+                                                              'AI',
+                                                              style: TextStyle(
+                                                                fontSize: 9,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w900,
+                                                                color: accent
+                                                                    .primary,
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ],
+                                                    ),
+                                                    const SizedBox(height: 3),
+                                                    Text(
+                                                      '${DateFormat('dd/MM HH:mm').format(tx.date)} • ${wallet?.name ?? 'Ví'} • ${category?.name ?? 'Chung'}',
+                                                      maxLines: 1,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                      style: TextStyle(
+                                                        fontSize: 11,
+                                                        color: isDark
+                                                            ? AppTokens
+                                                                .darkMuted
+                                                            : AppTokens
+                                                                .lightMuted,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              CurrencyText(
+                                                '${isExpense ? '-' : '+'}${_formatCurrency(tx.amount)}',
+                                                style: currencyTextStyle(
+                                                    context,
+                                                    TextStyle(
+                                                      fontSize: 14,
+                                                      fontWeight:
+                                                          FontWeight.w800,
+                                                      color: isExpense
+                                                          ? AppTokens.expense
+                                                          : AppTokens.income,
+                                                    )),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                                childCount: txs.length,
+                              ),
+                            ),
+                          );
+                        },
+                        loading: () => const SliverToBoxAdapter(
+                          child: Padding(
+                            padding: EdgeInsets.all(32),
+                            child: Center(
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2)),
+                          ),
+                        ),
+                        error: (err, _) => SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Text(
+                              'Lỗi tải giao dịch: $err',
+                              style: const TextStyle(color: AppTokens.expense),
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      const SliverToBoxAdapter(child: SizedBox(height: 96)),
+                    ],
+                  ),
+                ),
               ),
             ),
           ),
-        ),
-      ),
-    );
+        ));
   }
 }
 
@@ -1213,12 +1263,16 @@ class _ThemedAssetCard extends StatelessWidget {
                               decoration: BoxDecoration(
                                   color: Colors.white.withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(8)),
-                              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                                const Icon(Icons.wallet, size: 12, color: Colors.white),
-                                const SizedBox(width: 4),
-                                Text('$walletCount ví ❯',
-                                    style: const TextStyle(fontSize: 11, color: Colors.white)),
-                              ]))),
+                              child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.wallet,
+                                        size: 12, color: Colors.white),
+                                    const SizedBox(width: 4),
+                                    Text('$walletCount ví ❯',
+                                        style: const TextStyle(
+                                            fontSize: 11, color: Colors.white)),
+                                  ]))),
                     ]),
                     const Spacer(),
                     FittedBox(
@@ -1327,7 +1381,7 @@ class _CompactMetric extends StatelessWidget {
               FittedBox(
                   fit: BoxFit.scaleDown,
                   alignment: Alignment.centerLeft,
-                  child: Text(visible ? detail : '••••••',
+                  child: CurrencyText(detail,
                       style: TextStyle(
                           fontSize: 9.5,
                           color: isDark

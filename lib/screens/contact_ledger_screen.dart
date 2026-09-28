@@ -458,6 +458,7 @@ class _ContactLedgerScreenState extends ConsumerState<ContactLedgerScreen> {
       child: PreservedSleekDismissible(
         key: ValueKey('contact_debt_${tx.id}'),
         backgroundColor: AppTokens.expense,
+        borderRadius: 16,
         animateIn: _restoringDebtTxIds.contains(tx.id),
         onInsertAnimationCompleted: () {
           if (!mounted) return;

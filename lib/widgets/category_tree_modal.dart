@@ -21,7 +21,7 @@ import '../theme/app_theme.dart';
 // StreamProvider tự động cập nhật danh mục từ Drift SQLite
 final categoriesTreeStreamProvider = StreamProvider.autoDispose<List<Category>>((ref) {
   final db = ref.watch(databaseProvider);
-  return db.select(db.categories).watch();
+  return db.watchAvailableCategories();
 });
 
 class CategoryTreeModal extends ConsumerStatefulWidget {

@@ -193,9 +193,9 @@ class DashboardHeroCard extends ConsumerWidget {
     String compact(double value) =>
         NumberFormat.compact(locale: 'en').format(value);
     final cycleLabel = remainingKDays > 0
-        ? 'Bù nhanh: còn $remainingKDays/$totalKDays ngày • ${isVisible ? _formatCurrency(recoveryLimit) : '•••••• ₫'}/ngày'
+        ? 'Bù nhanh: còn $remainingKDays/$totalKDays ngày • ${_formatCurrency(recoveryLimit)}/ngày'
         : amortizedDeduction > 0
-            ? 'Đã dàn đều ${isVisible ? _formatCurrency(amortizedDeduction) : '•••••• ₫'}/ngày'
+            ? 'Đã dàn đều ${_formatCurrency(amortizedDeduction)}/ngày'
             : 'Theo Chu kỳ Tháng ${DateFormat('MM').format(anchorMonth)} (còn $daysRemaining ngày)';
 
     return SizedBox(
@@ -310,7 +310,8 @@ class DashboardHeroCard extends ConsumerWidget {
                       child: FittedBox(
                           fit: BoxFit.scaleDown,
                           alignment: Alignment.centerLeft,
-                          child: Text(cycleLabel,
+                          child: CurrencyText(cycleLabel,
+                              isVisible: isVisible,
                               style: TextStyle(fontSize: 11, color: muted))),
                     )),
                 const Spacer(),
@@ -332,7 +333,7 @@ class DashboardHeroCard extends ConsumerWidget {
                               fit: BoxFit.scaleDown,
                               alignment: Alignment.centerLeft,
                               child: CurrencyText(
-                                  'Đã tiêu: ${isVisible ? compact(todaySpent) : '••••••'} ₫',
+                                  'Đã tiêu: ${compact(todaySpent)} ₫',
                                   style:
                                       TextStyle(fontSize: 11, color: muted)))),
                       const SizedBox(width: 8),
@@ -341,7 +342,7 @@ class DashboardHeroCard extends ConsumerWidget {
                               fit: BoxFit.scaleDown,
                               alignment: Alignment.centerRight,
                               child: CurrencyText(
-                                  'Hạn mức: ${isVisible ? compact(effectiveDailyLimit) : '••••••'} ₫',
+                                  'Hạn mức: ${compact(effectiveDailyLimit)} ₫',
                                   style:
                                       TextStyle(fontSize: 11, color: muted)))),
                     ])),

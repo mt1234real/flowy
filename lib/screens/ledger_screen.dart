@@ -1,3 +1,4 @@
+import '../widgets/currency_text.dart';
 // ==============================================================================
 // File: lib/screens/ledger_screen.dart
 // Architecture: Universal Fluid Sheet Engine Integration, Sliding Pill Milestone Physics & Motion Hardening
@@ -530,7 +531,7 @@ class _PreservedMetricSwitcherState extends State<_PreservedMetricSwitcher>
   @override
   Widget build(BuildContext context) {
     if (_previousValue == null) {
-      return Text(_currentValue, style: currencyTextStyle(context, widget.style));
+      return CurrencyText(_currentValue, style: currencyTextStyle(context, widget.style));
     }
 
     return AnimatedBuilder(
@@ -550,7 +551,7 @@ class _PreservedMetricSwitcherState extends State<_PreservedMetricSwitcher>
               child: Transform.scale(
                 scale: oldScale,
                 alignment: Alignment.centerLeft,
-                child: Text(_previousValue!, style: currencyTextStyle(context, widget.style)),
+                child: CurrencyText(_previousValue!, style: currencyTextStyle(context, widget.style)),
               ),
             ),
             Opacity(
@@ -558,7 +559,7 @@ class _PreservedMetricSwitcherState extends State<_PreservedMetricSwitcher>
               child: Transform.scale(
                 scale: newScale,
                 alignment: Alignment.centerLeft,
-                child: Text(_currentValue, style: currencyTextStyle(context, widget.style)),
+                child: CurrencyText(_currentValue, style: currencyTextStyle(context, widget.style)),
               ),
             ),
           ],
@@ -1442,7 +1443,7 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> with TickerProvider
                         ),
                       ],
                     ),
-                    Text(
+                    CurrencyText(
                       '${netDaily >= 0 ? '+' : ''}${_formatCurrency(netDaily)}',
                       style: currencyTextStyle(context, TextStyle(
                         fontSize: 12,
@@ -1484,6 +1485,7 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> with TickerProvider
       child: PreservedSleekDismissible(
         key: ValueKey('ledger_tx_${item.id}'),
         backgroundColor: AppTokens.expense,
+        borderRadius: 16,
         animateIn: _restoringTxIds.contains(item.id),
         onInsertAnimationCompleted: () {
           if (!mounted) return;
@@ -1630,7 +1632,7 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> with TickerProvider
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
+                      CurrencyText(
                         '${isMoneyIn ? '+' : '-'}${_formatCurrency(item.amount)}',
                         style: currencyTextStyle(context, TextStyle(
                           fontSize: 14,

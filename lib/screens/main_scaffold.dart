@@ -26,6 +26,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/animation/app_animation_policy.dart';
+import '../features/notifications/notification_host.dart';
 import '../theme/app_theme.dart';
 import '../widgets/quick_entry_sheet.dart';
 import 'budget_screen.dart';
@@ -106,16 +107,18 @@ class _MainScaffoldState extends ConsumerState<MainScaffold>
       // CONTENT
       // ========================================================================
 
-      body: IndexedStack(
-        index: currentTabIndex,
-        children: List.generate(
-          _screens.length,
-          (index) {
-            return TickerMode(
-              enabled: currentTabIndex == index,
-              child: _screens[index],
-            );
-          },
+      body: NotificationHost(
+        child: IndexedStack(
+          index: currentTabIndex,
+          children: List.generate(
+            _screens.length,
+            (index) {
+              return TickerMode(
+                enabled: currentTabIndex == index,
+                child: _screens[index],
+              );
+            },
+          ),
         ),
       ),
 

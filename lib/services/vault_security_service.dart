@@ -12,6 +12,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import '../theme/app_theme.dart' show sharedPreferencesProvider;
+import 'package:shared_preferences/shared_preferences.dart';
 
 class VaultSecurityConfig {
   final String pin;
@@ -25,10 +27,10 @@ class VaultSecurityConfig {
   });
 
   Map<String, dynamic> toJson() => {
-    'pin': pin,
-    'length': length,
-    'isCustom': isCustom,
-  };
+        'pin': pin,
+        'length': length,
+        'isCustom': isCustom,
+      };
 
   factory VaultSecurityConfig.fromJson(Map<String, dynamic> json) {
     final rawPin = json['pin'] as String? ?? '1234';
@@ -58,7 +60,8 @@ class VaultSecurityService {
       final dir = await getApplicationDocumentsDirectory();
       return File(p.join(dir.path, 'vault_security_config.json'));
     } catch (e) {
-      debugPrint('VaultSecurityService: Error accessing documents directory: $e');
+      debugPrint(
+          'VaultSecurityService: Error accessing documents directory: $e');
       return null;
     }
   }
@@ -124,7 +127,8 @@ class VaultSecurityService {
 class VaultSecurityNotifier extends StateNotifier<VaultSecurityConfig> {
   final VaultSecurityService _service;
 
-  VaultSecurityNotifier(this._service) : super(VaultSecurityConfig.defaultConfig) {
+  VaultSecurityNotifier(this._service)
+      : super(VaultSecurityConfig.defaultConfig) {
     _load();
   }
 
@@ -153,7 +157,7 @@ final vaultSecurityServiceProvider = Provider<VaultSecurityService>((ref) {
 });
 
 final vaultSecurityNotifierProvider =
-StateNotifierProvider<VaultSecurityNotifier, VaultSecurityConfig>((ref) {
+    StateNotifierProvider<VaultSecurityNotifier, VaultSecurityConfig>((ref) {
   final service = ref.watch(vaultSecurityServiceProvider);
   return VaultSecurityNotifier(service);
 });
@@ -167,3 +171,19 @@ final vaultPinProvider = Provider<String>((ref) {
 final vaultPinLengthProvider = Provider<int>((ref) {
   return ref.watch(vaultSecurityNotifierProvider).length;
 });
+
+class VaultBiometricsNotifier extends StateNotifier<bool> {
+  final SharedPreferences prefs;
+  VaultBiometricsNotifier(this.prefs)
+      : super(prefs.getBool('vault_biometrics_enabled') ?? true);
+  Future<void> setEnabled(bool value) async {
+    if (!await prefs.setBool('vault_biometrics_enabled', value)) {
+      throw StateError('Cannot save biometric preference');
+    }
+    state = value;
+  }
+}
+
+final vaultBiometricsProvider =
+    StateNotifierProvider<VaultBiometricsNotifier, bool>(
+        (ref) => VaultBiometricsNotifier(ref.watch(sharedPreferencesProvider)));

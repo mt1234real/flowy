@@ -92,12 +92,14 @@ class InsightsTrendRibbon extends StatelessWidget {
   final String amount;
   final double delta;
   final bool expense;
+  final bool isVisible;
   const InsightsTrendRibbon(
       {super.key,
       required this.text,
       required this.delta,
       required this.details,
       required this.amount,
+      this.isVisible = true,
       this.expense = true});
   @override
   Widget build(BuildContext context) {
@@ -149,6 +151,7 @@ class InsightsTrendRibbon extends StatelessWidget {
                                   fontSize: 13.5, fontWeight: FontWeight.w700)),
                           const SizedBox(height: 5),
                           CurrencyText(amount,
+                              isVisible: isVisible,
                               style: TextStyle(fontSize: 12.5, color: tone)),
                         ])),
                   ])

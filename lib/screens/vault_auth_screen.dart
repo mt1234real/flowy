@@ -146,6 +146,7 @@ class _VaultAuthScreenState extends ConsumerState<VaultAuthScreen>
   }
 
   Future<void> _authenticateWithBiometrics() async {
+    if (!ref.read(vaultBiometricsProvider)) return;
     if (_isLockedOut ||
         _isUnlocking ||
         _isAuthenticatingBiometrics ||
@@ -431,14 +432,16 @@ class _VaultAuthScreenState extends ConsumerState<VaultAuthScreen>
                   onDigit: (digit) => _onKeyPress(digit, pinLength),
                   onBackspace: _onBackspace,
                   onBackspaceLongPress: _clearPin,
-                  leadingAction: PrecisionNumpadAction(
-                    icon: _preferFaceIcon
-                        ? Icons.face_retouching_natural_rounded
-                        : Icons.fingerprint_rounded,
-                    onPressed: _authenticateWithBiometrics,
-                    color: accentColor,
-                    semanticLabel: 'Sinh trắc học',
-                  ),
+                  leadingAction: !ref.watch(vaultBiometricsProvider)
+                      ? null
+                      : PrecisionNumpadAction(
+                          icon: _preferFaceIcon
+                              ? Icons.face_retouching_natural_rounded
+                              : Icons.fingerprint_rounded,
+                          onPressed: _authenticateWithBiometrics,
+                          color: accentColor,
+                          semanticLabel: 'Sinh trắc học',
+                        ),
                   digitColor: Colors.white,
                   actionColor: accentColor,
                   horizontalPadding: 18,

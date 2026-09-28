@@ -5,7 +5,6 @@ import '../../data/database.dart';
 import '../../theme/app_theme.dart';
 import '../../screens/ledger_screen.dart' show computeMonthCycleRange;
 
-final balancesVisibleProvider = StateProvider<bool>((ref) => false);
 final insightsTransactionsProvider =
     StreamProvider.autoDispose<List<Transaction>>(
         (ref) => ref.watch(databaseProvider).watchAllTransactions());

@@ -5,11 +5,12 @@
 // ==============================================================================
 
 import 'package:flutter/material.dart';
+import 'local_balance_peek.dart';
 
 import '../core/animation/app_animation_policy.dart';
 import '../theme/app_theme.dart';
 
-class PreservedBalanceTumbler extends StatefulWidget {
+class PreservedBalanceTumbler extends StatelessWidget {
   final bool isVisible;
   final String realValue;
   final String maskedValue;
@@ -36,11 +37,53 @@ class PreservedBalanceTumbler extends StatefulWidget {
   });
 
   @override
-  State<PreservedBalanceTumbler> createState() =>
-      _PreservedBalanceTumblerState();
+  Widget build(BuildContext context) => LocalBalancePeek(
+        visible: isVisible,
+        valueKey: realValue,
+        builder: (visible) => _BalanceMotion(
+            isVisible: visible,
+            realValue: realValue,
+            maskedValue: maskedValue,
+            style: style,
+            isCurrency: isCurrency,
+            height: height,
+            alignment: alignment,
+            travelPx: travelPx,
+            duration: duration,
+            debugLabel: debugLabel),
+      );
 }
 
-class _PreservedBalanceTumblerState extends State<PreservedBalanceTumbler>
+class _BalanceMotion extends StatefulWidget {
+  final bool isVisible;
+  final String realValue;
+  final String maskedValue;
+  final TextStyle style;
+  final bool isCurrency;
+  final double height;
+  final Alignment alignment;
+  final double travelPx;
+  final Duration duration;
+  final String debugLabel;
+
+  const _BalanceMotion({
+    required this.isVisible,
+    required this.realValue,
+    this.maskedValue = '•••••• ₫',
+    required this.style,
+    this.isCurrency = true,
+    this.height = 40.0,
+    this.alignment = Alignment.centerLeft,
+    this.travelPx = 4.0,
+    this.duration = const Duration(milliseconds: 180),
+    this.debugLabel = 'BalanceMotion',
+  });
+
+  @override
+  State<_BalanceMotion> createState() => _BalanceMotionState();
+}
+
+class _BalanceMotionState extends State<_BalanceMotion>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late bool _currentVisible;
@@ -58,7 +101,7 @@ class _PreservedBalanceTumblerState extends State<PreservedBalanceTumbler>
   }
 
   @override
-  void didUpdateWidget(covariant PreservedBalanceTumbler oldWidget) {
+  void didUpdateWidget(covariant _BalanceMotion oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.isVisible != widget.isVisible) {
       _previousVisible = oldWidget.isVisible;

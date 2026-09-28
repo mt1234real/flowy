@@ -50,21 +50,23 @@ class PrePurchaseAdvisorSheet extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<PrePurchaseAdvisorSheet> createState() => _PrePurchaseAdvisorSheetState();
+  ConsumerState<PrePurchaseAdvisorSheet> createState() =>
+      _PrePurchaseAdvisorSheetState();
 }
 
-class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorSheet> {
+class _PrePurchaseAdvisorSheetState
+    extends ConsumerState<PrePurchaseAdvisorSheet> {
   AdvisorTab _currentTab = AdvisorTab.single;
 
   // Single item controllers
   late final TextEditingController _singleNameController;
-  String _singleAmountBuffer = '150000';
+  String _singleAmountBuffer = '0';
 
   // Dilemma item controllers
   late final TextEditingController _itemANameController;
   late final TextEditingController _itemBNameController;
-  String _itemAAmountBuffer = '350000';
-  String _itemBAmountBuffer = '180000';
+  String _itemAAmountBuffer = '0';
+  String _itemBAmountBuffer = '0';
   int _activeDilemmaInput = 0; // 0: Item A, 1: Item B
 
   @override
@@ -84,7 +86,8 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
   }
 
   String _formatCurrency(double amount) {
-    return NumberFormat.currency(locale: 'vi_VN', symbol: '₫', decimalDigits: 0).format(amount);
+    return NumberFormat.currency(locale: 'vi_VN', symbol: '₫', decimalDigits: 0)
+        .format(amount);
   }
 
   void _onNumpadPressSingle(String key) {
@@ -94,7 +97,8 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
         _singleAmountBuffer = '0';
       } else if (key == '⌫') {
         if (_singleAmountBuffer.length > 1) {
-          _singleAmountBuffer = _singleAmountBuffer.substring(0, _singleAmountBuffer.length - 1);
+          _singleAmountBuffer =
+              _singleAmountBuffer.substring(0, _singleAmountBuffer.length - 1);
         } else {
           _singleAmountBuffer = '0';
         }
@@ -115,7 +119,8 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
   void _onNumpadPressDilemma(String key) {
     HapticFeedback.selectionClick();
     setState(() {
-      String target = _activeDilemmaInput == 0 ? _itemAAmountBuffer : _itemBAmountBuffer;
+      String target =
+          _activeDilemmaInput == 0 ? _itemAAmountBuffer : _itemBAmountBuffer;
 
       if (key == 'C') {
         target = '0';
@@ -168,10 +173,14 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
   }
 
   void _cancelPurchase(double amount) {
+    if (amount <= 0) {
+      Navigator.of(context).pop();
+      return;
+    }
     HapticFeedback.selectionClick();
     AppFeedback.showSuccess(
       context,
-      '🎉 Bạn vừa giữ lại ${_formatCurrency(amount)} cho chu kỳ này.',
+      'Bạn giữ lại ${_formatCurrency(amount)} cho chu kỳ này.',
       emitHaptic: false,
       icon: Icons.celebration_rounded,
     );
@@ -191,9 +200,13 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
           child: Container(
             padding: const EdgeInsets.fromLTRB(18, 12, 18, 20),
             decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF151C28).withValues(alpha: 0.98) : Colors.white.withValues(alpha: 0.98),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-              border: Border.all(color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
+              color: isDark
+                  ? const Color(0xFF151C28).withValues(alpha: 0.98)
+                  : Colors.white.withValues(alpha: 0.98),
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(28)),
+              border: Border.all(
+                  color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
             ),
             child: SafeArea(
               top: false,
@@ -228,7 +241,8 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
                                 color: accent.primary.withValues(alpha: 0.16),
                                 borderRadius: BorderRadius.circular(10),
                               ),
-                              child: const Text('⚖️', style: TextStyle(fontSize: 18)),
+                              child: const Text('⚖️',
+                                  style: TextStyle(fontSize: 18)),
                             ),
                             const SizedBox(width: 10),
                             Column(
@@ -239,12 +253,18 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
                                   style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w800,
-                                    color: isDark ? AppTokens.darkText : AppTokens.lightText,
+                                    color: isDark
+                                        ? AppTokens.darkText
+                                        : AppTokens.lightText,
                                   ),
                                 ),
                                 Text(
                                   'Xem khoản này ảnh hưởng thế nào đến ngân sách',
-                                  style: TextStyle(fontSize: 11, color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted),
+                                  style: TextStyle(
+                                      fontSize: 11,
+                                      color: isDark
+                                          ? AppTokens.darkMuted
+                                          : AppTokens.lightMuted),
                                 ),
                               ],
                             ),
@@ -306,13 +326,11 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
   // ===========================================================================
   Widget _buildSingleItemView(bool isDark, AppAccentPreset accent) {
     final double p = double.tryParse(_singleAmountBuffer) ?? 0.0;
-    final double sDaily = widget.dailySafe.isFinite
-        ? math.max(0.0, widget.dailySafe)
-        : 0.0;
+    final double sDaily =
+        widget.dailySafe.isFinite ? math.max(0.0, widget.dailySafe) : 0.0;
     final int d = math.max(1, widget.daysRemaining);
-    final double bFree = widget.freeBudgetRemaining.isFinite
-        ? widget.freeBudgetRemaining
-        : 0.0;
+    final double bFree =
+        widget.freeBudgetRemaining.isFinite ? widget.freeBudgetRemaining : 0.0;
 
     final double deltaS = (p / d).floorToDouble();
     final double sNew = math.max(0.0, sDaily - deltaS);
@@ -326,7 +344,10 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
       children: [
         TextField(
           controller: _singleNameController,
-          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: isDark ? AppTokens.darkText : AppTokens.lightText),
+          style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: isDark ? AppTokens.darkText : AppTokens.lightText),
           decoration: const InputDecoration(
             labelText: 'Tên món đồ (không bắt buộc)',
             hintText: 'Ví dụ: Tai nghe',
@@ -335,7 +356,6 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
           ),
         ),
         const SizedBox(height: 10),
-
         Container(
           width: double.infinity,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -345,7 +365,9 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
             border: Border.all(
               color: isGreen
                   ? const Color(0xFF10B981)
-                  : (isYellow ? const Color(0xFFF59E0B) : const Color(0xFFF43F5E)),
+                  : (isYellow
+                      ? const Color(0xFFF59E0B)
+                      : const Color(0xFFF43F5E)),
               width: 1.5,
             ),
           ),
@@ -357,36 +379,47 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
                 children: [
                   Text(
                     'Số tiền dự tính chi',
-                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted),
+                    style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: isDark
+                            ? AppTokens.darkMuted
+                            : AppTokens.lightMuted),
                   ),
                   const SizedBox(width: 8),
                   Flexible(
-                    child: _buildStatusBadge(isGreen: isGreen, isYellow: isYellow, isRed: isRed),
+                    child: _buildStatusBadge(
+                        isGreen: isGreen, isYellow: isYellow, isRed: isRed),
                   ),
                 ],
               ),
               const SizedBox(height: 4),
               Text(
                 _formatCurrency(p),
-                style: currencyTextStyle(context, TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.w900,
-                  color: isGreen
-                      ? const Color(0xFF10B981)
-                      : (isYellow ? const Color(0xFFF59E0B) : const Color(0xFFF43F5E)),
-                )),
+                style: currencyTextStyle(
+                    context,
+                    TextStyle(
+                      fontSize: 26,
+                      fontWeight: FontWeight.w900,
+                      color: isGreen
+                          ? const Color(0xFF10B981)
+                          : (isYellow
+                              ? const Color(0xFFF59E0B)
+                              : const Color(0xFFF43F5E)),
+                    )),
               ),
             ],
           ),
         ),
         const SizedBox(height: 12),
-
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: isDark ? AppTokens.darkCardSubtle : AppTokens.lightCardSubtle,
+            color:
+                isDark ? AppTokens.darkCardSubtle : AppTokens.lightCardSubtle,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
+            border: Border.all(
+                color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -394,20 +427,31 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
               if (isGreen) ...[
                 Row(
                   children: [
-                    const Icon(Icons.check_circle_outline_rounded, color: Color(0xFF10B981), size: 18),
+                    const Icon(Icons.check_circle_outline_rounded,
+                        color: Color(0xFF10B981), size: 18),
                     const SizedBox(width: 8),
                     Expanded(
                       child: CurrencyText(
+                        respectPrivacy: false,
                         'Khoản chi nằm trọn trong hạn mức hôm nay (${_formatCurrency(sDaily)}).',
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: isDark ? AppTokens.darkText : AppTokens.lightText),
+                        style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: isDark
+                                ? AppTokens.darkText
+                                : AppTokens.lightText),
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 6),
                 CurrencyText(
+                  respectPrivacy: false,
                   'Sau khi mua, hôm nay bạn vẫn còn lại ${_formatCurrency(sDaily - p)} khả chi. Các ngày tiếp theo hoàn toàn không bị ảnh hưởng!',
-                  style: TextStyle(fontSize: 11, color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted),
+                  style: TextStyle(
+                      fontSize: 11,
+                      color:
+                          isDark ? AppTokens.darkMuted : AppTokens.lightMuted),
                 ),
               ] else if (isYellow) ...[
                 Row(
@@ -418,7 +462,12 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
                     Expanded(
                       child: Text(
                         'Chiếm ${((p / bFree) * 100).clamp(0, 999).toStringAsFixed(0)}% quỹ còn lại',
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: isDark ? AppTokens.darkText : AppTokens.lightText),
+                        style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            color: isDark
+                                ? AppTokens.darkText
+                                : AppTokens.lightText),
                       ),
                     ),
                   ],
@@ -431,10 +480,14 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
                     const SizedBox(width: 8),
                     Expanded(
                       child: CurrencyText(
+                        respectPrivacy: false,
                         sDaily <= 0
                             ? 'Không còn tiền an toàn để chi'
                             : 'Nếu dàn đều: Hạn mức mỗi ngày từ mai sẽ giảm từ ${_formatCurrency(sDaily)} ➔ ${_formatCurrency(sNew)}/ngày (mỗi ngày bớt ${_formatCurrency(deltaS)}).',
-                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFFF59E0B)),
+                        style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFFF59E0B)),
                       ),
                     ),
                   ],
@@ -447,8 +500,13 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
                     const SizedBox(width: 8),
                     Expanded(
                       child: CurrencyText(
+                        respectPrivacy: false,
                         'Ngân sách tự do chu kỳ vẫn an toàn còn ${_formatCurrency(bFree - p)} cho $d ngày tới.',
-                        style: TextStyle(fontSize: 11, color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted),
+                        style: TextStyle(
+                            fontSize: 11,
+                            color: isDark
+                                ? AppTokens.darkMuted
+                                : AppTokens.lightMuted),
                       ),
                     ),
                   ],
@@ -456,14 +514,20 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
               ] else ...[
                 Row(
                   children: [
-                    const Icon(Icons.dangerous_outlined, color: Color(0xFFF43F5E), size: 18),
+                    const Icon(Icons.dangerous_outlined,
+                        color: Color(0xFFF43F5E), size: 18),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         bFree <= 0
                             ? 'Đang hết ngân sách tự do\nKhông còn tiền an toàn để chi'
                             : 'Khoản này lớn hơn số tiền bạn còn lại trong chu kỳ. Nếu mua, bạn sẽ phải bù từ tiền sinh hoạt cố định.',
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: isDark ? AppTokens.darkText : AppTokens.lightText),
+                        style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: isDark
+                                ? AppTokens.darkText
+                                : AppTokens.lightText),
                       ),
                     ),
                   ],
@@ -473,10 +537,8 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
           ),
         ),
         const SizedBox(height: 12),
-
         _buildNumpadGrid(isDark, _onNumpadPressSingle),
         const SizedBox(height: 14),
-
         Row(
           children: [
             Expanded(
@@ -484,14 +546,21 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
                 height: 48,
                 child: OutlinedButton(
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: isDark ? AppTokens.darkText : AppTokens.lightText,
-                    side: BorderSide(color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    foregroundColor:
+                        isDark ? AppTokens.darkText : AppTokens.lightText,
+                    side: BorderSide(
+                        color: isDark
+                            ? AppTokens.darkBorder
+                            : AppTokens.lightBorder),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16)),
                   ),
                   onPressed: () => _cancelPurchase(p),
                   child: const FittedBox(
                     fit: BoxFit.scaleDown,
-                    child: Text('Để sau', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                    child: Text('Để sau',
+                        style: TextStyle(
+                            fontSize: 13, fontWeight: FontWeight.w700)),
                   ),
                 ),
               ),
@@ -502,18 +571,27 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
                 height: 48,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: isRed ? const Color(0xFFF43F5E) : accent.primary,
+                    backgroundColor:
+                        isRed ? const Color(0xFFF43F5E) : accent.primary,
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16)),
                   ),
                   onPressed: p <= 0
                       ? null
-                      : () => _proceedToBuySingle(_singleNameController.text.trim().isEmpty ? 'Món đồ mới' : _singleNameController.text.trim(), p),
+                      : () => _proceedToBuySingle(
+                          _singleNameController.text.trim().isEmpty
+                              ? 'Món đồ mới'
+                              : _singleNameController.text.trim(),
+                          p),
                   child: FittedBox(
                     fit: BoxFit.scaleDown,
                     child: Text(
-                      isGreen ? 'Ghi chép giao dịch ngay' : 'Vẫn mua (chia đều các ngày)',
-                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+                      isGreen
+                          ? 'Ghi chép giao dịch ngay'
+                          : 'Vẫn mua (chia đều các ngày)',
+                      style: const TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.w800),
                     ),
                   ),
                 ),
@@ -525,12 +603,14 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
     );
   }
 
-  Widget _buildStatusBadge({required bool isGreen, required bool isYellow, required bool isRed}) {
+  Widget _buildStatusBadge(
+      {required bool isGreen, required bool isYellow, required bool isRed}) {
     String text = 'Mua được!';
     Color color = const Color(0xFF10B981);
     if (isYellow) {
       text = 'Dễ thở nhất';
-      color = const Color(0xFF10B981); // xanh ngọc: an toàn nhất trong ngưỡng vàng
+      color =
+          const Color(0xFF10B981); // xanh ngọc: an toàn nhất trong ngưỡng vàng
     } else if (isRed) {
       text = 'Bù nhanh';
       color = const Color(0xFFF43F5E);
@@ -544,7 +624,8 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
       ),
       child: Text(
         text,
-        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: color),
+        style:
+            TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: color),
       ),
     );
   }
@@ -555,13 +636,13 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
   Widget _buildDilemmaView(bool isDark, AppAccentPreset accent) {
     final double pA = math.max(0.0, double.tryParse(_itemAAmountBuffer) ?? 0.0);
     final double pB = math.max(0.0, double.tryParse(_itemBAmountBuffer) ?? 0.0);
-    final double sDaily = widget.dailySafe.isFinite
-        ? math.max(0.0, widget.dailySafe)
-        : 0.0;
+    final hasPrice = pA > 0 || pB > 0;
+    final comparable = pA > 0 && pB > 0;
+    final double sDaily =
+        widget.dailySafe.isFinite ? math.max(0.0, widget.dailySafe) : 0.0;
     final int d = math.max(1, widget.daysRemaining);
-    final double bFree = widget.freeBudgetRemaining.isFinite
-        ? widget.freeBudgetRemaining
-        : 0.0;
+    final double bFree =
+        widget.freeBudgetRemaining.isFinite ? widget.freeBudgetRemaining : 0.0;
 
     // Xác định món đắt hơn và rẻ hơn
     final bool isAExp = pA > pB;
@@ -579,8 +660,10 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
     final double savedPct = pMax > 0 ? ((pMax - pMin) / pMax) * 100.0 : 0.0;
 
     // 3. Tải trọng ngân sách (wA, wB) với clamp safe
-    final double wA = bFree > 0 ? ((pA / bFree) * 100.0).clamp(0.0, 999.0) : 0.0;
-    final double wB = bFree > 0 ? ((pB / bFree) * 100.0).clamp(0.0, 999.0) : 0.0;
+    final double wA =
+        bFree > 0 ? ((pA / bFree) * 100.0).clamp(0.0, 999.0) : 0.0;
+    final double wB =
+        bFree > 0 ? ((pB / bFree) * 100.0).clamp(0.0, 999.0) : 0.0;
 
     // 4. Mức giảm chi tiêu mỗi ngày nếu dàn đều
     final double deltaSA = (pA / d).floorToDouble();
@@ -591,8 +674,12 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
     // 5. Thặng dư tiền mặt bảo toàn
     final double deltaP = (pA - pB).abs();
 
-    final String nameA = _itemANameController.text.trim().isEmpty ? 'Món A' : _itemANameController.text.trim();
-    final String nameB = _itemBNameController.text.trim().isEmpty ? 'Món B' : _itemBNameController.text.trim();
+    final String nameA = _itemANameController.text.trim().isEmpty
+        ? 'Món A'
+        : _itemANameController.text.trim();
+    final String nameB = _itemBNameController.text.trim().isEmpty
+        ? 'Món B'
+        : _itemBNameController.text.trim();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -603,11 +690,15 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
             Expanded(
               child: TextField(
                 controller: _itemANameController,
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: isDark ? AppTokens.darkText : AppTokens.lightText),
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? AppTokens.darkText : AppTokens.lightText),
                 decoration: const InputDecoration(
                   labelText: 'Tên Lựa Chọn A',
                   isDense: true,
-                  contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  contentPadding:
+                      EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                 ),
               ),
             ),
@@ -615,11 +706,15 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
             Expanded(
               child: TextField(
                 controller: _itemBNameController,
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: isDark ? AppTokens.darkText : AppTokens.lightText),
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? AppTokens.darkText : AppTokens.lightText),
                 decoration: const InputDecoration(
                   labelText: 'Tên Lựa Chọn B',
                   isDense: true,
-                  contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  contentPadding:
+                      EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                 ),
               ),
             ),
@@ -646,11 +741,20 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
                     border: Border.all(
                       color: _activeDilemmaInput == 0
                           ? accent.primary
-                          : (isAExp ? const Color(0xFFF59E0B).withValues(alpha: 0.5) : (isDark ? AppTokens.darkBorder : AppTokens.lightBorder)),
+                          : (isAExp
+                              ? const Color(0xFFF59E0B).withValues(alpha: 0.5)
+                              : (isDark
+                                  ? AppTokens.darkBorder
+                                  : AppTokens.lightBorder)),
                       width: _activeDilemmaInput == 0 ? 2.0 : 1.0,
                     ),
                     boxShadow: _activeDilemmaInput == 0
-                        ? [BoxShadow(color: accent.primary.withValues(alpha: 0.15), blurRadius: 8, offset: const Offset(0, 2))]
+                        ? [
+                            BoxShadow(
+                                color: accent.primary.withValues(alpha: 0.15),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2))
+                          ]
                         : null,
                   ),
                   child: Column(
@@ -667,7 +771,11 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
                               style: TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w800,
-                                color: _activeDilemmaInput == 0 ? accent.primary : (isDark ? AppTokens.darkMuted : AppTokens.lightMuted),
+                                color: _activeDilemmaInput == 0
+                                    ? accent.primary
+                                    : (isDark
+                                        ? AppTokens.darkMuted
+                                        : AppTokens.lightMuted),
                               ),
                             ),
                           ),
@@ -675,7 +783,9 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
                             Container(
                               width: 6,
                               height: 6,
-                              decoration: BoxDecoration(color: accent.primary, shape: BoxShape.circle),
+                              decoration: BoxDecoration(
+                                  color: accent.primary,
+                                  shape: BoxShape.circle),
                             ),
                         ],
                       ),
@@ -685,37 +795,52 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
                         fit: BoxFit.scaleDown,
                         child: Text(
                           _formatCurrency(pA),
-                          style: currencyTextStyle(context, TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w900,
-                            color: isDark ? AppTokens.darkText : AppTokens.lightText,
-                          )),
+                          style: currencyTextStyle(
+                              context,
+                              TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w900,
+                                color: isDark
+                                    ? AppTokens.darkText
+                                    : AppTokens.lightText,
+                              )),
                         ),
                       ),
                       const SizedBox(height: 6),
                       // BADGE TƯƠNG QUAN MÓN A
-                      if (!isEqual)
+                      if (comparable && !isEqual)
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
                             color: isAExp
-                                ? const Color(0xFFF59E0B).withValues(alpha: 0.15)
-                                : const Color(0xFF10B981).withValues(alpha: 0.15),
+                                ? const Color(0xFFF59E0B)
+                                    .withValues(alpha: 0.15)
+                                : const Color(0xFF10B981)
+                                    .withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: CurrencyText(
+                            respectPrivacy: false,
                             isAExp
                                 ? 'Đắt hơn ${_formatCurrency(deltaP)} (+${premiumPct.toStringAsFixed(0)}%)'
                                 : 'Tiết kiệm ${_formatCurrency(deltaP)} (${savedPct.toStringAsFixed(0)}%)',
                             style: TextStyle(
                               fontSize: 9,
                               fontWeight: FontWeight.w800,
-                              color: isAExp ? const Color(0xFFF59E0B) : const Color(0xFF10B981),
+                              color: isAExp
+                                  ? const Color(0xFFF59E0B)
+                                  : const Color(0xFF10B981),
                             ),
                           ),
                         )
-                      else
-                        Text('Cùng mức giá', style: TextStyle(fontSize: 10, color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted)),
+                      else if (comparable)
+                        Text('Cùng mức giá',
+                            style: TextStyle(
+                                fontSize: 10,
+                                color: isDark
+                                    ? AppTokens.darkMuted
+                                    : AppTokens.lightMuted)),
                     ],
                   ),
                 ),
@@ -738,12 +863,21 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
                       color: _activeDilemmaInput == 1
-                          ? const Color(0xFF10B981)
-                          : (isBExp ? const Color(0xFFF59E0B).withValues(alpha: 0.5) : (isDark ? AppTokens.darkBorder : AppTokens.lightBorder)),
+                          ? accent.primary
+                          : (isBExp
+                              ? const Color(0xFFF59E0B).withValues(alpha: 0.5)
+                              : (isDark
+                                  ? AppTokens.darkBorder
+                                  : AppTokens.lightBorder)),
                       width: _activeDilemmaInput == 1 ? 2.0 : 1.0,
                     ),
                     boxShadow: _activeDilemmaInput == 1
-                        ? [BoxShadow(color: const Color(0xFF10B981).withValues(alpha: 0.15), blurRadius: 8, offset: const Offset(0, 2))]
+                        ? [
+                            BoxShadow(
+                                color: accent.primary.withValues(alpha: 0.15),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2))
+                          ]
                         : null,
                   ),
                   child: Column(
@@ -760,7 +894,11 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
                               style: TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w800,
-                                color: _activeDilemmaInput == 1 ? const Color(0xFF10B981) : (isDark ? AppTokens.darkMuted : AppTokens.lightMuted),
+                                color: _activeDilemmaInput == 1
+                                    ? accent.primary
+                                    : (isDark
+                                        ? AppTokens.darkMuted
+                                        : AppTokens.lightMuted),
                               ),
                             ),
                           ),
@@ -768,7 +906,9 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
                             Container(
                               width: 6,
                               height: 6,
-                              decoration: const BoxDecoration(color: Color(0xFF10B981), shape: BoxShape.circle),
+                              decoration: BoxDecoration(
+                                  color: accent.primary,
+                                  shape: BoxShape.circle),
                             ),
                         ],
                       ),
@@ -778,37 +918,52 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
                         fit: BoxFit.scaleDown,
                         child: Text(
                           _formatCurrency(pB),
-                          style: currencyTextStyle(context, TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w900,
-                            color: isDark ? AppTokens.darkText : AppTokens.lightText,
-                          )),
+                          style: currencyTextStyle(
+                              context,
+                              TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w900,
+                                color: isDark
+                                    ? AppTokens.darkText
+                                    : AppTokens.lightText,
+                              )),
                         ),
                       ),
                       const SizedBox(height: 6),
                       // BADGE TƯƠNG QUAN MÓN B
-                      if (!isEqual)
+                      if (comparable && !isEqual)
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
                             color: isBExp
-                                ? const Color(0xFFF59E0B).withValues(alpha: 0.15)
-                                : const Color(0xFF10B981).withValues(alpha: 0.15),
+                                ? const Color(0xFFF59E0B)
+                                    .withValues(alpha: 0.15)
+                                : const Color(0xFF10B981)
+                                    .withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: CurrencyText(
+                            respectPrivacy: false,
                             isBExp
                                 ? 'Đắt hơn ${_formatCurrency(deltaP)} (+${premiumPct.toStringAsFixed(0)}%)'
                                 : 'Tiết kiệm ${_formatCurrency(deltaP)} (${savedPct.toStringAsFixed(0)}%)',
                             style: TextStyle(
                               fontSize: 9,
                               fontWeight: FontWeight.w800,
-                              color: isBExp ? const Color(0xFFF59E0B) : const Color(0xFF10B981),
+                              color: isBExp
+                                  ? const Color(0xFFF59E0B)
+                                  : const Color(0xFF10B981),
                             ),
                           ),
                         )
-                      else
-                        Text('Cùng mức giá', style: TextStyle(fontSize: 10, color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted)),
+                      else if (comparable)
+                        Text('Cùng mức giá',
+                            style: TextStyle(
+                                fontSize: 10,
+                                color: isDark
+                                    ? AppTokens.darkMuted
+                                    : AppTokens.lightMuted)),
                     ],
                   ),
                 ),
@@ -818,86 +973,120 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
         ),
         const SizedBox(height: 10),
 
-        // B. BẢNG LƯỚI SO SÁNH 2 TẦNG (CẮT BỎ HOÀN TOÀN MỤC QUY ĐỔI NGÀY SỐNG)
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: isDark ? AppTokens.darkCardSubtle : AppTokens.lightCardSubtle,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
+        if (!hasPrice)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+                color: accent.primary.withValues(alpha: .08),
+                borderRadius: BorderRadius.circular(14)),
+            child: const Text(
+                'Nhập giá hai lựa chọn để xem ảnh hưởng đến khoản chi an toàn hôm nay và ngân sách chu kỳ.',
+                style: TextStyle(fontSize: 12, height: 1.4)),
           ),
-          child: Column(
-            children: [
-              // HÀNG 1: ẢNH HƯỞNG CHU KỲ
-              _buildMatrixRow(
-                title: 'Ảnh hưởng chu kỳ',
-                colA: bFree <= 0 ? 'Đang hết ngân sách tự do' : 'Chiếm ${wA.toStringAsFixed(0)}% quỹ còn lại',
-                colB: bFree <= 0 ? 'Đang hết ngân sách tự do' : 'Chiếm ${wB.toStringAsFixed(0)}% quỹ còn lại',
-                isDark: isDark,
-                highlightA: isAExp,
-                highlightB: isBExp,
-              ),
-              const Divider(height: 14),
+        if (hasPrice) ...[
+          // B. BẢNG LƯỚI SO SÁNH 2 TẦNG (CẮT BỎ HOÀN TOÀN MỤC QUY ĐỔI NGÀY SỐNG)
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color:
+                  isDark ? AppTokens.darkCardSubtle : AppTokens.lightCardSubtle,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                  color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
+            ),
+            child: Column(
+              children: [
+                // HÀNG 1: ẢNH HƯỞNG CHU KỲ
+                _buildMatrixRow(
+                  title: 'Ảnh hưởng chu kỳ',
+                  colA: bFree <= 0
+                      ? 'Đang hết ngân sách tự do'
+                      : 'Chiếm ${wA.toStringAsFixed(0)}% quỹ còn lại',
+                  colB: bFree <= 0
+                      ? 'Đang hết ngân sách tự do'
+                      : 'Chiếm ${wB.toStringAsFixed(0)}% quỹ còn lại',
+                  isDark: isDark,
+                  highlightA: isAExp,
+                  highlightB: isBExp,
+                ),
+                const Divider(height: 14),
 
-              // HÀNG 2: HẠN MỨC MỖI NGÀY TỚI
-              _buildMatrixRow(
-                title: 'Hạn mức mỗi ngày tới',
-                colA: bFree <= 0 || sDaily <= 0 ? 'Không còn tiền an toàn để chi' : 'Mỗi ngày tới giảm -${_formatCurrency(deltaSA)}\n(còn ${_formatCurrency(sNewA)}/ngày)',
-                colB: bFree <= 0 || sDaily <= 0 ? 'Không còn tiền an toàn để chi' : 'Mỗi ngày tới giảm -${_formatCurrency(deltaSB)}\n(còn ${_formatCurrency(sNewB)}/ngày)',
-                isDark: isDark,
-                highlightA: isAExp,
-                highlightB: isBExp,
-              ),
-            ],
+                // HÀNG 2: HẠN MỨC MỖI NGÀY TỚI
+                _buildMatrixRow(
+                  title: 'Hạn mức mỗi ngày tới',
+                  colA: bFree <= 0 || sDaily <= 0
+                      ? 'Không còn tiền an toàn để chi'
+                      : 'Mỗi ngày tới giảm -${_formatCurrency(deltaSA)}\n(còn ${_formatCurrency(sNewA)}/ngày)',
+                  colB: bFree <= 0 || sDaily <= 0
+                      ? 'Không còn tiền an toàn để chi'
+                      : 'Mỗi ngày tới giảm -${_formatCurrency(deltaSB)}\n(còn ${_formatCurrency(sNewB)}/ngày)',
+                  isDark: isDark,
+                  highlightA: isAExp,
+                  highlightB: isBExp,
+                ),
+              ],
+            ),
           ),
-        ),
-        const SizedBox(height: 10),
+          const SizedBox(height: 10),
 
-        // C. HỘP KẾT LUẬN ĐÒN BẨY (INSIGHT BOX)
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: const Color(0xFF10B981).withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const Text('💡', style: TextStyle(fontSize: 16)),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: CurrencyText(
-                      !isEqual
-                          ? (isBExp
-                          ? 'Chọn $nameA giúp bạn giữ lại ${savedPct.toStringAsFixed(0)}% số tiền (${_formatCurrency(deltaP)}).'
-                          : 'Chọn $nameB giúp bạn giữ lại ${savedPct.toStringAsFixed(0)}% số tiền (${_formatCurrency(deltaP)}).')
-                          : 'Hai món có chi phí ngang nhau, hãy cân nhắc theo giá trị sử dụng lâu dài.',
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: isDark ? AppTokens.darkText : AppTokens.lightText),
+          // C. HỘP KẾT LUẬN ĐÒN BẨY (INSIGHT BOX)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF10B981).withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                  color: const Color(0xFF10B981).withValues(alpha: 0.3)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Text('💡', style: TextStyle(fontSize: 16)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: CurrencyText(
+                        respectPrivacy: false,
+                        !comparable
+                            ? 'Nhập thêm giá lựa chọn còn lại để so sánh chênh lệch.'
+                            : !isEqual
+                                ? (isBExp
+                                    ? 'Chọn $nameA giúp bạn giữ lại ${savedPct.toStringAsFixed(0)}% số tiền (${_formatCurrency(deltaP)}).'
+                                    : 'Chọn $nameB giúp bạn giữ lại ${savedPct.toStringAsFixed(0)}% số tiền (${_formatCurrency(deltaP)}).')
+                                : 'Hai món có chi phí ngang nhau, hãy cân nhắc theo giá trị sử dụng lâu dài.',
+                        style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: isDark
+                                ? AppTokens.darkText
+                                : AppTokens.lightText),
+                      ),
+                    ),
+                  ],
+                ),
+                if (comparable && !isEqual && kDiff > 1.05) ...[
+                  const SizedBox(height: 4),
+                  Padding(
+                    padding: const EdgeInsets.only(left: 24),
+                    child: Text(
+                      isAExp
+                          ? '$nameA phải chi gấp ${kDiff.toStringAsFixed(1)} lần so với $nameB.'
+                          : '$nameB phải chi gấp ${kDiff.toStringAsFixed(1)} lần so với $nameA.',
+                      style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFFF59E0B)),
                     ),
                   ),
                 ],
-              ),
-              if (!isEqual && kDiff > 1.05) ...[
-                const SizedBox(height: 4),
-                Padding(
-                  padding: const EdgeInsets.only(left: 24),
-                  child: Text(
-                    isAExp
-                        ? '$nameA phải chi gấp ${kDiff.toStringAsFixed(1)} lần so với $nameB.'
-                        : '$nameB phải chi gấp ${kDiff.toStringAsFixed(1)} lần so với $nameA.',
-                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFFF59E0B)),
-                  ),
-                ),
               ],
-            ],
+            ),
           ),
-        ),
-        const SizedBox(height: 10),
-
+          const SizedBox(height: 10),
+        ],
         _buildNumpadGrid(isDark, _onNumpadPressDilemma),
         const SizedBox(height: 12),
 
@@ -911,12 +1100,18 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFF43F5E),
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14)),
                   ),
-                  onPressed: pA <= 0 ? null : () => _proceedToBuyDilemma(nameA, pA),
+                  onPressed:
+                      pA <= 0 ? null : () => _proceedToBuyDilemma(nameA, pA),
                   child: FittedBox(
                     fit: BoxFit.scaleDown,
-                    child: CurrencyText('Mua $nameA (${_formatCurrency(pA)})', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+                    child: CurrencyText(
+                        respectPrivacy: false,
+                        'Mua $nameA (${_formatCurrency(pA)})',
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w800, fontSize: 12)),
                   ),
                 ),
               ),
@@ -929,12 +1124,18 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF10B981),
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14)),
                   ),
-                  onPressed: pB <= 0 ? null : () => _proceedToBuyDilemma(nameB, pB),
+                  onPressed:
+                      pB <= 0 ? null : () => _proceedToBuyDilemma(nameB, pB),
                   child: FittedBox(
                     fit: BoxFit.scaleDown,
-                    child: CurrencyText('Mua $nameB (${_formatCurrency(pB)})', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+                    child: CurrencyText(
+                        respectPrivacy: false,
+                        'Mua $nameB (${_formatCurrency(pB)})',
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w800, fontSize: 12)),
                   ),
                 ),
               ),
@@ -949,12 +1150,16 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
           height: 44,
           child: OutlinedButton(
             style: OutlinedButton.styleFrom(
-              foregroundColor: isDark ? AppTokens.darkText : AppTokens.lightText,
-              side: BorderSide(color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              foregroundColor:
+                  isDark ? AppTokens.darkText : AppTokens.lightText,
+              side: BorderSide(
+                  color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14)),
             ),
             onPressed: () => _cancelPurchase(math.max(pA, pB)),
-            child: const Text('Không mua món nào', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+            child: const Text('Không mua món nào',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
           ),
         ),
       ],
@@ -991,7 +1196,9 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: highlightA ? FontWeight.w800 : FontWeight.w600,
-                  color: highlightA ? const Color(0xFFF59E0B) : (isDark ? AppTokens.darkText : AppTokens.lightText),
+                  color: highlightA
+                      ? const Color(0xFFF59E0B)
+                      : (isDark ? AppTokens.darkText : AppTokens.lightText),
                 ),
               ),
             ),
@@ -1002,7 +1209,9 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: highlightB ? FontWeight.w800 : FontWeight.w600,
-                  color: highlightB ? const Color(0xFFF59E0B) : (isDark ? AppTokens.darkText : AppTokens.lightText),
+                  color: highlightB
+                      ? const Color(0xFFF59E0B)
+                      : (isDark ? AppTokens.darkText : AppTokens.lightText),
                 ),
               ),
             ),
@@ -1039,14 +1248,21 @@ class _PrePurchaseAdvisorSheetState extends ConsumerState<PrePurchaseAdvisorShee
                       decoration: BoxDecoration(
                         color: isDark ? AppTokens.darkCard : Colors.white,
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
+                        border: Border.all(
+                            color: isDark
+                                ? AppTokens.darkBorder
+                                : AppTokens.lightBorder),
                       ),
                       child: Center(
                         child: isAction
                             ? (k == '⌫'
-                            ? const Icon(Icons.backspace_outlined, size: 16)
-                            : const Text('C', style: TextStyle(fontWeight: FontWeight.bold)))
-                            : Text(k, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                                ? const Icon(Icons.backspace_outlined, size: 16)
+                                : const Text('C',
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.bold)))
+                            : Text(k,
+                                style: const TextStyle(
+                                    fontSize: 16, fontWeight: FontWeight.w700)),
                       ),
                     ),
                   ),

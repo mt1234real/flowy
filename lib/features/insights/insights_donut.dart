@@ -1,3 +1,4 @@
+import '../../widgets/preserved_balance_tumbler.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -12,6 +13,7 @@ class InsightsDonut extends StatefulWidget {
   final double diameter;
   final String? selected;
   final String amount, label, supporting;
+  final bool isVisible;
   final ValueChanged<String?> onSelect;
   const InsightsDonut(
       {super.key,
@@ -20,6 +22,7 @@ class InsightsDonut extends StatefulWidget {
       required this.total,
       required this.selected,
       required this.amount,
+      required this.isVisible,
       required this.label,
       required this.supporting,
       required this.onSelect});
@@ -127,8 +130,11 @@ class _InsightsDonutState extends State<InsightsDonut>
                       const SizedBox(height: 4),
                       FittedBox(
                           fit: BoxFit.scaleDown,
-                          child: Text(widget.amount,
-                              maxLines: 1,
+                          child: PreservedBalanceTumbler(
+                              isVisible: widget.isVisible,
+                              realValue: widget.amount,
+                              height: 26,
+                              alignment: Alignment.center,
                               style: currencyTextStyle(
                                   context,
                                   const TextStyle(

@@ -38,6 +38,11 @@ dependencies:
   extension_google_sign_in_as_googleapis_auth: ^2.0.13
   archive: ^4.3.0
   encrypt: ^5.0.3
+  flutter_local_notifications: 19.5.0
+  timezone: 0.10.1
+  flutter_timezone: 5.0.0
+  uuid: 4.5.1
+  workmanager: 0.10.5
 
 dev_dependencies:
   flutter_test:

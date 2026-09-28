@@ -1,6 +1,6 @@
 // ==============================================================================
 // File: lib/screens/category_manager_screen.dart
-// Architecture: 2-Tier Category Manager with Slidable Actions & Add/Edit Modal
+// Architecture: 2-Tier Category Manager with Tap-to-Edit & Reversible Archive
 // Stack: flutter_riverpod, drift, flutter_slidable
 // Features: Unified 40+ Icon Resolver, Full Drift CRUD, Integrated Icon & Color Picker,
 //           Parent-Child Dropdown Picker, Transaction Constraint Validation on Delete
@@ -11,7 +11,8 @@ import 'package:drift/drift.dart' as drift;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_slidable/flutter_slidable.dart';
+import '../widgets/preserved_sleek_dismissible.dart';
+import '../widgets/archived_entities_sheet.dart';
 
 import '../widgets/sliding_segmented_bar.dart';
 import '../core/animation/app_animation_policy.dart';
@@ -21,9 +22,10 @@ import '../theme/app_theme.dart';
 import '../widgets/icon_color_picker_sheet.dart';
 
 // StreamProvider lấy toàn bộ danh mục từ database Drift SQLite
-final allCategoriesStreamProvider = StreamProvider.autoDispose<List<Category>>((ref) {
+final allCategoriesStreamProvider =
+    StreamProvider.autoDispose<List<Category>>((ref) {
   final db = ref.watch(databaseProvider);
-  return db.select(db.categories).watch();
+  return db.watchAvailableCategories();
 });
 
 // ==============================================================================
@@ -33,7 +35,7 @@ IconData resolveAppIcon(String? iconName) {
   if (iconName == null || iconName.isEmpty) return Icons.folder_open_rounded;
 
   switch (iconName.toLowerCase()) {
-  // Ăn uống
+    // Ăn uống
     case 'restaurant':
     case 'food':
       return Icons.restaurant_rounded;
@@ -52,7 +54,7 @@ IconData resolveAppIcon(String? iconName) {
     case 'fastfood':
       return Icons.fastfood_rounded;
 
-  // Xe cộ / Di chuyển
+    // Xe cộ / Di chuyển
     case 'directions_car':
     case 'car':
     case 'transport':
@@ -74,7 +76,7 @@ IconData resolveAppIcon(String? iconName) {
     case 'train':
       return Icons.commute_rounded;
 
-  // Nhà cửa / Hóa đơn
+    // Nhà cửa / Hóa đơn
     case 'home':
     case 'house':
     case 'rent':
@@ -93,7 +95,7 @@ IconData resolveAppIcon(String? iconName) {
     case 'clean':
       return Icons.cleaning_services_rounded;
 
-  // Mua sắm
+    // Mua sắm
     case 'shopping_bag':
     case 'shopping':
     case 'shop':
@@ -111,7 +113,7 @@ IconData resolveAppIcon(String? iconName) {
     case 'laptop':
       return Icons.devices_rounded;
 
-  // Sức khỏe & Học tập
+    // Sức khỏe & Học tập
     case 'medical_services':
     case 'health':
     case 'medicine':
@@ -128,7 +130,7 @@ IconData resolveAppIcon(String? iconName) {
     case 'book':
       return Icons.school_rounded;
 
-  // Giải trí
+    // Giải trí
     case 'sports_esports':
     case 'game':
     case 'entertainment':
@@ -145,7 +147,7 @@ IconData resolveAppIcon(String? iconName) {
     case 'gift':
       return Icons.card_giftcard_rounded;
 
-  // Tài chính / Thu nhập
+    // Tài chính / Thu nhập
     case 'payments':
     case 'salary':
     case 'income':
@@ -176,7 +178,8 @@ class CategoryManagerScreen extends ConsumerStatefulWidget {
   const CategoryManagerScreen({super.key});
 
   @override
-  ConsumerState<CategoryManagerScreen> createState() => _CategoryManagerScreenState();
+  ConsumerState<CategoryManagerScreen> createState() =>
+      _CategoryManagerScreenState();
 }
 
 class _CategoryManagerScreenState extends ConsumerState<CategoryManagerScreen> {
@@ -198,9 +201,12 @@ class _CategoryManagerScreenState extends ConsumerState<CategoryManagerScreen> {
     final isEditing = editingCategory != null;
 
     final db = ref.read(databaseProvider);
-    final allCats = await db.select(db.categories).get();
+    final allCats =
+        await (db.select(db.categories)..where(db.categoryAvailable)).get();
     final parentOptions = allCats
-        .where((c) => c.type == _activeType && (c.parentId == null || c.parentId!.isEmpty))
+        .where((c) =>
+            c.type == _activeType &&
+            (c.parentId == null || c.parentId!.isEmpty))
         .toList();
 
     if (!mounted) return;
@@ -218,64 +224,59 @@ class _CategoryManagerScreenState extends ConsumerState<CategoryManagerScreen> {
     );
   }
 
-  // Xác thực trước khi Xóa / Ẩn
-  Future<void> _handleDeleteOrArchiveCategory(Category category) async {
-    HapticFeedback.mediumImpact();
+  Future<bool> _confirmArchiveCategory(Category category) async {
     final db = ref.read(databaseProvider);
-
-    // Kiểm tra xem danh mục có giao dịch nào liên quan không
-    final txs = await (db.select(db.transactions)..where((t) => t.categoryId.equals(category.id))).get();
-
-    if (!mounted) return;
-
-    if (txs.isNotEmpty) {
-      // Đã có giao dịch -> Không được xóa cứng
-      showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Không thể xóa cứng'),
-          content: Text(
-            'Danh mục "${category.name}" hiện đang có ${txs.length} giao dịch liên kết. '
-                'Bạn có muốn đổi tên hoặc ẩn danh mục này để bảo toàn số liệu sổ cái?',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('ĐÓNG'),
-            ),
-          ],
-        ),
-      );
-    } else {
-      // Chưa có giao dịch -> Cho phép xóa
-      final confirm = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Xác nhận xóa'),
-          content: Text('Bạn có chắc chắn muốn xóa danh mục "${category.name}"?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text('HỦY'),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: AppTokens.expense),
-              onPressed: () => Navigator.of(ctx).pop(true),
-              child: const Text('XÓA', style: TextStyle(color: Colors.white)),
-            ),
-          ],
-        ),
-      );
-
-      if (confirm == true) {
-        await (db.delete(db.categories)..where((c) => c.id.equals(category.id))).go();
-        if (!mounted) return;
-        AppFeedback.showSuccess(
-          context,
-          'Đã xóa danh mục "${category.name}"',
-        );
-      }
+    if (category.isSystem) {
+      AppFeedback.showInfo(context, 'Danh mục hệ thống cần được giữ lại.');
+      return false;
     }
+    final children = await (db.select(db.categories)
+          ..where((c) => c.parentId.equals(category.id)))
+        .get();
+    final ids = [category.id, ...children.map((c) => c.id)];
+    final txs = await (db.select(db.transactions)
+          ..where((t) => t.categoryId.isIn(ids)))
+        .get();
+    if (!mounted) return false;
+    if (children.any((c) => c.isSystem)) {
+      AppFeedback.showInfo(
+          context, 'Nhóm này chứa danh mục hệ thống cần được giữ lại.');
+      return false;
+    }
+    if (txs.isEmpty && children.isEmpty) return true;
+    return await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+                  title: const Text('Lưu trữ danh mục?'),
+                  content: Text(
+                      'Ẩn “${category.name}”${children.isEmpty ? '' : ' và các mục con'} khỏi danh sách chọn. Lịch sử giao dịch và ngân sách vẫn được giữ nguyên.'),
+                  actions: [
+                    TextButton(
+                        onPressed: () => Navigator.pop(ctx, false),
+                        child: const Text('Để lại')),
+                    TextButton(
+                        onPressed: () => Navigator.pop(ctx, true),
+                        child: const Text('Lưu trữ')),
+                  ],
+                )) ??
+        false;
+  }
+
+  Future<void> _archiveCategory(Category category) async {
+    final db = ref.read(databaseProvider);
+    try {
+      await db.archiveEntity('category', category.id);
+    } catch (_) {
+      if (mounted) {
+        AppFeedback.showInfo(
+            context, 'Chưa lưu trữ được danh mục. Vui lòng thử lại.');
+      }
+      rethrow;
+    }
+    if (!mounted) return;
+    AppFeedback.showUndo(context,
+        message: 'Đã lưu trữ “${category.name}”',
+        onUndo: () => db.restoreArchivedEntity('category', category.id));
   }
 
   @override
@@ -291,6 +292,13 @@ class _CategoryManagerScreenState extends ConsumerState<CategoryManagerScreen> {
           backgroundColor: isDark ? AppTokens.darkBg : AppTokens.lightBg,
           elevation: 0,
           centerTitle: true,
+          actions: [
+            IconButton(
+                tooltip: 'Đã lưu trữ',
+                icon: const Icon(Icons.inventory_2_outlined),
+                onPressed: () => showArchivedEntities(
+                    context, ref.read(databaseProvider), 'category'))
+          ],
           leading: IconButton(
             icon: Icon(
               Icons.arrow_back_ios_new_rounded,
@@ -320,11 +328,15 @@ class _CategoryManagerScreenState extends ConsumerState<CategoryManagerScreen> {
                   overshootPx: 1.8,
                   debugLabel: 'CategoryManager.typeTabs',
                   selectedValue: _activeType,
-                  trackColor: isDark ? AppTokens.darkCard : AppTokens.lightCardSubtle,
-                  trackBorderColor: isDark ? AppTokens.darkBorder : AppTokens.lightBorder,
-                  indicatorColor: isDark ? AppTokens.darkCardSubtle : Colors.white,
+                  trackColor:
+                      isDark ? AppTokens.darkCard : AppTokens.lightCardSubtle,
+                  trackBorderColor:
+                      isDark ? AppTokens.darkBorder : AppTokens.lightBorder,
+                  indicatorColor:
+                      isDark ? AppTokens.darkCardSubtle : Colors.white,
                   indicatorBorderColor: Colors.transparent,
-                  mutedTextColor: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                  mutedTextColor:
+                      isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
                   indicatorShadowColor: Colors.black.withValues(alpha: 0.05),
                   items: const [
                     SlidingSegmentedItem<CategoryType>(
@@ -353,8 +365,12 @@ class _CategoryManagerScreenState extends ConsumerState<CategoryManagerScreen> {
               Expanded(
                 child: categoriesAsync.when(
                   data: (allCategories) {
-                    final filtered = allCategories.where((c) => c.type == _activeType).toList();
-                    final parentCategories = filtered.where((c) => c.parentId == null || c.parentId!.isEmpty).toList();
+                    final filtered = allCategories
+                        .where((c) => c.type == _activeType)
+                        .toList();
+                    final parentCategories = filtered
+                        .where((c) => c.parentId == null || c.parentId!.isEmpty)
+                        .toList();
 
                     final Map<String, List<Category>> childrenMap = {};
                     for (final c in filtered) {
@@ -371,14 +387,18 @@ class _CategoryManagerScreenState extends ConsumerState<CategoryManagerScreen> {
                             Icon(
                               Icons.category_outlined,
                               size: 48,
-                              color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                              color: isDark
+                                  ? AppTokens.darkMuted
+                                  : AppTokens.lightMuted,
                             ),
                             const SizedBox(height: 10),
                             Text(
                               'Chưa có danh mục nào trong nhóm này',
                               style: TextStyle(
                                 fontSize: 13,
-                                color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                                color: isDark
+                                    ? AppTokens.darkMuted
+                                    : AppTokens.lightMuted,
                               ),
                             ),
                           ],
@@ -406,9 +426,11 @@ class _CategoryManagerScreenState extends ConsumerState<CategoryManagerScreen> {
                       },
                     );
                   },
-                  loading: () => const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                  loading: () => const Center(
+                      child: CircularProgressIndicator(strokeWidth: 2)),
                   error: (err, _) => Center(
-                    child: Text('Lỗi tải danh mục: $err', style: const TextStyle(color: AppTokens.expense)),
+                    child: Text('Lỗi tải danh mục: $err',
+                        style: const TextStyle(color: AppTokens.expense)),
                   ),
                 ),
               ),
@@ -432,6 +454,8 @@ class _CategoryManagerScreenState extends ConsumerState<CategoryManagerScreen> {
     );
   }
 
+  final Set<String> _expandedCategories = {};
+
   Widget _buildParentAccordionCard({
     required Category parent,
     required List<Category> children,
@@ -439,36 +463,13 @@ class _CategoryManagerScreenState extends ConsumerState<CategoryManagerScreen> {
     required bool isDark,
     required AppAccentPreset accent,
   }) {
-    return Slidable(
+    return PreservedSleekDismissible(
       key: ValueKey(parent.id),
-      // Swipe Right -> Sửa
-      startActionPane: ActionPane(
-        motion: const DrawerMotion(),
-        children: [
-          SlidableAction(
-            onPressed: (_) => _openAddOrEditCategoryModal(parent),
-            backgroundColor: const Color(0xFF10B981),
-            foregroundColor: Colors.white,
-            icon: Icons.edit_rounded,
-            label: 'Sửa',
-            borderRadius: const BorderRadius.horizontal(left: Radius.circular(18)),
-          ),
-        ],
-      ),
-      // Swipe Left -> Ẩn / Xóa
-      endActionPane: ActionPane(
-        motion: const DrawerMotion(),
-        children: [
-          SlidableAction(
-            onPressed: (_) => _handleDeleteOrArchiveCategory(parent),
-            backgroundColor: AppTokens.expense,
-            foregroundColor: Colors.white,
-            icon: Icons.delete_outline_rounded,
-            label: 'Ẩn / Xóa',
-            borderRadius: const BorderRadius.horizontal(right: Radius.circular(18)),
-          ),
-        ],
-      ),
+      borderRadius: 18,
+      label: 'Lưu trữ',
+      icon: Icons.archive_outlined,
+      confirmDismiss: () => _confirmArchiveCategory(parent),
+      onDismissed: () => _archiveCategory(parent),
       child: Container(
         decoration: BoxDecoration(
           color: isDark ? AppTokens.darkCard : Colors.white,
@@ -486,66 +487,72 @@ class _CategoryManagerScreenState extends ConsumerState<CategoryManagerScreen> {
         ),
         child: Theme(
           data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-          child: ExpansionTile(
-            tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
-            childrenPadding: EdgeInsets.zero,
-            leading: Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: parentColor.withValues(alpha: 0.16),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Icon(
-                resolveAppIcon(parent.icon),
-                color: parentColor,
-                size: 22,
-              ),
-            ),
-            title: Text(
-              parent.name,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: isDark ? AppTokens.darkText : AppTokens.lightText,
-              ),
-            ),
-            subtitle: Text(
-              '${children.length} mục con',
-              style: TextStyle(
-                fontSize: 11,
-                color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
-              ),
-            ),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.drag_indicator_rounded,
-                  size: 20,
-                  color: isDark ? Colors.white24 : Colors.black26,
+          child: Column(children: [
+            ListTile(
+              onTap: () => _openAddOrEditCategoryModal(parent),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+              leading: Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: parentColor.withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(14),
                 ),
-                const SizedBox(width: 4),
-                const Icon(Icons.keyboard_arrow_down_rounded, size: 20),
-              ],
+                child: Icon(
+                  resolveAppIcon(parent.icon),
+                  color: parentColor,
+                  size: 22,
+                ),
+              ),
+              title: Text(
+                parent.name,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: isDark ? AppTokens.darkText : AppTokens.lightText,
+                ),
+              ),
+              subtitle: Text(
+                '${children.length} mục con',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                ),
+              ),
+              trailing: IconButton(
+                tooltip: _expandedCategories.contains(parent.id)
+                    ? 'Thu gọn'
+                    : 'Xem mục con',
+                icon: Icon(_expandedCategories.contains(parent.id)
+                    ? Icons.expand_less_rounded
+                    : Icons.expand_more_rounded),
+                onPressed: () => setState(() {
+                  if (!_expandedCategories.add(parent.id)) {
+                    _expandedCategories.remove(parent.id);
+                  }
+                }),
+              ),
             ),
-            children: [
+            if (_expandedCategories.contains(parent.id)) ...[
               if (children.isEmpty)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 12.0, top: 4.0),
                   child: Text(
-                    'Chưa có danh mục con. Vuốt sang phải để thêm mới.',
+                    'Chưa có mục con. Chọn Thêm danh mục để tạo mới.',
                     style: TextStyle(
                       fontSize: 11,
                       fontStyle: FontStyle.italic,
-                      color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                      color:
+                          isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
                     ),
                   ),
                 )
               else
-                ...children.map((child) => _buildChildCategoryItem(child, isDark)),
+                ...children
+                    .map((child) => _buildChildCategoryItem(child, isDark)),
             ],
-          ),
+          ]),
         ),
       ),
     );
@@ -554,78 +561,61 @@ class _CategoryManagerScreenState extends ConsumerState<CategoryManagerScreen> {
   Widget _buildChildCategoryItem(Category child, bool isDark) {
     final childColor = _parseColor(child.color);
 
-    return Slidable(
+    return PreservedSleekDismissible(
       key: ValueKey(child.id),
-      startActionPane: ActionPane(
-        motion: const DrawerMotion(),
-        children: [
-          SlidableAction(
-            onPressed: (_) => _openAddOrEditCategoryModal(child),
-            backgroundColor: const Color(0xFF10B981),
-            foregroundColor: Colors.white,
-            icon: Icons.edit_rounded,
-            label: 'Sửa',
-          ),
-        ],
-      ),
-      endActionPane: ActionPane(
-        motion: const DrawerMotion(),
-        children: [
-          SlidableAction(
-            onPressed: (_) => _handleDeleteOrArchiveCategory(child),
-            backgroundColor: AppTokens.expense,
-            foregroundColor: Colors.white,
-            icon: Icons.delete_outline_rounded,
-            label: 'Xóa',
-          ),
-        ],
-      ),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF111722) : const Color(0xFFF8FAFC),
-          border: Border(
-            top: BorderSide(
-              color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder,
-              width: 0.6,
-            ),
-          ),
-        ),
-        child: Row(
-          children: [
-            const SizedBox(width: 12),
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                color: childColor.withValues(alpha: 0.14),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(
-                resolveAppIcon(child.icon),
-                size: 16,
-                color: childColor,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                child.name,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: isDark ? AppTokens.darkText : AppTokens.lightText,
+      borderRadius: 0,
+      label: 'Lưu trữ',
+      icon: Icons.archive_outlined,
+      confirmDismiss: () => _confirmArchiveCategory(child),
+      onDismissed: () => _archiveCategory(child),
+      child: InkWell(
+          onTap: () => _openAddOrEditCategoryModal(child),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF111722) : const Color(0xFFF8FAFC),
+              border: Border(
+                top: BorderSide(
+                  color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder,
+                  width: 0.6,
                 ),
               ),
             ),
-            Icon(
-              Icons.drag_indicator_rounded,
-              size: 18,
-              color: isDark ? Colors.white12 : Colors.black12,
+            child: Row(
+              children: [
+                const SizedBox(width: 12),
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: childColor.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    resolveAppIcon(child.icon),
+                    size: 16,
+                    color: childColor,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    child.name,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? AppTokens.darkText : AppTokens.lightText,
+                    ),
+                  ),
+                ),
+                Icon(
+                  Icons.drag_indicator_rounded,
+                  size: 18,
+                  color: isDark ? Colors.white12 : Colors.black12,
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
+          )),
     );
   }
 }
@@ -660,7 +650,7 @@ class _CategoryFormModalState extends ConsumerState<_CategoryFormModal> {
 
   bool _isSaving = false;
   final AppValidationFeedbackController _nameFeedback =
-  AppValidationFeedbackController();
+      AppValidationFeedbackController();
 
   @override
   void initState() {
@@ -676,7 +666,9 @@ class _CategoryFormModalState extends ConsumerState<_CategoryFormModal> {
     } else {
       _nameController = TextEditingController();
       _isChildCategory = false;
-      _selectedParentId = widget.parentOptions.isNotEmpty ? widget.parentOptions.first.id : null;
+      _selectedParentId = widget.parentOptions.isNotEmpty
+          ? widget.parentOptions.first.id
+          : null;
     }
   }
 
@@ -728,7 +720,9 @@ class _CategoryFormModalState extends ConsumerState<_CategoryFormModal> {
 
       if (widget.isEditing) {
         // Cập nhật danh mục
-        await (db.update(db.categories)..where((c) => c.id.equals(widget.initialCategory!.id))).write(
+        await (db.update(db.categories)
+              ..where((c) => c.id.equals(widget.initialCategory!.id)))
+            .write(
           CategoriesCompanion(
             name: drift.Value(name),
             icon: drift.Value(_selectedIconName),
@@ -740,15 +734,15 @@ class _CategoryFormModalState extends ConsumerState<_CategoryFormModal> {
         // Tạo mới danh mục
         final newId = 'cat_${DateTime.now().millisecondsSinceEpoch}';
         await db.into(db.categories).insert(
-          CategoriesCompanion.insert(
-            id: newId,
-            name: name,
-            type: widget.activeType,
-            parentId: drift.Value(parentId),
-            icon: drift.Value(_selectedIconName),
-            color: drift.Value(_selectedHexColor),
-          ),
-        );
+              CategoriesCompanion.insert(
+                id: newId,
+                name: name,
+                type: widget.activeType,
+                parentId: drift.Value(parentId),
+                icon: drift.Value(_selectedIconName),
+                color: drift.Value(_selectedHexColor),
+              ),
+            );
       }
 
       if (!mounted) return;
@@ -778,10 +772,12 @@ class _CategoryFormModalState extends ConsumerState<_CategoryFormModal> {
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
           child: Container(
-            padding: EdgeInsets.fromLTRB(20, 10, 20, MediaQuery.of(context).viewInsets.bottom + 20),
+            padding: EdgeInsets.fromLTRB(
+                20, 10, 20, MediaQuery.of(context).viewInsets.bottom + 20),
             decoration: BoxDecoration(
               color: isDark ? const Color(0xFF151C28) : Colors.white,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(28)),
             ),
             child: SafeArea(
               top: false,
@@ -804,11 +800,14 @@ class _CategoryFormModalState extends ConsumerState<_CategoryFormModal> {
 
                     // Header
                     Text(
-                      widget.isEditing ? 'Chỉnh sửa danh mục' : 'Thêm danh mục mới',
+                      widget.isEditing
+                          ? 'Chỉnh sửa danh mục'
+                          : 'Thêm danh mục mới',
                       style: TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.w800,
-                        color: isDark ? AppTokens.darkText : AppTokens.lightText,
+                        color:
+                            isDark ? AppTokens.darkText : AppTokens.lightText,
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -817,20 +816,26 @@ class _CategoryFormModalState extends ConsumerState<_CategoryFormModal> {
                     Container(
                       padding: const EdgeInsets.all(3),
                       decoration: BoxDecoration(
-                        color: isDark ? AppTokens.darkCardSubtle : AppTokens.lightCardSubtle,
+                        color: isDark
+                            ? AppTokens.darkCardSubtle
+                            : AppTokens.lightCardSubtle,
                         borderRadius: BorderRadius.circular(14),
                       ),
                       child: Row(
                         children: [
                           Expanded(
                             child: InkWell(
-                              onTap: () => setState(() => _isChildCategory = false),
+                              onTap: () =>
+                                  setState(() => _isChildCategory = false),
                               borderRadius: BorderRadius.circular(11),
                               child: Container(
-                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 8),
                                 decoration: BoxDecoration(
                                   color: !_isChildCategory
-                                      ? (isDark ? AppTokens.darkCard : Colors.white)
+                                      ? (isDark
+                                          ? AppTokens.darkCard
+                                          : Colors.white)
                                       : Colors.transparent,
                                   borderRadius: BorderRadius.circular(11),
                                 ),
@@ -839,10 +844,16 @@ class _CategoryFormModalState extends ConsumerState<_CategoryFormModal> {
                                     'Nhóm Cha',
                                     style: TextStyle(
                                       fontSize: 12,
-                                      fontWeight: !_isChildCategory ? FontWeight.w800 : FontWeight.w600,
+                                      fontWeight: !_isChildCategory
+                                          ? FontWeight.w800
+                                          : FontWeight.w600,
                                       color: !_isChildCategory
-                                          ? (isDark ? AppTokens.darkText : AppTokens.lightText)
-                                          : (isDark ? AppTokens.darkMuted : AppTokens.lightMuted),
+                                          ? (isDark
+                                              ? AppTokens.darkText
+                                              : AppTokens.lightText)
+                                          : (isDark
+                                              ? AppTokens.darkMuted
+                                              : AppTokens.lightMuted),
                                     ),
                                   ),
                                 ),
@@ -851,13 +862,17 @@ class _CategoryFormModalState extends ConsumerState<_CategoryFormModal> {
                           ),
                           Expanded(
                             child: InkWell(
-                              onTap: () => setState(() => _isChildCategory = true),
+                              onTap: () =>
+                                  setState(() => _isChildCategory = true),
                               borderRadius: BorderRadius.circular(11),
                               child: Container(
-                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 8),
                                 decoration: BoxDecoration(
                                   color: _isChildCategory
-                                      ? (isDark ? AppTokens.darkCard : Colors.white)
+                                      ? (isDark
+                                          ? AppTokens.darkCard
+                                          : Colors.white)
                                       : Colors.transparent,
                                   borderRadius: BorderRadius.circular(11),
                                 ),
@@ -866,10 +881,16 @@ class _CategoryFormModalState extends ConsumerState<_CategoryFormModal> {
                                     'Danh Mục Con',
                                     style: TextStyle(
                                       fontSize: 12,
-                                      fontWeight: _isChildCategory ? FontWeight.w800 : FontWeight.w600,
+                                      fontWeight: _isChildCategory
+                                          ? FontWeight.w800
+                                          : FontWeight.w600,
                                       color: _isChildCategory
-                                          ? (isDark ? AppTokens.darkText : AppTokens.lightText)
-                                          : (isDark ? AppTokens.darkMuted : AppTokens.lightMuted),
+                                          ? (isDark
+                                              ? AppTokens.darkText
+                                              : AppTokens.lightText)
+                                          : (isDark
+                                              ? AppTokens.darkMuted
+                                              : AppTokens.lightMuted),
                                     ),
                                   ),
                                 ),
@@ -888,24 +909,31 @@ class _CategoryFormModalState extends ConsumerState<_CategoryFormModal> {
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                          color: isDark
+                              ? AppTokens.darkMuted
+                              : AppTokens.lightMuted,
                         ),
                       ),
                       const SizedBox(height: 6),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 14),
                         decoration: BoxDecoration(
-                          color: isDark ? AppTokens.darkCard : AppTokens.lightCardSubtle,
+                          color: isDark
+                              ? AppTokens.darkCard
+                              : AppTokens.lightCardSubtle,
                           borderRadius: BorderRadius.circular(14),
                           border: Border.all(
-                            color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder,
+                            color: isDark
+                                ? AppTokens.darkBorder
+                                : AppTokens.lightBorder,
                           ),
                         ),
                         child: DropdownButtonHideUnderline(
                           child: DropdownButton<String>(
                             isExpanded: true,
                             value: _selectedParentId,
-                            dropdownColor: isDark ? AppTokens.darkCard : Colors.white,
+                            dropdownColor:
+                                isDark ? AppTokens.darkCard : Colors.white,
                             items: widget.parentOptions.map((p) {
                               return DropdownMenuItem<String>(
                                 value: p.id,
@@ -914,12 +942,15 @@ class _CategoryFormModalState extends ConsumerState<_CategoryFormModal> {
                                   style: TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w700,
-                                    color: isDark ? AppTokens.darkText : AppTokens.lightText,
+                                    color: isDark
+                                        ? AppTokens.darkText
+                                        : AppTokens.lightText,
                                   ),
                                 ),
                               );
                             }).toList(),
-                            onChanged: (val) => setState(() => _selectedParentId = val),
+                            onChanged: (val) =>
+                                setState(() => _selectedParentId = val),
                           ),
                         ),
                       ),
@@ -952,7 +983,9 @@ class _CategoryFormModalState extends ConsumerState<_CategoryFormModal> {
                               children: [
                                 Icon(
                                   resolveAppIcon(_selectedIconName),
-                                  color: activeColor.computeLuminance() > 0.5 ? Colors.black87 : Colors.white,
+                                  color: activeColor.computeLuminance() > 0.5
+                                      ? Colors.black87
+                                      : Colors.white,
                                   size: 28,
                                 ),
                                 Positioned(
@@ -964,7 +997,8 @@ class _CategoryFormModalState extends ConsumerState<_CategoryFormModal> {
                                       color: Colors.white,
                                       shape: BoxShape.circle,
                                     ),
-                                    child: const Icon(Icons.edit, size: 10, color: Colors.black87),
+                                    child: const Icon(Icons.edit,
+                                        size: 10, color: Colors.black87),
                                   ),
                                 ),
                               ],
@@ -980,7 +1014,7 @@ class _CategoryFormModalState extends ConsumerState<_CategoryFormModal> {
                                   ? AppTokens.darkBorder
                                   : AppTokens.lightBorder;
                               final borderColor =
-                              visual.borderColor(restingBorder);
+                                  visual.borderColor(restingBorder);
 
                               return TextField(
                                 controller: _nameController,
@@ -998,7 +1032,7 @@ class _CategoryFormModalState extends ConsumerState<_CategoryFormModal> {
                                 ),
                                 decoration: InputDecoration(
                                   hintText:
-                                  'Tên danh mục (vd: Ăn uống, Cafe)...',
+                                      'Tên danh mục (vd: Ăn uống, Cafe)...',
                                   hintStyle: TextStyle(
                                     fontSize: 13,
                                     color: isDark
@@ -1009,15 +1043,13 @@ class _CategoryFormModalState extends ConsumerState<_CategoryFormModal> {
                                   fillColor: isDark
                                       ? AppTokens.darkCard
                                       : AppTokens.lightCardSubtle,
-                                  contentPadding:
-                                  const EdgeInsets.symmetric(
+                                  contentPadding: const EdgeInsets.symmetric(
                                     horizontal: 14,
                                     vertical: 14,
                                   ),
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(16),
-                                    borderSide:
-                                    BorderSide(color: borderColor),
+                                    borderSide: BorderSide(color: borderColor),
                                   ),
                                   enabledBorder: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(16),
@@ -1053,20 +1085,25 @@ class _CategoryFormModalState extends ConsumerState<_CategoryFormModal> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: accent.primary,
                           foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16)),
                           elevation: 2,
                         ),
                         onPressed: _isSaving ? null : _saveCategory,
                         child: _isSaving
                             ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                        )
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2, color: Colors.white),
+                              )
                             : Text(
-                          widget.isEditing ? 'LƯU THAY ĐỔI' : 'TẠO DANH MỤC',
-                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
-                        ),
+                                widget.isEditing
+                                    ? 'LƯU THAY ĐỔI'
+                                    : 'TẠO DANH MỤC',
+                                style: const TextStyle(
+                                    fontSize: 14, fontWeight: FontWeight.w800),
+                              ),
                       ),
                     ),
                   ],

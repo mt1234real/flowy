@@ -1215,8 +1215,9 @@ class _WalletManagerScreenState extends ConsumerState<WalletManagerScreen> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Text(
-                      _isBalanceVisible ? _formatCurrency(wallet.balance) : '•••••••• ₫',
+                    CurrencyText(
+                      _formatCurrency(wallet.balance),
+                      isVisible: _isBalanceVisible,
                       style: currencyTextStyle(context, TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w900,
@@ -1611,8 +1612,9 @@ class _WalletManagerScreenState extends ConsumerState<WalletManagerScreen> {
                               ],
                             ),
                             const SizedBox(height: 6),
-                            Text(
-                              _isBalanceVisible ? _formatCurrency(netRealAssets) : '•••••••• ₫',
+                            CurrencyText(
+                              _formatCurrency(netRealAssets),
+                      isVisible: _isBalanceVisible,
                               style: currencyTextStyle(context, const TextStyle(
                                 fontSize: 26,
                                 fontWeight: FontWeight.w900,
@@ -1641,8 +1643,9 @@ class _WalletManagerScreenState extends ConsumerState<WalletManagerScreen> {
                                           color: isDark ? AppTokens.darkMuted : Colors.white70,
                                         ),
                                       ),
-                                      Text(
-                                        _isBalanceVisible ? _formatCurrency(availableSpending) : '•••••• ₫',
+                                      CurrencyText(
+                                        _formatCurrency(availableSpending),
+                      isVisible: _isBalanceVisible,
                                         style: currencyTextStyle(context, const TextStyle(
                                           fontSize: 12,
                                           fontWeight: FontWeight.w800,
@@ -1662,8 +1665,9 @@ class _WalletManagerScreenState extends ConsumerState<WalletManagerScreen> {
                                           color: isDark ? AppTokens.darkMuted : Colors.white70,
                                         ),
                                       ),
-                                      Text(
-                                        _isBalanceVisible ? _formatCurrency(excludedOrFrozen) : '•••••• ₫',
+                                      CurrencyText(
+                                        _formatCurrency(excludedOrFrozen),
+                      isVisible: _isBalanceVisible,
                                         style: currencyTextStyle(context, const TextStyle(
                                           fontSize: 12,
                                           fontWeight: FontWeight.w800,

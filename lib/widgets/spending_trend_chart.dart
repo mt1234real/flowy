@@ -1,3 +1,4 @@
+import 'currency_text.dart';
 // ==============================================================================
 // File: lib/widgets/spending_trend_chart.dart
 // Architecture: 100% Real-Data Interactive Spending Trend Bar Chart with Drift SQLite
@@ -373,8 +374,9 @@ class _SpendingTrendChartState extends ConsumerState<SpendingTrendChart>
                               ],
                             ),
                             const SizedBox(width: 8),
-                            Text(
-                              widget.isVisible ? infoAmount : '•••••• ₫',
+                            CurrencyText(
+                              infoAmount,
+                              isVisible: widget.isVisible,
                               style: currencyTextStyle(
                                   context,
                                   TextStyle(

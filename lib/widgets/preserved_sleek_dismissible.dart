@@ -5,6 +5,7 @@
 
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 
 import '../core/animation/app_animation_policy.dart';
@@ -15,6 +16,10 @@ class PreservedSleekDismissible extends StatefulWidget {
   final FutureOr<void> Function() onDismissed;
   final Color backgroundColor;
   final bool animateIn;
+  final FutureOr<bool?> Function()? confirmDismiss;
+  final String label;
+  final IconData icon;
+  final double borderRadius;
   final VoidCallback? onInsertAnimationCompleted;
 
   const PreservedSleekDismissible({
@@ -23,11 +28,16 @@ class PreservedSleekDismissible extends StatefulWidget {
     required this.onDismissed,
     this.backgroundColor = AppTokens.expense,
     this.animateIn = false,
+    this.confirmDismiss,
+    this.label = 'Xóa',
+    this.icon = Icons.delete_outline_rounded,
+    this.borderRadius = 20,
     this.onInsertAnimationCompleted,
   });
 
   @override
-  State<PreservedSleekDismissible> createState() => _PreservedSleekDismissibleState();
+  State<PreservedSleekDismissible> createState() =>
+      _PreservedSleekDismissibleState();
 }
 
 class _PreservedSleekDismissibleState extends State<PreservedSleekDismissible>
@@ -72,7 +82,8 @@ class _PreservedSleekDismissibleState extends State<PreservedSleekDismissible>
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         _collapseController
-            .animateBack(0.0, duration: _insertDuration, curve: Curves.easeOutCubic)
+            .animateBack(0.0,
+                duration: _insertDuration, curve: Curves.easeOutCubic)
             .then((_) {
           if (mounted) {
             widget.onInsertAnimationCompleted?.call();
@@ -94,12 +105,12 @@ class _PreservedSleekDismissibleState extends State<PreservedSleekDismissible>
 
     final dx = details.primaryDelta ?? 0.0;
     final nextOffset = (_dragOffset + dx).clamp(-_itemWidth, 0.0);
-    final progress = (-nextOffset / _itemWidth).clamp(0.0, 1.0);
+    final progress = (nextOffset.abs() / _itemWidth).clamp(0.0, 1.0);
 
     if (progress >= _dismissThreshold && !_isThresholdReached) {
       _isThresholdReached = true;
       // Exactly one readiness haptic when crossing the 40% delete threshold.
-      HapticFeedback.selectionClick();
+      HapticFeedback.mediumImpact();
     } else if (progress < _dismissThreshold && _isThresholdReached) {
       _isThresholdReached = false;
     }
@@ -115,11 +126,29 @@ class _PreservedSleekDismissibleState extends State<PreservedSleekDismissible>
     final progress = (-_dragOffset / _itemWidth).clamp(0.0, 1.0);
     final velocity = details.primaryVelocity ?? 0.0;
 
-    if (progress >= _dismissThreshold || (velocity < -500 && _dragOffset < -20)) {
+    if (progress >= _dismissThreshold ||
+        (velocity < -500 && _dragOffset < -20)) {
+      _returnAnimation = null;
+      _isReturning = true;
+      bool allowed;
+      try {
+        allowed = widget.confirmDismiss == null ||
+            await widget.confirmDismiss!.call() == true;
+      } catch (_) {
+        allowed = false;
+      }
+      if (!mounted) return;
+      _isReturning = false;
+      if (!allowed) {
+        await _returnToRest();
+        return;
+      }
       _isDismissing = true;
 
-      _exitAnimation = Tween<double>(begin: _dragOffset, end: -_itemWidth).animate(
-        CurvedAnimation(parent: _horizontalController, curve: Curves.easeOutCubic),
+      _exitAnimation =
+          Tween<double>(begin: _dragOffset, end: -_itemWidth).animate(
+        CurvedAnimation(
+            parent: _horizontalController, curve: Curves.easeOutCubic),
       );
       _horizontalController.duration = _exitSlideDuration;
       _horizontalController.forward(from: 0.0);
@@ -140,21 +169,24 @@ class _PreservedSleekDismissibleState extends State<PreservedSleekDismissible>
         }
       }
     } else {
-      _isReturning = true;
-      _returnAnimation = Tween<double>(begin: _dragOffset, end: 0.0).animate(
-        CurvedAnimation(parent: _horizontalController, curve: Curves.linear),
-      );
-      _horizontalController.duration = _returnDuration;
-      await _horizontalController.forward(from: 0.0);
-
-      if (mounted) {
-        setState(() {
-          _dragOffset = 0.0;
-          _isThresholdReached = false;
-          _isReturning = false;
-        });
-      }
+      await _returnToRest();
     }
+  }
+
+  Future<void> _returnToRest() async {
+    if (_dragOffset == 0 || !mounted) return;
+    _isReturning = true;
+    _returnAnimation = Tween<double>(begin: _dragOffset, end: 0).animate(
+        CurvedAnimation(
+            parent: _horizontalController, curve: Curves.easeOutCubic));
+    _horizontalController.duration = _returnDuration;
+    await _horizontalController.forward(from: 0);
+    if (!mounted) return;
+    setState(() {
+      _dragOffset = 0;
+      _isThresholdReached = false;
+      _isReturning = false;
+    });
   }
 
   @override
@@ -176,13 +208,14 @@ class _PreservedSleekDismissibleState extends State<PreservedSleekDismissible>
               currentOffset = _returnAnimation!.value;
             }
 
-            final double heightFactor = (1.0 - _collapseController.value).clamp(0.0, 1.0);
+            final double heightFactor =
+                (1.0 - _collapseController.value).clamp(0.0, 1.0);
             if (heightFactor <= 0.0001 && !_isDismissing) {
               return const SizedBox.shrink();
             }
 
             final double dragProgress = _itemWidth > 0
-                ? (-currentOffset / _itemWidth).clamp(0.0, 1.0)
+                ? (currentOffset.abs() / _itemWidth).clamp(0.0, 1.0)
                 : 0.0;
 
             // Progressive underlay:
@@ -190,12 +223,12 @@ class _PreservedSleekDismissibleState extends State<PreservedSleekDismissible>
             // - Background gradually reaches full visibility at the 40% threshold.
             // - Trash icon only starts revealing after 15%, scaling 0.8 -> 1.0.
             final underlayProgress =
-            (dragProgress / _dismissThreshold).clamp(0.0, 1.0).toDouble();
+                (dragProgress / _dismissThreshold).clamp(0.0, 1.0).toDouble();
             final underlayOpacity =
-            Curves.easeOutCubic.transform(underlayProgress);
+                Curves.easeOutCubic.transform(underlayProgress);
 
             final iconProgress = ((dragProgress - _iconRevealStart) /
-                (_dismissThreshold - _iconRevealStart))
+                    (_dismissThreshold - _iconRevealStart))
                 .clamp(0.0, 1.0)
                 .toDouble();
             final iconOpacity = Curves.easeOutCubic.transform(iconProgress);
@@ -215,21 +248,30 @@ class _PreservedSleekDismissibleState extends State<PreservedSleekDismissible>
                             opacity: underlayOpacity,
                             child: Container(
                               alignment: Alignment.centerRight,
-                              padding: const EdgeInsets.only(right: 20),
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 20),
                               decoration: BoxDecoration(
                                 color: widget.backgroundColor,
-                                borderRadius: BorderRadius.circular(16),
+                                borderRadius:
+                                    BorderRadius.circular(widget.borderRadius),
                               ),
                               child: Opacity(
                                 opacity: iconOpacity,
                                 child: Transform.scale(
                                   scale: iconScale,
                                   alignment: Alignment.center,
-                                  child: const Icon(
-                                    Icons.delete_outline_rounded,
-                                    color: Colors.white,
-                                    size: 22,
-                                  ),
+                                  child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(widget.icon,
+                                            color: Colors.white, size: 20),
+                                        const SizedBox(width: 6),
+                                        Text(widget.label,
+                                            style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 12.5,
+                                                fontWeight: FontWeight.w800)),
+                                      ]),
                                 ),
                               ),
                             ),
@@ -238,10 +280,25 @@ class _PreservedSleekDismissibleState extends State<PreservedSleekDismissible>
                       ),
                       Transform.translate(
                         offset: Offset(currentOffset, 0),
-                        child: GestureDetector(
+                        child: RawGestureDetector(
                           behavior: HitTestBehavior.opaque,
-                          onHorizontalDragUpdate: _onHorizontalDragUpdate,
-                          onHorizontalDragEnd: _onHorizontalDragEnd,
+                          gestures: {
+                            _InteriorHorizontalDrag:
+                                GestureRecognizerFactoryWithHandlers<
+                                    _InteriorHorizontalDrag>(
+                              () => _InteriorHorizontalDrag(),
+                              (recognizer) => recognizer
+                                ..edgeInset =
+                                    MediaQuery.paddingOf(context).left + 24
+                                ..onUpdate = _onHorizontalDragUpdate
+                                ..onEnd = _onHorizontalDragEnd
+                                ..onCancel = () {
+                                  if (!_isDismissing && !_isReturning) {
+                                    _returnToRest();
+                                  }
+                                },
+                            ),
+                          },
                           child: widget.child,
                         ),
                       ),
@@ -255,4 +312,12 @@ class _PreservedSleekDismissibleState extends State<PreservedSleekDismissible>
       },
     );
   }
+}
+
+// Leave the system back-swipe edge out of this recognizer's gesture arena.
+class _InteriorHorizontalDrag extends HorizontalDragGestureRecognizer {
+  double edgeInset = 24;
+  @override
+  bool isPointerAllowed(PointerEvent event) =>
+      event.position.dx > edgeInset && super.isPointerAllowed(event);
 }

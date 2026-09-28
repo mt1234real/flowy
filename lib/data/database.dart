@@ -15,6 +15,7 @@
 // ==============================================================================
 
 import 'dart:io';
+import 'package:uuid/uuid.dart';
 import 'dart:math' as math;
 
 import 'package:drift/drift.dart';
@@ -227,6 +228,38 @@ class DeletedTransactionItem {
 
 // --- APP DATABASE & DAO IMPLEMENTATION ---
 
+// Small content-free ledger keeps deduplication after inbox retention cleanup.
+// Archive metadata keeps category/contact schemas and financial history intact.
+class EntityArchives extends Table {
+  TextColumn get entityId => text()();
+  TextColumn get entityType => text()();
+  DateTimeColumn get archivedAt => dateTime().withDefault(currentDateAndTime)();
+  @override
+  Set<Column> get primaryKey => {entityId, entityType};
+}
+
+class NotificationReceipts extends Table {
+  TextColumn get dedupKey => text()();
+  @override
+  Set<Column> get primaryKey => {dedupKey};
+}
+
+class AppNotifications extends Table {
+  TextColumn get id => text()();
+  TextColumn get dedupKey => text().nullable().unique()();
+  TextColumn get title => text().withLength(min: 1, max: 150)();
+  TextColumn get body => text()();
+  TextColumn get type => text()();
+  TextColumn get payload => text().nullable()();
+  TextColumn get relatedEntityId => text().nullable()();
+  BoolColumn get isRead => boolean().withDefault(const Constant(false))();
+  // Keep a tombstone until retention cleanup so deleting never re-alerts.
+  BoolColumn get isDismissed => boolean().withDefault(const Constant(false))();
+  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 @DriftDatabase(tables: [
   Wallets,
   Categories,
@@ -236,12 +269,15 @@ class DeletedTransactionItem {
   DebtTransactions,
   ProjectBudgets,
   SavingsGoals,
+  AppNotifications,
+  NotificationReceipts,
+  EntityArchives,
 ])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 8; // Version 8: Bổ sung DebtTransactions.deletedAt cho cơ chế Xóa Mềm Nợ
+  int get schemaVersion => 10; // Local notification inbox and deduplication.
 
   @override
   MigrationStrategy get migration {
@@ -277,9 +313,17 @@ class AppDatabase extends _$AppDatabase {
         if (from < 8) {
           await m.addColumn(debtTransactions, debtTransactions.deletedAt);
         }
+        if (from < 9) {
+          await m.createTable(appNotifications);
+          await m.createTable(notificationReceipts);
+        }
+        if (from < 10) {
+          await m.createTable(entityArchives);
+        }
       },
       beforeOpen: (details) async {
         await customStatement('PRAGMA foreign_keys = ON');
+        await purgeOldNotifications();
         // Tự động dọn dẹp các mục trong thùng rác đã quá 30 ngày trên CẢ 2 BẢNG mỗi khi mở CSDL
         final thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
         await (delete(transactions)
@@ -290,6 +334,121 @@ class AppDatabase extends _$AppDatabase {
             .go();
       },
     );
+  }
+
+  SimpleSelectStatement<EntityArchives, EntityArchive> _archives(String type) =>
+      select(entityArchives)..where((a) => a.entityType.equals(type));
+
+  Expression<bool> categoryAvailable(Categories c) {
+    final archived = selectOnly(entityArchives)
+      ..addColumns([entityArchives.entityId])
+      ..where(entityArchives.entityType.equals('category'));
+    return c.id.isNotInQuery(archived) &
+        (c.parentId.isNull() | c.parentId.isNotInQuery(archived));
+  }
+
+  Stream<List<Category>> watchAvailableCategories() =>
+      (select(categories)..where(categoryAvailable)).watch();
+
+  Stream<List<DebtContact>> watchAvailableDebtContacts() {
+    final archived = selectOnly(entityArchives)
+      ..addColumns([entityArchives.entityId])
+      ..where(entityArchives.entityType.equals('contact'));
+    return (select(debtContacts)..where((c) => c.id.isNotInQuery(archived) | c.netBalance.abs().isBiggerThanValue(.001))).watch();
+  }
+
+  Future<void> archiveEntity(String type, String id) => transaction(() async {
+    if (type == 'contact') {
+      final contact = await (select(debtContacts)..where((c) => c.id.equals(id))).getSingleOrNull();
+      final outstanding = await (select(debtTransactions)..where((d) =>
+          d.contactId.equals(id) & d.deletedAt.isNull() & d.isSettled.equals(false) & d.type.isIn(['LEND', 'BORROW']))).get();
+      if (contact == null || contact.netBalance.abs() > .001 || outstanding.isNotEmpty) {
+        throw StateError('Hãy tất toán các khoản vay trước khi lưu trữ đối tác.');
+      }
+    } else if (type == 'category') {
+      final category = await (select(categories)..where((c) => c.id.equals(id))).getSingleOrNull();
+      final protectedChildren = await (select(categories)..where((c) => c.parentId.equals(id) & c.isSystem.equals(true))).get();
+      if (category == null || category.isSystem || protectedChildren.isNotEmpty) {
+        throw StateError('Danh mục hệ thống cần được giữ lại.');
+      }
+    } else {
+      throw ArgumentError.value(type);
+    }
+    await into(entityArchives).insert(EntityArchivesCompanion.insert(entityId: id, entityType: type), mode: InsertMode.insertOrIgnore);
+  });
+
+  Future<void> restoreArchivedEntity(String type, String id) async {
+    await (delete(entityArchives)..where((a) => a.entityType.equals(type) & a.entityId.equals(id))).go();
+  }
+
+  Stream<List<EntityArchive>> watchEntityArchives(String type) => _archives(type).watch();
+
+  Future<void> restoreNotification(String id) async {
+    await (update(appNotifications)..where((n) => n.id.equals(id)))
+        .write(const AppNotificationsCompanion(isDismissed: Value(false)));
+  }
+
+  Stream<List<AppNotification>> watchNotifications({String? filterType}) {
+    return (select(appNotifications)
+      ..where((n) => n.isDismissed.equals(false) &
+        n.createdAt.isSmallerOrEqualValue(DateTime.now()) &
+        (filterType == null ? const Constant(true) :
+          filterType == 'reminder' ? n.type.isIn(['reminder', 'digest', 'system']) : n.type.equals(filterType)))
+      ..orderBy([(n) => OrderingTerm.desc(n.createdAt)])).watch();
+  }
+
+  Stream<int> watchUnreadNotificationCount() {
+    final count = appNotifications.id.count();
+    return (selectOnly(appNotifications)..addColumns([count])
+      ..where(appNotifications.isRead.equals(false) & appNotifications.isDismissed.equals(false) &
+        appNotifications.createdAt.isSmallerOrEqualValue(DateTime.now())))
+      .watchSingle().map((row) => row.read(count) ?? 0);
+  }
+
+  Future<AppNotification?> createNotificationIfNotExists({
+    required String dedupKey, required String title, required String body,
+    required String type, String? payload, String? relatedEntityId, DateTime? createdAt,
+  }) => transaction(() async {
+    final receipt = await (select(notificationReceipts)..where((n) => n.dedupKey.equals(dedupKey))).getSingleOrNull();
+    if (receipt != null) return null;
+    final existing = await (select(appNotifications)..where((n) => n.dedupKey.equals(dedupKey))).getSingleOrNull();
+    if (existing != null) return null;
+    final id = const Uuid().v4();
+    await into(appNotifications).insert(AppNotificationsCompanion.insert(
+      id: id, dedupKey: Value(dedupKey), title: title, body: body, type: type,
+      payload: Value(payload), relatedEntityId: Value(relatedEntityId),
+      createdAt: Value(createdAt ?? DateTime.now()),
+    ), mode: InsertMode.insertOrIgnore);
+    return (select(appNotifications)..where((n) => n.id.equals(id))).getSingleOrNull();
+  });
+
+  Future<void> markAsRead(String id, {bool isRead = true}) async {
+    await (update(appNotifications)..where((n) => n.id.equals(id)))
+      .write(AppNotificationsCompanion(isRead: Value(isRead)));
+  }
+  Future<void> markAllAsRead() async {
+    await (update(appNotifications)..where((n) => n.createdAt.isSmallerOrEqualValue(DateTime.now())))
+      .write(const AppNotificationsCompanion(isRead: Value(true)));
+  }
+  Future<void> deleteNotification(String id) async {
+    await (update(appNotifications)..where((n) => n.id.equals(id)))
+      .write(const AppNotificationsCompanion(isDismissed: Value(true)));
+  }
+  Future<void> revokeNotificationByEntityId(String entityId) async {
+    await (update(appNotifications)..where((n) => n.relatedEntityId.equals(entityId)))
+      .write(const AppNotificationsCompanion(isDismissed: Value(true)));
+  }
+  Future<void> purgeOldNotifications() async {
+    await transaction(() async {
+      final cutoff = DateTime.now().subtract(const Duration(days: 30));
+      final old = await (select(appNotifications)..where((n) => n.createdAt.isSmallerThanValue(cutoff))).get();
+      for (final item in old) {
+        if (item.dedupKey != null) {
+          await into(notificationReceipts).insert(NotificationReceiptsCompanion.insert(dedupKey: item.dedupKey!), mode: InsertMode.insertOrIgnore);
+        }
+      }
+      await (delete(appNotifications)..where((n) => n.createdAt.isSmallerThanValue(cutoff))).go();
+    });
   }
 
   // ==========================================
@@ -620,6 +779,7 @@ class AppDatabase extends _$AppDatabase {
     await transaction(() async {
       final tx = await (select(transactions)..where((t) => t.id.equals(txId))).getSingleOrNull();
       if (tx == null || tx.deletedAt != null) return;
+      await revokeNotificationByEntityId(txId);
 
       final wallet = await (select(wallets)..where((w) => w.id.equals(tx.walletId))).getSingleOrNull();
       if (wallet != null) {
@@ -719,6 +879,7 @@ class AppDatabase extends _$AppDatabase {
     await transaction(() async {
       final tx = await (select(debtTransactions)..where((t) => t.id.equals(txId))).getSingleOrNull();
       if (tx == null || tx.deletedAt != null) return;
+      await revokeNotificationByEntityId(txId);
 
       double contactReversal = 0.0;
       double walletReversal = 0.0;

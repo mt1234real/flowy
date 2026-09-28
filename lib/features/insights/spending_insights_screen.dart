@@ -1,3 +1,4 @@
+import '../../widgets/preserved_balance_tumbler.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -83,10 +84,7 @@ class _SpendingInsightsScreenState
     _custom = widget.customWindow;
   }
 
-  String _display(double amount) =>
-      ref.read(balancesVisibleProvider) || _sessionReveal
-          ? _money(amount)
-          : '•••••• ₫';
+  String _display(double amount) => _money(amount);
   String _change(double current, double previous) {
     final difference = current - previous;
     if (difference == 0) return 'Không đổi · ${_display(0)}';
@@ -345,105 +343,119 @@ class _SpendingInsightsScreenState
   @override
   Widget build(BuildContext context) {
     final data = ref.watch(insightsDataProvider);
-    ref.watch(balancesVisibleProvider);
     final accent = ref.watch(accentPresetProvider);
     final theme = Theme.of(context);
     final dark = theme.brightness == Brightness.dark;
-    return DecoratedBox(
-        decoration: BoxDecoration(
-            gradient: RadialGradient(
-                center: const Alignment(.6, -.95),
-                radius: 1.2,
-                colors: [
-              Color.alphaBlend(
-                  accent.primary.withValues(alpha: dark ? .06 : .065),
-                  (dark ? const Color(0xFF0F172A) : const Color(0xFFF7FAF9))),
-              (dark ? const Color(0xFF0F172A) : const Color(0xFFF7FAF9))
-            ])),
-        child: Scaffold(
-            backgroundColor: Colors.transparent,
-            appBar: AppBar(
+    return BalancePrivacyScope(
+        visible: _sessionReveal,
+        child: DecoratedBox(
+            decoration: BoxDecoration(
+                gradient: RadialGradient(
+                    center: const Alignment(.6, -.95),
+                    radius: 1.2,
+                    colors: [
+                  Color.alphaBlend(
+                      accent.primary.withValues(alpha: dark ? .06 : .065),
+                      (dark
+                          ? const Color(0xFF0F172A)
+                          : const Color(0xFFF7FAF9))),
+                  (dark ? const Color(0xFF0F172A) : const Color(0xFFF7FAF9))
+                ])),
+            child: Scaffold(
                 backgroundColor: Colors.transparent,
-                surfaceTintColor: Colors.transparent,
-                toolbarHeight:
-                    56 + (MediaQuery.textScalerOf(context).scale(20) - 20) * 2,
-                leadingWidth: 62,
-                leading: Padding(
-                    padding: const EdgeInsets.only(left: 16),
-                    child: Center(
-                        child: IconButton.filledTonal(
-                            style: IconButton.styleFrom(
-                                backgroundColor: theme.colorScheme.surface
-                                    .withValues(alpha: .8)),
-                            tooltip: 'Quay lại',
-                            onPressed: () => Navigator.maybePop(context),
-                            icon: const Icon(Icons.arrow_back_rounded,
-                                size: 21)))),
-                actions: [
-                  if (!_detail && data.hasValue)
-                    Padding(
-                        padding: const EdgeInsets.only(right: 16),
-                        child: SizedBox(
-                            width: 98,
-                            child: TextButton(
-                                style: TextButton.styleFrom(
+                appBar: AppBar(
+                    backgroundColor: Colors.transparent,
+                    surfaceTintColor: Colors.transparent,
+                    toolbarHeight: 56 +
+                        (MediaQuery.textScalerOf(context).scale(20) - 20) * 2,
+                    leadingWidth: 62,
+                    leading: Padding(
+                        padding: const EdgeInsets.only(left: 16),
+                        child: Center(
+                            child: IconButton.filledTonal(
+                                style: IconButton.styleFrom(
                                     backgroundColor: theme.colorScheme.surface
-                                        .withValues(alpha: .85),
-                                    foregroundColor:
-                                        theme.colorScheme.onSurface,
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 10),
-                                    minimumSize: const Size(44, 44),
-                                    shape: const StadiumBorder()),
-                                onPressed: () =>
-                                    _chooseWallets(data.requireValue.wallets),
-                                child: Text(
-                                    '${_walletLabel(data.requireValue.wallets)} ▾',
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    textAlign: TextAlign.center,
-                                    style: const TextStyle(
-                                        fontSize: 11.5,
-                                        fontWeight: FontWeight.w600)))))
-                ],
-                title: Text(widget.title ?? 'Phân tích chi tiêu',
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        fontSize: 20, fontWeight: FontWeight.w800))),
-            body: SafeArea(
-                child: data.when(
-              skipLoadingOnRefresh: true,
-              loading: () => InsightsReveal(
-                  pulse: true,
-                  child: ListView(padding: const EdgeInsets.all(20), children: [
-                    for (final height in [44.0, 72.0, 240.0, 72.0, 72.0])
-                      Container(
-                          height: height,
-                          margin: const EdgeInsets.only(bottom: 16),
-                          decoration: BoxDecoration(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onSurface
-                                  .withValues(alpha: .06),
-                              borderRadius: BorderRadius.circular(22)))
-                  ])),
-              error: (error, stack) {
-                debugPrint('Insights query failed: $error');
-                return Center(
-                    child: Padding(
-                        padding: const EdgeInsets.all(24),
-                        child:
-                            Column(mainAxisSize: MainAxisSize.min, children: [
-                          const Text(
-                              'Không thể tải phân tích chi tiêu.\nDữ liệu của bạn vẫn được giữ nguyên.',
-                              textAlign: TextAlign.center),
-                          TextButton(
-                              onPressed: _retry, child: const Text('Thử lại'))
-                        ])));
-              },
-              data: _content,
-            ))));
+                                        .withValues(alpha: .8)),
+                                tooltip: 'Quay lại',
+                                onPressed: () => Navigator.maybePop(context),
+                                icon: const Icon(Icons.arrow_back_rounded,
+                                    size: 21)))),
+                    actions: [
+                      if (!_detail && data.hasValue)
+                        Padding(
+                            padding: const EdgeInsets.only(right: 16),
+                            child: SizedBox(
+                                width: 98,
+                                child: TextButton(
+                                    style: TextButton.styleFrom(
+                                        backgroundColor: theme
+                                            .colorScheme.surface
+                                            .withValues(alpha: .85),
+                                        foregroundColor:
+                                            theme.colorScheme.onSurface,
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 10),
+                                        minimumSize: const Size(44, 44),
+                                        shape: const StadiumBorder()),
+                                    onPressed: () => _chooseWallets(
+                                        data.requireValue.wallets),
+                                    child: Text(
+                                        '${_walletLabel(data.requireValue.wallets)} ▾',
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                        textAlign: TextAlign.center,
+                                        style: const TextStyle(
+                                            fontSize: 11.5,
+                                            fontWeight: FontWeight.w600)))))
+                    ],
+                    title: Text(widget.title ?? 'Phân tích chi tiêu',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 20, fontWeight: FontWeight.w800))),
+                body: SafeArea(
+                    child: data.when(
+                  skipLoadingOnRefresh: true,
+                  loading: () => InsightsReveal(
+                      pulse: true,
+                      child: ListView(
+                          padding: const EdgeInsets.all(20),
+                          children: [
+                            for (final height in [
+                              44.0,
+                              72.0,
+                              240.0,
+                              72.0,
+                              72.0
+                            ])
+                              Container(
+                                  height: height,
+                                  margin: const EdgeInsets.only(bottom: 16),
+                                  decoration: BoxDecoration(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurface
+                                          .withValues(alpha: .06),
+                                      borderRadius: BorderRadius.circular(22)))
+                          ])),
+                  error: (error, stack) {
+                    debugPrint('Insights query failed: $error');
+                    return Center(
+                        child: Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Text(
+                                      'Không thể tải phân tích chi tiêu.\nDữ liệu của bạn vẫn được giữ nguyên.',
+                                      textAlign: TextAlign.center),
+                                  TextButton(
+                                      onPressed: _retry,
+                                      child: const Text('Thử lại'))
+                                ])));
+                  },
+                  data: _content,
+                )))));
   }
 
   Widget _content(InsightsData data) {
@@ -589,20 +601,19 @@ class _SpendingInsightsScreenState
                         const Icon(Icons.expand_more_rounded, size: 18)
                       ]))),
               const Spacer(),
-              if (!ref.watch(balancesVisibleProvider))
-                IconButton(
-                    tooltip: _sessionReveal
-                        ? 'Ẩn số liệu'
-                        : 'Hiện số liệu trong phiên này',
-                    onPressed: () {
-                      HapticFeedback.selectionClick();
-                      setState(() => _sessionReveal = !_sessionReveal);
-                    },
-                    icon: Icon(
-                        _sessionReveal
-                            ? Icons.visibility_outlined
-                            : Icons.visibility_off_outlined,
-                        size: 19)),
+              IconButton(
+                  tooltip: _sessionReveal
+                      ? 'Ẩn số liệu'
+                      : 'Hiện số liệu trong phiên này',
+                  onPressed: () {
+                    HapticFeedback.selectionClick();
+                    setState(() => _sessionReveal = !_sessionReveal);
+                  },
+                  icon: Icon(
+                      _sessionReveal
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined,
+                      size: 19)),
               if (_wallets.isNotEmpty ||
                   _period != widget.initialPeriod ||
                   _custom != widget.customWindow ||
@@ -637,6 +648,7 @@ class _SpendingInsightsScreenState
                         color:
                             Theme.of(context).colorScheme.onSurfaceVariant))),
           InsightsTrendRibbon(
+              isVisible: _sessionReveal,
               delta: delta,
               text: comparison,
               amount:
@@ -784,7 +796,8 @@ class _SpendingInsightsScreenState
                                     color: Color(0xFF64748B))),
                             title: const Text('Các nhóm khác'),
                             subtitle: CurrencyText(
-                                '${_display(other.amount)} • ${report.total > 0 ? (other.amount / report.total * 100).toStringAsFixed(1) : '0'}% • Xem ${tail.length} nhóm'),
+                                '${_display(other.amount)} • ${report.total > 0 ? (other.amount / report.total * 100).toStringAsFixed(1) : '0'}% • Xem ${tail.length} nhóm',
+                                isVisible: _sessionReveal),
                             trailing: Icon(_othersExpanded
                                 ? Icons.expand_less
                                 : Icons.expand_more),
@@ -881,7 +894,8 @@ class _SpendingInsightsScreenState
                           maxWidth: MediaQuery.sizeOf(context).width * .38),
                       child: FittedBox(
                           fit: BoxFit.scaleDown,
-                          child: Text(_display(transaction.amount),
+                          child: CurrencyText(_display(transaction.amount),
+                              isVisible: _sessionReveal,
                               style: currencyTextStyle(
                                   context,
                                   const TextStyle(
@@ -1069,6 +1083,7 @@ class _SpendingInsightsScreenState
               (horizontal ? constraints.maxWidth * .55 : constraints.maxWidth)
                   .clamp(0.0, horizontal ? 190.0 : 205.0);
           final chart = InsightsDonut(
+              isVisible: _sessionReveal,
               diameter: diameter,
               slices: slices,
               total: report.total,
@@ -1086,7 +1101,7 @@ class _SpendingInsightsScreenState
                   excludeSemantics: true,
                   selected: active?.id == slice.id,
                   label:
-                      '${slice.name}, ${_display(slice.amount)}, ${(slice.amount / report.total * 100).toStringAsFixed(1)} phần trăm',
+                      '${slice.name}, ${_sessionReveal ? _display(slice.amount) : 'Số tiền đang ẩn'}, ${(slice.amount / report.total * 100).toStringAsFixed(1)} phần trăm',
                   child: Material(
                       color: active?.id == slice.id
                           ? theme.colorScheme.primary.withValues(alpha: .07)
@@ -1168,7 +1183,7 @@ class _SpendingInsightsScreenState
       if (budget == null)
         const Text('Bạn chưa đặt hạn mức cho danh mục này.')
       else ...[
-        CurrencyText('Hạn mức: ${_display(limit)}'),
+        CurrencyText('Hạn mức: ${_display(limit)}', isVisible: _sessionReveal),
         if (matches && limit > 0) ...[
           const SizedBox(height: 8),
           LinearProgressIndicator(
@@ -1176,7 +1191,8 @@ class _SpendingInsightsScreenState
           const SizedBox(height: 8),
           Text('Đã dùng ${(spent / limit * 100).toStringAsFixed(0)}% hạn mức.'),
           CurrencyText(
-              '${spent <= limit ? 'Còn' : 'Vượt'} ${_display((limit - spent).abs())}'),
+              '${spent <= limit ? 'Còn' : 'Vượt'} ${_display((limit - spent).abs())}',
+              isVisible: _sessionReveal),
         ] else if (range != null)
           Text(
               'Áp dụng ${DateFormat('dd/MM').format(range.startDate)} – ${DateFormat('dd/MM/yyyy').format(range.endDate)} · tất cả ví',
@@ -1213,6 +1229,7 @@ class _SpendingInsightsScreenState
               child: FittedBox(
                   fit: BoxFit.scaleDown,
                   child: CurrencyText(_display(bucket.amount),
+                      isVisible: _sessionReveal,
                       style: const TextStyle(fontWeight: FontWeight.w700)))),
           onTap: () {
             HapticFeedback.selectionClick();
@@ -1269,7 +1286,7 @@ class _SpendingInsightsScreenState
     return Padding(
         padding: const EdgeInsets.only(bottom: 10),
         child: Tooltip(
-            message: info,
+            message: _sessionReveal ? info : 'Số tiền đang ẩn',
             child: Material(
                 color: dark
                     ? const Color(0xFF1E2430).withValues(alpha: .9)
@@ -1329,8 +1346,12 @@ class _SpendingInsightsScreenState
                                           style: const TextStyle(
                                               fontSize: 14,
                                               fontWeight: FontWeight.w700));
-                                      final amount = CurrencyText(metric,
-                                          maxLines: 1,
+                                      final amount = PreservedBalanceTumbler(
+                                          isVisible:
+                                              _metric == 1 || _sessionReveal,
+                                          realValue: metric,
+                                          isCurrency: _metric != 1,
+                                          height: 24,
                                           style: const TextStyle(
                                               fontSize: 15,
                                               fontWeight: FontWeight.w800));
@@ -1404,6 +1425,7 @@ class _SpendingInsightsScreenState
                                       const SizedBox(height: 7),
                                       CurrencyText(
                                           'Khoản lớn nhất: ${_display(largest.amount)}${largest.note?.trim().isNotEmpty == true ? ' · ${largest.note}' : ''}',
+                                          isVisible: _sessionReveal,
                                           maxLines: 2,
                                           overflow: TextOverflow.ellipsis,
                                           style: TextStyle(

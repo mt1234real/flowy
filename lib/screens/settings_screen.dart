@@ -1,3 +1,4 @@
+import '../features/notifications/notification_settings_sheet.dart';
 // ==============================================================================
 // File: lib/screens/settings_screen.dart
 // Architecture: Settings Screen with Cloud Sync Hub, Identity, Luminescent Edge & Recycle Bin
@@ -43,7 +44,6 @@ import '../widgets/two_stage_overscroll_header.dart';
 import 'category_manager_screen.dart';
 import 'debt_dashboard_screen.dart';
 import 'recycle_bin_screen.dart';
-import 'vault_pin_change_screen.dart';
 
 class FontItemDef {
   final String name;
@@ -1028,6 +1028,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 // ===============================================================
                 // [KHỐI 5]: QUẢN LÝ DỮ LIỆU & BẢO MẬT KÉT & THÙNG RÁC
                 // ===============================================================
+                _SettingsTileSurface(
+                  isDark: isDark,
+                  child: ListTile(
+                    leading: const Icon(Icons.notifications_none_rounded),
+                    title: const Text('Thông báo & nhắc nhở'),
+                    subtitle: const Text('Giờ nhắc, hạn mức và quyền riêng tư'),
+                    trailing: const Icon(Icons.chevron_right_rounded),
+                    onTap: () => NotificationSettingsSheet.show(context),
+                  ),
+                ),
+                const SizedBox(height: 20),
                 _buildSectionHeader('QUẢN LÝ DỮ LIỆU & BẢO MẬT', isDark),
                 const SizedBox(height: 8),
 
@@ -1071,26 +1082,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         onTap: () {
                           HapticFeedback.selectionClick();
                           Navigator.of(context).push(MaterialPageRoute(builder: (_) => const DebtDashboardScreen()));
-                        },
-                      ),
-                      Divider(height: 1, indent: 16, endIndent: 16, color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
-
-                      ListTile(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                        leading: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Icon(Icons.pin_rounded, color: Color(0xFFF59E0B), size: 20),
-                        ),
-                        title: const Text('Đổi mã PIN Két Tiết Kiệm', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
-                        subtitle: const Text('Chuyển đổi độ dài 4 hoặc 6 số bảo mật'),
-                        trailing: const Icon(Icons.chevron_right_rounded),
-                        onTap: () {
-                          HapticFeedback.selectionClick();
-                          Navigator.of(context).push(MaterialPageRoute(builder: (_) => const VaultPinChangeScreen()));
                         },
                       ),
                       Divider(height: 1, indent: 16, endIndent: 16, color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
