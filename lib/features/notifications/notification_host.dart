@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
+import '../../widgets/backup_progress_curtain.dart';
+import '../../services/cloud_backup_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/database.dart';
@@ -40,7 +42,18 @@ class _NotificationHostState extends ConsumerState<NotificationHost>
       db.select(db.budgets).watch(),
       db.select(db.debtContacts).watch()
     ]) {
-      _subscriptions.add(stream.listen((_) => _queue()));
+      var first = true;
+      _subscriptions.add(stream.listen((_) {
+        _queue();
+        if (!first && ref.read(backupOperationProvider) == null) {
+          unawaited(ref
+              .read(cloudBackupServiceProvider)
+              .notifyDataChanged()
+              .catchError(
+                  (Object e) => debugPrint('Backup scheduling failed: $e')));
+        }
+        first = false;
+      }));
     }
     _subscriptions.add(NotificationPlatform.instance.taps.stream
         .listen((_) => _openPending()));
@@ -54,7 +67,7 @@ class _NotificationHostState extends ConsumerState<NotificationHost>
   }
 
   Future<void> _refresh() async {
-    if (!mounted) return;
+    if (!mounted || ref.read(backupOperationProvider) != null) return;
     final coordinator = ref.read(notificationCoordinatorProvider);
     try {
       await ref.read(sharedPreferencesProvider).setString(
@@ -116,10 +129,13 @@ class _NotificationHostState extends ConsumerState<NotificationHost>
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(backupOperationProvider, (_, value) {
+      if (value == null) _queue();
+    });
     ref.listen(notificationPreferencesProvider, (_, __) => _queue());
     ref.listen(cycleStartDaysByMonthProvider, (_, __) => _queue());
     ref.listen(notificationDailySnapshotProvider, (_, value) {
-      if (value == null) return;
+      if (value == null || ref.read(backupOperationProvider) != null) return;
       unawaited(ref
           .read(notificationCoordinatorProvider)
           .dailyLimit(

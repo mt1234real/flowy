@@ -1,3 +1,4 @@
+import '../widgets/flowy_selection_picker.dart';
 // ==============================================================================
 // File: lib/screens/category_manager_screen.dart
 // Architecture: 2-Tier Category Manager with Tap-to-Edit & Reversible Archive
@@ -915,44 +916,34 @@ class _CategoryFormModalState extends ConsumerState<_CategoryFormModal> {
                         ),
                       ),
                       const SizedBox(height: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14),
-                        decoration: BoxDecoration(
-                          color: isDark
-                              ? AppTokens.darkCard
-                              : AppTokens.lightCardSubtle,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(
-                            color: isDark
-                                ? AppTokens.darkBorder
-                                : AppTokens.lightBorder,
-                          ),
-                        ),
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<String>(
-                            isExpanded: true,
-                            value: _selectedParentId,
-                            dropdownColor:
-                                isDark ? AppTokens.darkCard : Colors.white,
-                            items: widget.parentOptions.map((p) {
-                              return DropdownMenuItem<String>(
+                      FlowyDropdown<String>(
+                        title: 'Chọn danh mục cha',
+                        isExpanded: true,
+                        value: _selectedParentId,
+                        dropdownColor:
+                            isDark ? AppTokens.darkCard : Colors.white,
+                        items: widget.parentOptions
+                            .map((p) => DropdownMenuItem<String>(
                                 value: p.id,
-                                child: Text(
-                                  p.name,
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w700,
-                                    color: isDark
-                                        ? AppTokens.darkText
-                                        : AppTokens.lightText,
-                                  ),
-                                ),
-                              );
-                            }).toList(),
-                            onChanged: (val) =>
-                                setState(() => _selectedParentId = val),
-                          ),
-                        ),
+                                child: Row(children: [
+                                  Icon(resolveAppIcon(p.icon),
+                                      size: 20, color: accent.primary),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                      child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                        Text(p.name,
+                                            style: const TextStyle(
+                                                fontWeight: FontWeight.w700)),
+                                        const Text('Danh mục cha',
+                                            style: TextStyle(fontSize: 11)),
+                                      ]))
+                                ])))
+                            .toList(),
+                        onChanged: (val) =>
+                            setState(() => _selectedParentId = val),
                       ),
                     ],
 

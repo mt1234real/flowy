@@ -1,3 +1,4 @@
+import 'flowy_selection_picker.dart';
 // ==============================================================================
 // File: lib/widgets/internal_transfer_sheet.dart
 // Architecture: Executive Internal Wallet-to-Wallet Transfer Sheet (Double-Entry Non-Impact Engine)
@@ -23,7 +24,8 @@ import '../theme/app_theme.dart';
 import '../widgets/currency_text.dart';
 
 /// StreamProvider chuyên biệt lấy danh sách ví đang hoạt động (không gồm ví lưu trữ)
-final activeWalletsStreamProvider = StreamProvider.autoDispose<List<Wallet>>((ref) {
+final activeWalletsStreamProvider =
+    StreamProvider.autoDispose<List<Wallet>>((ref) {
   final db = ref.watch(databaseProvider);
   return db.watchAllWallets(includeArchived: false);
 });
@@ -43,12 +45,12 @@ class InternalTransferSheet extends ConsumerStatefulWidget {
   });
 
   static Future<void> show(
-      BuildContext context, {
-        String? initialFromWalletId,
-        String? initialToWalletId,
-        double? initialAmount,
-        String? initialNote,
-      }) {
+    BuildContext context, {
+    String? initialFromWalletId,
+    String? initialToWalletId,
+    double? initialAmount,
+    String? initialNote,
+  }) {
     HapticFeedback.selectionClick();
     return AppAnimationPolicy.showFluidSheet<void>(
       context: context,
@@ -64,7 +66,8 @@ class InternalTransferSheet extends ConsumerStatefulWidget {
   }
 
   @override
-  ConsumerState<InternalTransferSheet> createState() => _InternalTransferSheetState();
+  ConsumerState<InternalTransferSheet> createState() =>
+      _InternalTransferSheetState();
 }
 
 class _InternalTransferSheetState extends ConsumerState<InternalTransferSheet> {
@@ -78,9 +81,9 @@ class _InternalTransferSheetState extends ConsumerState<InternalTransferSheet> {
   bool _showExtraFields = false;
 
   final AppValidationFeedbackController _walletFeedback =
-  AppValidationFeedbackController();
+      AppValidationFeedbackController();
   final AppValidationFeedbackController _amountFeedback =
-  AppValidationFeedbackController();
+      AppValidationFeedbackController();
 
   @override
   void initState() {
@@ -109,7 +112,8 @@ class _InternalTransferSheetState extends ConsumerState<InternalTransferSheet> {
   }
 
   String _formatCurrency(double amount) {
-    final formatter = NumberFormat.currency(locale: 'vi_VN', symbol: '₫', decimalDigits: 0);
+    final formatter =
+        NumberFormat.currency(locale: 'vi_VN', symbol: '₫', decimalDigits: 0);
     return formatter.format(amount);
   }
 
@@ -165,8 +169,10 @@ class _InternalTransferSheetState extends ConsumerState<InternalTransferSheet> {
   }
 
   Future<void> _submitTransfer(List<Wallet> wallets) async {
-    final fromWallet = wallets.firstWhere((w) => w.id == _fromWalletId, orElse: () => wallets.first);
-    final toWallet = wallets.firstWhere((w) => w.id == _toWalletId, orElse: () => wallets.first);
+    final fromWallet = wallets.firstWhere((w) => w.id == _fromWalletId,
+        orElse: () => wallets.first);
+    final toWallet = wallets.firstWhere((w) => w.id == _toWalletId,
+        orElse: () => wallets.first);
 
     if (_fromWalletId == null || _toWalletId == null) {
       _walletFeedback.reject();
@@ -201,7 +207,9 @@ class _InternalTransferSheetState extends ConsumerState<InternalTransferSheet> {
         toWalletId: _toWalletId!,
         amount: _currentAmount,
         fee: _transferFee,
-        note: _noteController.text.trim().isEmpty ? null : _noteController.text.trim(),
+        note: _noteController.text.trim().isEmpty
+            ? null
+            : _noteController.text.trim(),
         date: DateTime.now(),
       );
 
@@ -209,7 +217,7 @@ class _InternalTransferSheetState extends ConsumerState<InternalTransferSheet> {
         AppFeedback.showSuccess(
           context,
           'Đã chuyển ${_formatCurrency(_currentAmount)} từ '
-              '"${fromWallet.name}" sang "${toWallet.name}" thành công!',
+          '"${fromWallet.name}" sang "${toWallet.name}" thành công!',
         );
         Navigator.of(context).pop();
       }
@@ -224,228 +232,28 @@ class _InternalTransferSheetState extends ConsumerState<InternalTransferSheet> {
     }
   }
 
-  void _showWalletPicker({
-    required BuildContext context,
-    required bool isSource,
-    required List<Wallet> wallets,
-    required bool isDark,
-    required AppAccentPreset accent,
-  }) {
-    HapticFeedback.selectionClick();
-    AppAnimationPolicy.showFluidSheet<void>(
-      context: context,
-      mode: FluidSheetMode.nestedScrollable,
-      backgroundColor: Colors.transparent,
-      builder: (sheetContext, __) => ClipRRect(
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-          child: Container(
-            padding: const EdgeInsets.fromLTRB(20, 14, 20, 28),
-            decoration: BoxDecoration(
-              color: isDark ? AppTokens.darkCard : Colors.white,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-              border: Border.all(
-                color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder,
-              ),
-            ),
-            child: SafeArea(
-              top: false,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: isDark ? Colors.white24 : Colors.black26,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    isSource ? 'Chọn Ví Nguồn (Trích Tiền)' : 'Chọn Ví Đích (Nhận Tiền)',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      color: isDark ? AppTokens.darkText : AppTokens.lightText,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxHeight: MediaQuery.of(sheetContext).size.height * 0.45,
-                    ),
-                    child: ListView.separated(
-                      shrinkWrap: true,
-                      itemCount: wallets.length,
-                      separatorBuilder: (context, index) => const SizedBox(height: 8),
-                      itemBuilder: (context, index) {
-                        final wallet = wallets[index];
-                        final isSelected = isSource
-                            ? wallet.id == _fromWalletId
-                            : wallet.id == _toWalletId;
-                        final isOpposite = isSource
-                            ? wallet.id == _toWalletId
-                            : wallet.id == _fromWalletId;
-
-                        return InkWell(
-                          onTap: () {
-                            HapticFeedback.selectionClick();
-                            setState(() {
-                              if (isSource) {
-                                _fromWalletId = wallet.id;
-                                if (_toWalletId == wallet.id) {
-                                  _toWalletId = null;
-                                }
-                              } else {
-                                _toWalletId = wallet.id;
-                                if (_fromWalletId == wallet.id) {
-                                  _fromWalletId = null;
-                                }
-                              }
-                            });
-                            _walletFeedback.clear();
-                            _amountFeedback.clear();
-                            Navigator.of(sheetContext).pop();
-                          },
-                          borderRadius: BorderRadius.circular(16),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                            decoration: BoxDecoration(
-                              color: isSelected
-                                  ? accent.primary.withValues(alpha: 0.12)
-                                  : (isDark ? AppTokens.darkCardSubtle : AppTokens.lightCardSubtle),
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                color: isSelected
-                                    ? accent.primary
-                                    : (isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
-                                width: isSelected ? 1.5 : 1.0,
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 38,
-                                  height: 38,
-                                  decoration: BoxDecoration(
-                                    color: _parseColor(wallet.color).withValues(alpha: 0.2),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Center(
-                                    child: Icon(
-                                      _getWalletIconData(wallet.type),
-                                      size: 20,
-                                      color: _parseColor(wallet.color),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          Text(
-                                            wallet.name,
-                                            style: TextStyle(
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w700,
-                                              color: isDark ? AppTokens.darkText : AppTokens.lightText,
-                                            ),
-                                          ),
-                                          if (isOpposite) ...[
-                                            const SizedBox(width: 6),
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                                              decoration: BoxDecoration(
-                                                color: Colors.grey.withValues(alpha: 0.2),
-                                                borderRadius: BorderRadius.circular(6),
-                                              ),
-                                              child: Text(
-                                                isSource ? 'Đang là đích' : 'Đang là nguồn',
-                                                style: TextStyle(
-                                                  fontSize: 10,
-                                                  color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ],
-                                      ),
-                                      const SizedBox(height: 2),
-                                      CurrencyText(
-                                        '${_getWalletTypeName(wallet.type)} • Số dư: ${_formatCurrency(wallet.balance)}',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                if (isSelected)
-                                  Icon(Icons.check_circle_rounded, color: accent.primary, size: 20),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Color _parseColor(String colorHex) {
-    try {
-      final hex = colorHex.replaceAll('#', '');
-      return Color(int.parse('FF$hex', radix: 16));
-    } catch (_) {
-      return const Color(0xFF10B981);
-    }
-  }
-
-  IconData _getWalletIconData(String type) {
-    switch (type.toLowerCase()) {
-      case 'bank':
-        return Icons.account_balance_rounded;
-      case 'ewallet':
-        return Icons.account_balance_wallet_rounded;
-      case 'credit':
-        return Icons.credit_card_rounded;
-      case 'savings':
-        return Icons.savings_rounded;
-      case 'cash':
-      default:
-        return Icons.payments_rounded;
-    }
-  }
-
-  String _getWalletTypeName(String type) {
-    switch (type.toLowerCase()) {
-      case 'bank':
-        return 'Tài khoản Ngân hàng';
-      case 'ewallet':
-        return 'Ví điện tử';
-      case 'credit':
-        return 'Thẻ tín dụng';
-      case 'savings':
-        return 'Tài khoản tiết kiệm';
-      case 'cash':
-      default:
-        return 'Tiền mặt';
-    }
+  Future<void> _showWalletPicker(
+      {required BuildContext context,
+      required bool isSource,
+      required List<Wallet> wallets,
+      required bool isDark,
+      required AppAccentPreset accent}) async {
+    final id = await showFlowyWalletPicker(
+        context, ref.read(databaseProvider), wallets,
+        title: isSource ? 'Từ nguồn tiền' : 'Đến nguồn tiền',
+        selected: isSource ? _fromWalletId : _toWalletId);
+    if (!mounted || id == null) return;
+    setState(() {
+      if (isSource) {
+        _fromWalletId = id;
+        if (_toWalletId == id) _toWalletId = null;
+      } else {
+        _toWalletId = id;
+        if (_fromWalletId == id) _fromWalletId = null;
+      }
+    });
+    _walletFeedback.clear();
+    _amountFeedback.clear();
   }
 
   @override
@@ -460,10 +268,14 @@ class _InternalTransferSheetState extends ConsumerState<InternalTransferSheet> {
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
           child: Container(
-            padding: EdgeInsets.fromLTRB(20, 14, 20, MediaQuery.of(context).viewInsets.bottom + 20),
+            padding: EdgeInsets.fromLTRB(
+                20, 14, 20, MediaQuery.of(context).viewInsets.bottom + 20),
             decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF0F172A).withValues(alpha: 0.98) : Colors.white.withValues(alpha: 0.98),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+              color: isDark
+                  ? const Color(0xFF0F172A).withValues(alpha: 0.98)
+                  : Colors.white.withValues(alpha: 0.98),
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(28)),
               border: Border.all(
                 color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder,
               ),
@@ -475,23 +287,30 @@ class _InternalTransferSheetState extends ConsumerState<InternalTransferSheet> {
                   if (wallets.isEmpty) {
                     return const Padding(
                       padding: EdgeInsets.all(32),
-                      child: Center(child: Text('Chưa có ví nào để chuyển tiền.')),
+                      child:
+                          Center(child: Text('Chưa có ví nào để chuyển tiền.')),
                     );
                   }
 
                   _fromWalletId ??= wallets.first.id;
                   if (_toWalletId == null || _toWalletId == _fromWalletId) {
                     if (wallets.length > 1) {
-                      _toWalletId = wallets.firstWhere((w) => w.id != _fromWalletId).id;
+                      _toWalletId =
+                          wallets.firstWhere((w) => w.id != _fromWalletId).id;
                     } else {
                       _toWalletId = wallets.first.id;
                     }
                   }
 
-                  final fromWallet = wallets.firstWhere((w) => w.id == _fromWalletId, orElse: () => wallets.first);
-                  final toWallet = wallets.firstWhere((w) => w.id == _toWalletId, orElse: () => wallets.first);
+                  final fromWallet = wallets.firstWhere(
+                      (w) => w.id == _fromWalletId,
+                      orElse: () => wallets.first);
+                  final toWallet = wallets.firstWhere(
+                      (w) => w.id == _toWalletId,
+                      orElse: () => wallets.first);
 
-                  final fromAfterBalance = fromWallet.balance - (_currentAmount + _transferFee);
+                  final fromAfterBalance =
+                      fromWallet.balance - (_currentAmount + _transferFee);
                   final toAfterBalance = toWallet.balance + _currentAmount;
 
                   return SingleChildScrollView(
@@ -522,10 +341,12 @@ class _InternalTransferSheetState extends ConsumerState<InternalTransferSheet> {
                                 Container(
                                   padding: const EdgeInsets.all(6),
                                   decoration: BoxDecoration(
-                                    color: accent.primary.withValues(alpha: 0.15),
+                                    color:
+                                        accent.primary.withValues(alpha: 0.15),
                                     borderRadius: BorderRadius.circular(10),
                                   ),
-                                  child: Icon(Icons.sync_alt_rounded, color: accent.primary, size: 20),
+                                  child: Icon(Icons.sync_alt_rounded,
+                                      color: accent.primary, size: 20),
                                 ),
                                 const SizedBox(width: 10),
                                 Column(
@@ -536,14 +357,18 @@ class _InternalTransferSheetState extends ConsumerState<InternalTransferSheet> {
                                       style: TextStyle(
                                         fontSize: 17,
                                         fontWeight: FontWeight.w800,
-                                        color: isDark ? AppTokens.darkText : AppTokens.lightText,
+                                        color: isDark
+                                            ? AppTokens.darkText
+                                            : AppTokens.lightText,
                                       ),
                                     ),
                                     Text(
                                       'Không ảnh hưởng Tổng Thu/Chi của chu kỳ',
                                       style: TextStyle(
                                         fontSize: 11,
-                                        color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                                        color: isDark
+                                            ? AppTokens.darkMuted
+                                            : AppTokens.lightMuted,
                                       ),
                                     ),
                                   ],
@@ -555,7 +380,9 @@ class _InternalTransferSheetState extends ConsumerState<InternalTransferSheet> {
                               icon: Icon(
                                 Icons.close_rounded,
                                 size: 22,
-                                color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                                color: isDark
+                                    ? AppTokens.darkMuted
+                                    : AppTokens.lightMuted,
                               ),
                             ),
                           ],
@@ -570,7 +397,7 @@ class _InternalTransferSheetState extends ConsumerState<InternalTransferSheet> {
                                 ? AppTokens.darkBorder
                                 : AppTokens.lightBorder;
                             final borderColor =
-                            visual.borderColor(restingBorder);
+                                visual.borderColor(restingBorder);
 
                             return Container(
                               padding: const EdgeInsets.all(12),
@@ -587,95 +414,19 @@ class _InternalTransferSheetState extends ConsumerState<InternalTransferSheet> {
                               child: Column(
                                 children: [
                                   // Ví Nguồn
-                                  InkWell(
-                                    onTap: () => _showWalletPicker(
-                                      context: context,
-                                      isSource: true,
-                                      wallets: wallets,
-                                      isDark: isDark,
-                                      accent: accent,
-                                    ),
-                                    borderRadius: BorderRadius.circular(14),
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                      decoration: BoxDecoration(
-                                        color: isDark ? AppTokens.darkCardSubtle : Colors.white,
-                                        borderRadius: BorderRadius.circular(14),
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          Container(
-                                            width: 34,
-                                            height: 34,
-                                            decoration: BoxDecoration(
-                                              color: _parseColor(fromWallet.color).withValues(alpha: 0.2),
-                                              borderRadius: BorderRadius.circular(10),
-                                            ),
-                                            child: Icon(
-                                              _getWalletIconData(fromWallet.type),
-                                              size: 18,
-                                              color: _parseColor(fromWallet.color),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 10),
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                Text(
-                                                  'Từ ví nguồn',
-                                                  style: TextStyle(
-                                                    fontSize: 10,
-                                                    fontWeight: FontWeight.w700,
-                                                    color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
-                                                  ),
-                                                ),
-                                                Text(
-                                                  fromWallet.name,
-                                                  style: TextStyle(
-                                                    fontSize: 13,
-                                                    fontWeight: FontWeight.w800,
-                                                    color: isDark ? AppTokens.darkText : AppTokens.lightText,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                          Column(
-                                            crossAxisAlignment: CrossAxisAlignment.end,
-                                            children: [
-                                              Text(
-                                                'Khả dụng',
-                                                style: TextStyle(
-                                                  fontSize: 10,
-                                                  color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
-                                                ),
-                                              ),
-                                              Text(
-                                                _formatCurrency(fromWallet.balance),
-                                                style: currencyTextStyle(context, TextStyle(
-                                                  fontSize: 12,
-                                                  fontWeight: FontWeight.w800,
-                                                  color: fromWallet.balance < 0
-                                                      ? AppTokens.expense
-                                                      : (isDark ? AppTokens.darkText : AppTokens.lightText),
-                                                )),
-                                              ),
-                                            ],
-                                          ),
-                                          const SizedBox(width: 4),
-                                          Icon(
-                                            Icons.arrow_drop_down_rounded,
-                                            color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
+                                  FlowyPickerTrigger(
+                                      onTap: () => _showWalletPicker(
+                                          context: context,
+                                          isSource: true,
+                                          wallets: wallets,
+                                          isDark: isDark,
+                                          accent: accent),
+                                      child: walletPickerLabel(fromWallet)),
 
                                   // Nút Đảo Chiều
                                   Padding(
-                                    padding: const EdgeInsets.symmetric(vertical: 4),
+                                    padding:
+                                        const EdgeInsets.symmetric(vertical: 4),
                                     child: Center(
                                       child: InkWell(
                                         onTap: _swapWallets,
@@ -683,10 +434,12 @@ class _InternalTransferSheetState extends ConsumerState<InternalTransferSheet> {
                                         child: Container(
                                           padding: const EdgeInsets.all(7),
                                           decoration: BoxDecoration(
-                                            color: accent.primary.withValues(alpha: 0.16),
+                                            color: accent.primary
+                                                .withValues(alpha: 0.16),
                                             shape: BoxShape.circle,
                                             border: Border.all(
-                                              color: accent.primary.withValues(alpha: 0.3),
+                                              color: accent.primary
+                                                  .withValues(alpha: 0.3),
                                               width: 1.5,
                                             ),
                                           ),
@@ -701,91 +454,14 @@ class _InternalTransferSheetState extends ConsumerState<InternalTransferSheet> {
                                   ),
 
                                   // Ví Đích
-                                  InkWell(
-                                    onTap: () => _showWalletPicker(
-                                      context: context,
-                                      isSource: false,
-                                      wallets: wallets,
-                                      isDark: isDark,
-                                      accent: accent,
-                                    ),
-                                    borderRadius: BorderRadius.circular(14),
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                      decoration: BoxDecoration(
-                                        color: isDark ? AppTokens.darkCardSubtle : Colors.white,
-                                        borderRadius: BorderRadius.circular(14),
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          Container(
-                                            width: 34,
-                                            height: 34,
-                                            decoration: BoxDecoration(
-                                              color: _parseColor(toWallet.color).withValues(alpha: 0.2),
-                                              borderRadius: BorderRadius.circular(10),
-                                            ),
-                                            child: Icon(
-                                              _getWalletIconData(toWallet.type),
-                                              size: 18,
-                                              color: _parseColor(toWallet.color),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 10),
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                Text(
-                                                  'Đến ví nhận',
-                                                  style: TextStyle(
-                                                    fontSize: 10,
-                                                    fontWeight: FontWeight.w700,
-                                                    color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
-                                                  ),
-                                                ),
-                                                Text(
-                                                  toWallet.name,
-                                                  style: TextStyle(
-                                                    fontSize: 13,
-                                                    fontWeight: FontWeight.w800,
-                                                    color: isDark ? AppTokens.darkText : AppTokens.lightText,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                          Column(
-                                            crossAxisAlignment: CrossAxisAlignment.end,
-                                            children: [
-                                              Text(
-                                                'Hiện có',
-                                                style: TextStyle(
-                                                  fontSize: 10,
-                                                  color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
-                                                ),
-                                              ),
-                                              Text(
-                                                _formatCurrency(toWallet.balance),
-                                                style: currencyTextStyle(context, TextStyle(
-                                                  fontSize: 12,
-                                                  fontWeight: FontWeight.w800,
-                                                  color: toWallet.balance < 0
-                                                      ? AppTokens.expense
-                                                      : (isDark ? AppTokens.darkText : AppTokens.lightText),
-                                                )),
-                                              ),
-                                            ],
-                                          ),
-                                          const SizedBox(width: 4),
-                                          Icon(
-                                            Icons.arrow_drop_down_rounded,
-                                            color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
+                                  FlowyPickerTrigger(
+                                      onTap: () => _showWalletPicker(
+                                          context: context,
+                                          isSource: false,
+                                          wallets: wallets,
+                                          isDark: isDark,
+                                          accent: accent),
+                                      child: walletPickerLabel(toWallet)),
                                 ],
                               ),
                             );
@@ -801,7 +477,7 @@ class _InternalTransferSheetState extends ConsumerState<InternalTransferSheet> {
                                 ? AppTokens.darkBorder
                                 : AppTokens.lightBorder;
                             final borderColor =
-                            visual.borderColor(restingBorder);
+                                visual.borderColor(restingBorder);
 
                             return Container(
                               width: double.infinity,
@@ -811,7 +487,7 @@ class _InternalTransferSheetState extends ConsumerState<InternalTransferSheet> {
                               ),
                               decoration: BoxDecoration(
                                 color:
-                                isDark ? AppTokens.darkCard : Colors.white,
+                                    isDark ? AppTokens.darkCard : Colors.white,
                                 borderRadius: BorderRadius.circular(18),
                                 border: Border.all(
                                   color: borderColor,
@@ -826,7 +502,9 @@ class _InternalTransferSheetState extends ConsumerState<InternalTransferSheet> {
                                       fontSize: 10,
                                       fontWeight: FontWeight.bold,
                                       letterSpacing: 0.8,
-                                      color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                                      color: isDark
+                                          ? AppTokens.darkMuted
+                                          : AppTokens.lightMuted,
                                     ),
                                   ),
                                   const SizedBox(height: 4),
@@ -834,12 +512,14 @@ class _InternalTransferSheetState extends ConsumerState<InternalTransferSheet> {
                                     fit: BoxFit.scaleDown,
                                     child: Text(
                                       _formatCurrency(_currentAmount),
-                                      style: currencyTextStyle(context, TextStyle(
-                                        fontSize: 32,
-                                        fontWeight: FontWeight.w900,
-                                        color: accent.primary,
-                                        letterSpacing: -0.5,
-                                      )),
+                                      style: currencyTextStyle(
+                                          context,
+                                          TextStyle(
+                                            fontSize: 32,
+                                            fontWeight: FontWeight.w900,
+                                            color: accent.primary,
+                                            letterSpacing: -0.5,
+                                          )),
                                     ),
                                   ),
                                   const SizedBox(height: 10),
@@ -848,13 +528,17 @@ class _InternalTransferSheetState extends ConsumerState<InternalTransferSheet> {
                                     physics: const BouncingScrollPhysics(),
                                     child: Row(
                                       children: [
-                                        _buildQuickAddChip('+50.000', 50000, isDark, accent),
+                                        _buildQuickAddChip(
+                                            '+50.000', 50000, isDark, accent),
                                         const SizedBox(width: 6),
-                                        _buildQuickAddChip('+100.000', 100000, isDark, accent),
+                                        _buildQuickAddChip(
+                                            '+100.000', 100000, isDark, accent),
                                         const SizedBox(width: 6),
-                                        _buildQuickAddChip('+200.000', 200000, isDark, accent),
+                                        _buildQuickAddChip(
+                                            '+200.000', 200000, isDark, accent),
                                         const SizedBox(width: 6),
-                                        _buildQuickAddChip('+500.000', 500000, isDark, accent),
+                                        _buildQuickAddChip(
+                                            '+500.000', 500000, isDark, accent),
                                         if (fromWallet.balance > 0) ...[
                                           const SizedBox(width: 6),
                                           InkWell(
@@ -862,17 +546,27 @@ class _InternalTransferSheetState extends ConsumerState<InternalTransferSheet> {
                                               HapticFeedback.selectionClick();
                                               _amountFeedback.clear();
                                               setState(() {
-                                                _amountInput =
-                                                    fromWallet.balance.toStringAsFixed(0);
+                                                _amountInput = fromWallet
+                                                    .balance
+                                                    .toStringAsFixed(0);
                                               });
                                             },
-                                            borderRadius: BorderRadius.circular(10),
+                                            borderRadius:
+                                                BorderRadius.circular(10),
                                             child: Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 10,
+                                                      vertical: 5),
                                               decoration: BoxDecoration(
-                                                color: Colors.amber.withValues(alpha: 0.15),
-                                                borderRadius: BorderRadius.circular(10),
-                                                border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+                                                color: Colors.amber
+                                                    .withValues(alpha: 0.15),
+                                                borderRadius:
+                                                    BorderRadius.circular(10),
+                                                border: Border.all(
+                                                    color: Colors.amber
+                                                        .withValues(
+                                                            alpha: 0.3)),
                                               ),
                                               child: const Text(
                                                 'Tất cả số dư',
@@ -898,11 +592,13 @@ class _InternalTransferSheetState extends ConsumerState<InternalTransferSheet> {
                         // Nút mở rộng Phí & Ghi chú
                         InkWell(
                           onTap: () {
-                            setState(() => _showExtraFields = !_showExtraFields);
+                            setState(
+                                () => _showExtraFields = !_showExtraFields);
                           },
                           borderRadius: BorderRadius.circular(12),
                           child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
+                            padding: const EdgeInsets.symmetric(
+                                vertical: 4, horizontal: 4),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
@@ -913,7 +609,9 @@ class _InternalTransferSheetState extends ConsumerState<InternalTransferSheet> {
                                   style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w600,
-                                    color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                                    color: isDark
+                                        ? AppTokens.darkMuted
+                                        : AppTokens.lightMuted,
                                   ),
                                 ),
                                 if (_transferFee > 0)
@@ -941,17 +639,24 @@ class _InternalTransferSheetState extends ConsumerState<InternalTransferSheet> {
                                   keyboardType: TextInputType.number,
                                   style: TextStyle(
                                     fontSize: 13,
-                                    color: isDark ? AppTokens.darkText : AppTokens.lightText,
+                                    color: isDark
+                                        ? AppTokens.darkText
+                                        : AppTokens.lightText,
                                   ),
                                   decoration: InputDecoration(
                                     labelText: 'Phí chuyển (nếu có)',
                                     labelStyle: TextStyle(
                                       fontSize: 12,
-                                      color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                                      color: isDark
+                                          ? AppTokens.darkMuted
+                                          : AppTokens.lightMuted,
                                     ),
-                                    prefixIcon: const Icon(Icons.receipt_outlined, size: 16),
+                                    prefixIcon: const Icon(
+                                        Icons.receipt_outlined,
+                                        size: 16),
                                     isDense: true,
-                                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 10, vertical: 10),
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(12),
                                     ),
@@ -961,8 +666,9 @@ class _InternalTransferSheetState extends ConsumerState<InternalTransferSheet> {
                                     _amountFeedback.clear();
                                     setState(() {
                                       _transferFee = double.tryParse(
-                                        val.replaceAll(RegExp(r'[^0-9]'), ''),
-                                      ) ??
+                                            val.replaceAll(
+                                                RegExp(r'[^0-9]'), ''),
+                                          ) ??
                                           0.0;
                                     });
                                   },
@@ -975,17 +681,24 @@ class _InternalTransferSheetState extends ConsumerState<InternalTransferSheet> {
                                   controller: _noteController,
                                   style: TextStyle(
                                     fontSize: 13,
-                                    color: isDark ? AppTokens.darkText : AppTokens.lightText,
+                                    color: isDark
+                                        ? AppTokens.darkText
+                                        : AppTokens.lightText,
                                   ),
                                   decoration: InputDecoration(
                                     labelText: 'Ghi chú chuyển tiền',
                                     labelStyle: TextStyle(
                                       fontSize: 12,
-                                      color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                                      color: isDark
+                                          ? AppTokens.darkMuted
+                                          : AppTokens.lightMuted,
                                     ),
-                                    prefixIcon: const Icon(Icons.edit_note_rounded, size: 18),
+                                    prefixIcon: const Icon(
+                                        Icons.edit_note_rounded,
+                                        size: 18),
                                     isDense: true,
-                                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 10, vertical: 10),
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(12),
                                     ),
@@ -1000,12 +713,17 @@ class _InternalTransferSheetState extends ConsumerState<InternalTransferSheet> {
                         if (_currentAmount > 0) ...[
                           const SizedBox(height: 10),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 8),
                             decoration: BoxDecoration(
-                              color: isDark ? AppTokens.darkCard : AppTokens.lightCardSubtle,
+                              color: isDark
+                                  ? AppTokens.darkCard
+                                  : AppTokens.lightCardSubtle,
                               borderRadius: BorderRadius.circular(14),
                               border: Border.all(
-                                color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder,
+                                color: isDark
+                                    ? AppTokens.darkBorder
+                                    : AppTokens.lightBorder,
                               ),
                             ),
                             child: Row(
@@ -1017,7 +735,9 @@ class _InternalTransferSheetState extends ConsumerState<InternalTransferSheet> {
                                     fontSize: 11,
                                     color: fromAfterBalance < 0
                                         ? AppTokens.expense
-                                        : (isDark ? AppTokens.darkMuted : AppTokens.lightMuted),
+                                        : (isDark
+                                            ? AppTokens.darkMuted
+                                            : AppTokens.lightMuted),
                                   ),
                                 ),
                                 CurrencyText(
@@ -1025,7 +745,9 @@ class _InternalTransferSheetState extends ConsumerState<InternalTransferSheet> {
                                   style: TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.bold,
-                                    color: isDark ? AppTokens.darkText : AppTokens.lightText,
+                                    color: isDark
+                                        ? AppTokens.darkText
+                                        : AppTokens.lightText,
                                   ),
                                 ),
                               ],
@@ -1048,27 +770,33 @@ class _InternalTransferSheetState extends ConsumerState<InternalTransferSheet> {
                             style: ElevatedButton.styleFrom(
                               backgroundColor: accent.primary,
                               foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16)),
                               elevation: 2,
                             ),
-                            onPressed: _isSubmitting ? null : () => _submitTransfer(wallets),
+                            onPressed: _isSubmitting
+                                ? null
+                                : () => _submitTransfer(wallets),
                             child: _isSubmitting
                                 ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                            )
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2, color: Colors.white),
+                                  )
                                 : const Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.check_rounded, size: 20),
-                                SizedBox(width: 8),
-                                Text(
-                                  'XÁC NHẬN CHUYỂN TIỀN',
-                                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
-                                ),
-                              ],
-                            ),
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(Icons.check_rounded, size: 20),
+                                      SizedBox(width: 8),
+                                      Text(
+                                        'XÁC NHẬN CHUYỂN TIỀN',
+                                        style: TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w800),
+                                      ),
+                                    ],
+                                  ),
                           ),
                         ),
                       ],
@@ -1085,7 +813,8 @@ class _InternalTransferSheetState extends ConsumerState<InternalTransferSheet> {
     );
   }
 
-  Widget _buildQuickAddChip(String label, double amount, bool isDark, AppAccentPreset accent) {
+  Widget _buildQuickAddChip(
+      String label, double amount, bool isDark, AppAccentPreset accent) {
     return InkWell(
       onTap: () => _addQuickAmount(amount),
       borderRadius: BorderRadius.circular(10),
@@ -1138,11 +867,17 @@ class _InternalTransferSheetState extends ConsumerState<InternalTransferSheet> {
                       height: 44,
                       decoration: BoxDecoration(
                         color: isSpecial
-                            ? (isDark ? AppTokens.darkCard : AppTokens.lightCardSubtle)
-                            : (isDark ? AppTokens.darkCardSubtle : Colors.white),
+                            ? (isDark
+                                ? AppTokens.darkCard
+                                : AppTokens.lightCardSubtle)
+                            : (isDark
+                                ? AppTokens.darkCardSubtle
+                                : Colors.white),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder,
+                          color: isDark
+                              ? AppTokens.darkBorder
+                              : AppTokens.lightBorder,
                         ),
                       ),
                       child: Center(
@@ -1152,8 +887,14 @@ class _InternalTransferSheetState extends ConsumerState<InternalTransferSheet> {
                             fontSize: isSpecial ? 15 : 18,
                             fontWeight: FontWeight.bold,
                             color: isSpecial
-                                ? (key == 'C' ? AppTokens.expense : (isDark ? AppTokens.darkMuted : AppTokens.lightMuted))
-                                : (isDark ? AppTokens.darkText : AppTokens.lightText),
+                                ? (key == 'C'
+                                    ? AppTokens.expense
+                                    : (isDark
+                                        ? AppTokens.darkMuted
+                                        : AppTokens.lightMuted))
+                                : (isDark
+                                    ? AppTokens.darkText
+                                    : AppTokens.lightText),
                           ),
                         ),
                       ),

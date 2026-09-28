@@ -29,6 +29,8 @@ import '../../../theme/app_theme.dart';
 import '../controllers/onboarding_controller.dart';
 
 import '../../../widgets/sliding_segmented_bar.dart';
+import '../../../widgets/restore_diff_modal.dart';
+import '../../../services/cloud_backup_service.dart';
 class _FontItemDef {
   final String name;
   final String badge;
@@ -1561,16 +1563,15 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
                     ),
                     onPressed: () async {
                       Navigator.of(context).pop();
-                      final success = await ref.read(onboardingControllerProvider.notifier).restoreFromCloud();
-                      if (success && context.mounted) {
-                        Navigator.of(context).pushReplacement(
-                          MaterialPageRoute(builder: (_) => const MainScaffold()),
-                        );
-                      }
+                      if (!mounted) return;
+                      await RestoreDiffModal.show(this.context,
+                        finishOnboarding: true,
+                        backupItem: CloudBackupItem(fileId: meta.fileId, fileName: 'Bản sao lưu',
+                          sizeBytes: 0, createdTime: meta.updatedAt, properties: const {}));
                     },
                     icon: const Icon(Icons.restore_rounded, size: 18),
                     label: const Text(
-                      'Khôi phục dữ liệu ngay',
+                      'Xem và đối soát bản sao lưu',
                       style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
                     ),
                   ),

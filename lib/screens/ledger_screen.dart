@@ -1,3 +1,4 @@
+import 'dart:convert';
 import '../widgets/currency_text.dart';
 // ==============================================================================
 // File: lib/screens/ledger_screen.dart
@@ -79,8 +80,12 @@ final currentAnchorMonthProvider = StateProvider<DateTime>((ref) {
   return DateTime(now.year, now.month, 1);
 });
 
-final cycleStartDaysByMonthProvider = StateProvider<Map<String, int>>((ref) => {
-  'default': 10,
+final cycleStartDaysByMonthProvider = StateProvider<Map<String, int>>((ref) {
+  final saved = ref.read(sharedPreferencesProvider).getString('notification_cycle_snapshot');
+  if (saved != null) {
+    try { return Map<String, int>.from(jsonDecode(saved) as Map); } catch (_) {}
+  }
+  return {'default': (ref.read(sharedPreferencesProvider).getInt('flowy_cycle_start_day') ?? 10).clamp(1, 31)};
 });
 
 class MonthCycleRange {

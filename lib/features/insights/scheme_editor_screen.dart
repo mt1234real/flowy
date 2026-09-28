@@ -1,3 +1,5 @@
+import '../../screens/category_manager_screen.dart' show resolveAppIcon;
+import '../../widgets/flowy_selection_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -186,16 +188,18 @@ class _SchemeEditorScreenState extends ConsumerState<SchemeEditorScreen> {
           for (final category in categories)
             Padding(
                 padding: const EdgeInsets.only(bottom: 12),
-                child: DropdownButtonFormField<String>(
+                child: FlowyDropdown<String>(
+                  title: 'Phân loại chi tiêu',
                   initialValue: _assignments[category.id] ?? '',
                   isExpanded: true,
-                  decoration: InputDecoration(labelText: category.name),
+                  decoration: InputDecoration(
+                      labelText: category.name,
+                      prefixIcon: Icon(resolveAppIcon(category.icon))),
                   items: [
                     const DropdownMenuItem(
                         value: '', child: Text('Chưa phân loại')),
-                    ..._groups.map((g) => DropdownMenuItem(
-                        value: g.id,
-                        child: Text(g.name, overflow: TextOverflow.ellipsis)))
+                    ..._groups.map((g) =>
+                        DropdownMenuItem(value: g.id, child: Text(g.name)))
                   ],
                   onChanged: _saving
                       ? null

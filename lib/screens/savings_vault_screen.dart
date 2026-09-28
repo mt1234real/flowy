@@ -1,3 +1,4 @@
+import '../widgets/flowy_selection_picker.dart';
 // ==============================================================================
 // File: lib/screens/savings_vault_screen.dart
 // Architecture: Digital Swiss Vault Savings Screen & Root-Safe Auto-Lock
@@ -35,7 +36,7 @@ class SavingsVaultScreen extends ConsumerStatefulWidget {
 
 class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
     with WidgetsBindingObserver {
-  bool _isBalanceHidden = false;
+  late bool _isBalanceHidden = ref.read(sharedPreferencesProvider).getBool('flowy_restored_private') ?? false;
   bool _isPrivacyShieldActive = false;
   bool _isUnlockFlowActive = false;
 
@@ -1185,21 +1186,52 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
   // ============================================================================
   // E. BOTTOM SHEET RÚT TIỀN TỪ HŨ VỀ VÍ (WITHDRAW - ACID TRANSACTION)
   // ============================================================================
+  Widget _vaultSheetHeader(BuildContext context, String title,
+      {bool enabled = true}) {
+    final scheme = Theme.of(context).colorScheme;
+    return Row(children: [
+      Expanded(
+          child: Text(title,
+              style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: scheme.onSurface))),
+      const SizedBox(width: 12),
+      IconButton(
+        tooltip: 'Đóng',
+        constraints: const BoxConstraints.tightFor(width: 32, height: 32),
+        padding: EdgeInsets.zero,
+        style: IconButton.styleFrom(
+          backgroundColor: scheme.onSurface.withValues(alpha: .06),
+          foregroundColor: scheme.onSurfaceVariant,
+          shape: const CircleBorder(),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ),
+        onPressed: !enabled
+            ? null
+            : () {
+                if (ModalRoute.of(context)?.isCurrent == true) {
+                  Navigator.of(context).pop();
+                }
+              },
+        icon: const Icon(Icons.close_rounded, size: 20),
+      ),
+    ]);
+  }
+
   void _showWithdrawSheet(
       BuildContext context, SavingsGoal goal, AppDatabase db) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final inputFill = isDark ? const Color(0xFF1A212D) : Colors.white;
     final accent = ref.read(accentPresetProvider);
     final amountValidation = AppValidationFeedbackController();
     AppAnimationPolicy.showFluidSheet<void>(
       context: context,
       mode: FluidSheetMode.scrollable,
-      backgroundColor: scheme.surface,
-      shape: RoundedRectangleBorder(
-        side: BorderSide(
-            color: scheme.outlineVariant.withValues(alpha: .4), width: .8),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-      ),
+      enableBlur: true,
+      backgroundColor: Colors.transparent,
       builder: (sheetCtx, scrollController) {
         String enteredAmountStr = '';
         String? selectedWalletId;
@@ -1218,322 +1250,293 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
 
                 final double amount = double.tryParse(enteredAmountStr) ?? 0.0;
 
-                return SingleChildScrollView(
-                    controller: scrollController,
-                    physics: const ClampingScrollPhysics(),
-                    child: Padding(
-                      padding: EdgeInsets.only(
-                        bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
-                        left: 20,
-                        right: 20,
-                        top: 20,
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Center(
-                            child: Container(
-                              width: 42,
-                              height: 4,
-                              decoration: BoxDecoration(
-                                color: scheme.onSurface.withValues(alpha: .24),
-                                borderRadius: BorderRadius.circular(2),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: accent.primary.withValues(alpha: 0.2),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Icon(Icons.arrow_upward_rounded,
-                                    color: accent.primary, size: 20),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Rút tiền về ví',
-                                      style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w800,
-                                          color: scheme.onSurface),
-                                    ),
-                                    CurrencyText(
-                                      'Nguồn: ${goal.icon} ${goal.title} (Có: ${_formatCurrency(goal.currentAmount)})',
-                                      style: TextStyle(
-                                          fontSize: 12,
-                                          color: scheme.onSurfaceVariant),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 18),
-
-                          // CHỌN VÍ NHẬN TIỀN
-                          Text(
-                            'Chuyển tiền vào ví',
-                            style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w800,
-                                color: scheme.onSurfaceVariant),
-                          ),
-                          const SizedBox(height: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: scheme.surfaceContainerHighest,
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                  color: scheme.outlineVariant
-                                      .withValues(alpha: .4)),
-                            ),
-                            child: DropdownButtonHideUnderline(
-                              child: DropdownButton<String>(
-                                value: selectedWalletId,
-                                dropdownColor: scheme.surfaceContainerHighest,
-                                isExpanded: true,
-                                icon: Icon(Icons.keyboard_arrow_down_rounded,
-                                    color: scheme.onSurfaceVariant),
-                                items: wallets.map((w) {
-                                  return DropdownMenuItem<String>(
-                                    value: w.id,
-                                    child: Text(w.name,
-                                        style: TextStyle(
-                                            color: scheme.onSurface,
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w700)),
-                                  );
-                                }).toList(),
-                                onChanged: (val) {
-                                  if (val != null) {
-                                    setSheetState(() {
-                                      selectedWalletId = val;
-                                      errorMessage = null;
-                                      amountValidation.clear();
-                                    });
-                                  }
-                                },
-                              ),
-                            ),
-                          ),
-
-                          const SizedBox(height: 18),
-
-                          // Ô HIỂN THỊ SỐ TIỀN RÚT
-                          AppValidationFeedback(
-                            controller: amountValidation,
-                            builder: (context, visual) => Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.symmetric(
-                                  vertical: 16, horizontal: 16),
-                              decoration: BoxDecoration(
-                                color: scheme.surfaceContainerHighest,
-                                borderRadius: BorderRadius.circular(18),
-                                border: Border.all(
-                                  color: visual.borderColor(
-                                    accent.primary.withValues(alpha: 0.3),
-                                  ),
-                                  width: visual.isInvalid ? 1.8 : 1.0,
-                                ),
+                return Material(
+                    color: scheme.surface,
+                    borderRadius:
+                        const BorderRadius.vertical(top: Radius.circular(28)),
+                    clipBehavior: Clip.antiAlias,
+                    child: SafeArea(
+                        top: false,
+                        child: SingleChildScrollView(
+                            controller: scrollController,
+                            physics: const ClampingScrollPhysics(),
+                            child: Padding(
+                              padding: EdgeInsets.only(
+                                bottom:
+                                    MediaQuery.of(ctx).viewInsets.bottom + 24,
+                                left: 20,
+                                right: 20,
+                                top: 16,
                               ),
                               child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
-                                    enteredAmountStr.isEmpty
-                                        ? '0 ₫'
-                                        : _formatCurrency(amount),
-                                    style: currencyTextStyle(
-                                        context,
-                                        TextStyle(
-                                          fontSize: 30,
-                                          fontWeight: FontWeight.w900,
-                                          color: visual.isInvalid
-                                              ? AppTokens.expense
-                                              : accent.primary,
-                                        )),
-                                  ),
-                                  const SizedBox(height: 4),
+                                  _vaultSheetHeader(ctx, 'Rút tiền về ví',
+                                      enabled: !isSubmitting),
+                                  const SizedBox(height: 6),
                                   CurrencyText(
-                                    'Số dư tối đa trong hũ: ${_formatCurrency(goal.currentAmount)}',
+                                    'Nguồn: ${goal.icon} ${goal.title} (Có: ${_formatCurrency(goal.currentAmount)})',
                                     style: TextStyle(
-                                        fontSize: 11,
+                                        fontSize: 12,
                                         color: scheme.onSurfaceVariant),
                                   ),
-                                ],
-                              ),
-                            ),
-                          ),
+                                  const SizedBox(height: 18),
 
-                          if (errorMessage != null) ...[
-                            const SizedBox(height: 8),
-                            Text(
-                              errorMessage!,
-                              style: const TextStyle(
-                                  fontSize: 11,
-                                  color: Colors.redAccent,
-                                  fontWeight: FontWeight.bold),
-                            ),
-                          ],
-
-                          const SizedBox(height: 12),
-
-                          // NÚT CHỌN RÚT TOÀN BỘ (RÚT HẾT)
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              InkWell(
-                                onTap: () {
-                                  HapticFeedback.selectionClick();
-                                  setSheetState(() {
-                                    enteredAmountStr =
-                                        goal.currentAmount.toInt().toString();
-                                    errorMessage = null;
-                                    amountValidation.clear();
-                                  });
-                                },
-                                borderRadius: BorderRadius.circular(10),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 12, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    color:
-                                        accent.primary.withValues(alpha: 0.2),
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(
-                                        color: accent.primary
-                                            .withValues(alpha: 0.4)),
+                                  // CHỌN VÍ NHẬN TIỀN
+                                  Text(
+                                    'Chuyển tiền vào ví',
+                                    style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w800,
+                                        color: scheme.onSurfaceVariant),
                                   ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(Icons.all_inclusive_rounded,
-                                          size: 14, color: accent.primary),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        'Rút hết số dư',
-                                        style: TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w800,
-                                            color: accent.primary),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-
-                          const SizedBox(height: 14),
-
-                          // BÀN PHÍM NUMPAD TÍCH HỢP
-                          _buildInlineNumpad(
-                            context: context,
-                            onPress: (digit) {
-                              setSheetState(() {
-                                if (enteredAmountStr.length < 11) {
-                                  enteredAmountStr += digit;
-                                  errorMessage = null;
-                                  amountValidation.clear();
-                                }
-                              });
-                            },
-                            onBackspace: () {
-                              setSheetState(() {
-                                if (enteredAmountStr.isNotEmpty) {
-                                  enteredAmountStr = enteredAmountStr.substring(
-                                      0, enteredAmountStr.length - 1);
-                                  errorMessage = null;
-                                  amountValidation.clear();
-                                }
-                              });
-                            },
-                            onClear: () {
-                              setSheetState(() {
-                                enteredAmountStr = '';
-                                errorMessage = null;
-                                amountValidation.clear();
-                              });
-                            },
-                          ),
-
-                          const SizedBox(height: 18),
-
-                          // NÚT XÁC NHẬN RÚT TIỀN
-                          SizedBox(
-                            width: double.infinity,
-                            height: 48,
-                            child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: accent.primary,
-                                foregroundColor: scheme.onPrimary,
-                                elevation: 0,
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16)),
-                              ),
-                              onPressed: (isSubmitting ||
-                                      amount <= 0 ||
-                                      selectedWalletId == null)
-                                  ? null
-                                  : () async {
-                                      if (amount > goal.currentAmount) {
-                                        amountValidation.reject();
+                                  const SizedBox(height: 8),
+                                  FlowyDropdown<String>(
+                                    value: selectedWalletId,
+                                    dropdownColor: inputFill,
+                                    isExpanded: true,
+                                    icon: Icon(
+                                        Icons.keyboard_arrow_down_rounded,
+                                        color: scheme.onSurfaceVariant),
+                                    items: walletPickerItems(wallets),
+                                    itemsStream: db
+                                        .watchAllWallets()
+                                        .map(walletPickerItems),
+                                    title: 'Chuyển vào ví',
+                                    onChanged: (val) {
+                                      if (val != null) {
                                         setSheetState(() {
-                                          errorMessage =
-                                              'Số tiền rút vượt quá số dư trong hũ (${_formatCurrency(goal.currentAmount)})!';
-                                        });
-                                        return;
-                                      }
-
-                                      setSheetState(() => isSubmitting = true);
-                                      try {
-                                        await db.withdrawFromGoal(
-                                          goalId: goal.id,
-                                          walletId: selectedWalletId!,
-                                          amount: amount,
-                                        );
-                                        if (context.mounted) {
-                                          AppFeedback.showSuccess(
-                                            context,
-                                            'Đã rút thành công ${_formatCurrency(amount)} về ví',
-                                          );
-                                        }
-                                        if (sheetCtx.mounted) {
-                                          Navigator.of(sheetCtx).pop();
-                                        }
-                                      } catch (e) {
-                                        setSheetState(() {
-                                          isSubmitting = false;
-                                          errorMessage = 'Lỗi rút tiền: $e';
+                                          selectedWalletId = val;
+                                          errorMessage = null;
+                                          amountValidation.clear();
                                         });
                                       }
                                     },
-                              child: isSubmitting
-                                  ? SizedBox(
-                                      width: 20,
-                                      height: 20,
-                                      child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          color: scheme.onPrimary))
-                                  : const Text('Xác nhận rút tiền',
-                                      style: TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w800)),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ));
+                                  ),
+
+                                  const SizedBox(height: 18),
+
+                                  // Ô HIỂN THỊ SỐ TIỀN RÚT
+                                  AppValidationFeedback(
+                                    controller: amountValidation,
+                                    builder: (context, visual) => Container(
+                                      width: double.infinity,
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 16, horizontal: 16),
+                                      decoration: BoxDecoration(
+                                        color: inputFill,
+                                        borderRadius: BorderRadius.circular(20),
+                                        boxShadow: [
+                                          BoxShadow(
+                                              color: accent.primary
+                                                  .withValues(alpha: .04),
+                                              blurRadius: 10,
+                                              offset: const Offset(0, 3))
+                                        ],
+                                        border: Border.all(
+                                          color: visual.borderColor(
+                                            accent.primary
+                                                .withValues(alpha: 0.35),
+                                          ),
+                                          width: visual.isInvalid ? 1.8 : 1.2,
+                                        ),
+                                      ),
+                                      child: Column(
+                                        children: [
+                                          Text(
+                                            enteredAmountStr.isEmpty
+                                                ? '0 ₫'
+                                                : _formatCurrency(amount),
+                                            style: currencyTextStyle(
+                                                context,
+                                                TextStyle(
+                                                  fontSize: 30,
+                                                  fontWeight: FontWeight.w900,
+                                                  color: visual.isInvalid
+                                                      ? AppTokens.expense
+                                                      : accent.primary,
+                                                )),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          CurrencyText(
+                                            'Số dư tối đa trong hũ: ${_formatCurrency(goal.currentAmount)}',
+                                            style: TextStyle(
+                                                fontSize: 11,
+                                                color: scheme.onSurfaceVariant),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+
+                                  if (errorMessage != null) ...[
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      errorMessage!,
+                                      style: const TextStyle(
+                                          fontSize: 11,
+                                          color: Colors.redAccent,
+                                          fontWeight: FontWeight.bold),
+                                    ),
+                                  ],
+
+                                  const SizedBox(height: 12),
+
+                                  // NÚT CHỌN RÚT TOÀN BỘ (RÚT HẾT)
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.end,
+                                    children: [
+                                      InkWell(
+                                        onTap: () {
+                                          HapticFeedback.selectionClick();
+                                          setSheetState(() {
+                                            enteredAmountStr = goal
+                                                .currentAmount
+                                                .toInt()
+                                                .toString();
+                                            errorMessage = null;
+                                            amountValidation.clear();
+                                          });
+                                        },
+                                        borderRadius: BorderRadius.circular(10),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 12, vertical: 6),
+                                          decoration: BoxDecoration(
+                                            color: accent.primary
+                                                .withValues(alpha: 0.2),
+                                            borderRadius:
+                                                BorderRadius.circular(10),
+                                            border: Border.all(
+                                                color: accent.primary
+                                                    .withValues(alpha: 0.4)),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(Icons.all_inclusive_rounded,
+                                                  size: 14,
+                                                  color: accent.primary),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                'Rút hết số dư',
+                                                style: TextStyle(
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.w800,
+                                                    color: accent.primary),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+
+                                  const SizedBox(height: 14),
+
+                                  // BÀN PHÍM NUMPAD TÍCH HỢP
+                                  _buildInlineNumpad(
+                                    context: context,
+                                    onPress: (digit) {
+                                      setSheetState(() {
+                                        if (enteredAmountStr.length < 11) {
+                                          enteredAmountStr += digit;
+                                          errorMessage = null;
+                                          amountValidation.clear();
+                                        }
+                                      });
+                                    },
+                                    onBackspace: () {
+                                      setSheetState(() {
+                                        if (enteredAmountStr.isNotEmpty) {
+                                          enteredAmountStr =
+                                              enteredAmountStr.substring(0,
+                                                  enteredAmountStr.length - 1);
+                                          errorMessage = null;
+                                          amountValidation.clear();
+                                        }
+                                      });
+                                    },
+                                    onClear: () {
+                                      setSheetState(() {
+                                        enteredAmountStr = '';
+                                        errorMessage = null;
+                                        amountValidation.clear();
+                                      });
+                                    },
+                                  ),
+
+                                  const SizedBox(height: 18),
+
+                                  // NÚT XÁC NHẬN RÚT TIỀN
+                                  SizedBox(
+                                    width: double.infinity,
+                                    height: 48,
+                                    child: ElevatedButton(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: accent.primary,
+                                        foregroundColor: scheme.onPrimary,
+                                        elevation: 0,
+                                        shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(16)),
+                                      ),
+                                      onPressed: (isSubmitting ||
+                                              amount <= 0 ||
+                                              selectedWalletId == null)
+                                          ? null
+                                          : () async {
+                                              if (amount > goal.currentAmount) {
+                                                amountValidation.reject();
+                                                setSheetState(() {
+                                                  errorMessage =
+                                                      'Số tiền rút vượt quá số dư trong hũ (${_formatCurrency(goal.currentAmount)})!';
+                                                });
+                                                return;
+                                              }
+
+                                              setSheetState(
+                                                  () => isSubmitting = true);
+                                              try {
+                                                await db.withdrawFromGoal(
+                                                  goalId: goal.id,
+                                                  walletId: selectedWalletId!,
+                                                  amount: amount,
+                                                );
+                                                if (context.mounted) {
+                                                  AppFeedback.showSuccess(
+                                                    context,
+                                                    'Đã rút thành công ${_formatCurrency(amount)} về ví',
+                                                  );
+                                                }
+                                                if (sheetCtx.mounted) {
+                                                  Navigator.of(sheetCtx).pop();
+                                                }
+                                              } catch (e) {
+                                                setSheetState(() {
+                                                  isSubmitting = false;
+                                                  errorMessage =
+                                                      'Lỗi rút tiền: $e';
+                                                });
+                                              }
+                                            },
+                                      child: isSubmitting
+                                          ? SizedBox(
+                                              width: 20,
+                                              height: 20,
+                                              child: CircularProgressIndicator(
+                                                  strokeWidth: 2,
+                                                  color: scheme.onPrimary))
+                                          : const Text('Xác nhận rút tiền',
+                                              style: TextStyle(
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.w800)),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ))));
               },
             );
           },
@@ -1563,6 +1566,8 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
     final targetValidation = AppValidationFeedbackController();
     final accent = ref.read(accentPresetProvider);
     final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final inputFill = isDark ? const Color(0xFF1A212D) : Colors.white;
 
     final icons = _vaultGoalIcons.keys.toList(growable: false);
     final colors = [
@@ -1574,405 +1579,445 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
     AppAnimationPolicy.showFluidSheet<void>(
       context: context,
       mode: FluidSheetMode.scrollable,
-      backgroundColor: scheme.surface,
-      shape: RoundedRectangleBorder(
-        side: BorderSide(
-            color: scheme.outlineVariant.withValues(alpha: .4), width: .8),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-      ),
+      enableBlur: true,
+      backgroundColor: Colors.transparent,
       builder: (modalCtx, scrollController) {
         return StatefulBuilder(
           builder: (ctx, setModalState) {
-            return Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
-                left: 20,
-                right: 20,
-                top: 20,
-              ),
-              child: SingleChildScrollView(
-                controller: scrollController,
-                physics: const ClampingScrollPhysics(),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                      child: Container(
-                        width: 42,
-                        height: 4,
-                        decoration: BoxDecoration(
-                            color: scheme.onSurface.withValues(alpha: .24),
-                            borderRadius: BorderRadius.circular(2)),
+            return Material(
+                color: scheme.surface,
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(28)),
+                clipBehavior: Clip.antiAlias,
+                child: SafeArea(
+                    top: false,
+                    child: Padding(
+                      padding: EdgeInsets.only(
+                        bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+                        left: 20,
+                        right: 20,
+                        top: 16,
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      existingGoal == null
-                          ? 'Tạo Mục Tiêu Tích Lũy'
-                          : 'Chỉnh Sửa Mục Tiêu',
-                      style: TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w800,
-                          color: scheme.onSurface),
-                    ),
-                    const SizedBox(height: 18),
+                      child: SingleChildScrollView(
+                        controller: scrollController,
+                        physics: const ClampingScrollPhysics(),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _vaultSheetHeader(
+                                ctx,
+                                existingGoal == null
+                                    ? 'Tạo mục tiêu tích lũy'
+                                    : 'Chỉnh sửa mục tiêu'),
+                            const SizedBox(height: 18),
 
-                    // TÊN MỤC TIÊU
-                    Text('TÊN MỤC TIÊU',
-                        style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                            color: scheme.onSurfaceVariant)),
-                    const SizedBox(height: 6),
-                    AppValidationFeedback(
-                      controller: titleValidation,
-                      builder: (context, visual) => TextField(
-                        controller: titleController,
-                        onChanged: (_) => titleValidation.clear(),
-                        style: TextStyle(color: scheme.onSurface, fontSize: 14),
-                        decoration: InputDecoration(
-                          hintText:
-                              'Ví dụ: Đàn Guitar, Mua MacBook, Quỹ khẩn cấp',
-                          hintStyle: TextStyle(
-                              color: scheme.onSurfaceVariant, fontSize: 13),
-                          filled: true,
-                          fillColor: scheme.surfaceContainerHighest,
-                          contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 12),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            borderSide: BorderSide(
-                              color: visual.borderColor(
-                                  scheme.outlineVariant.withValues(alpha: .4)),
+                            // TÊN MỤC TIÊU
+                            Text('TÊN MỤC TIÊU',
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w800,
+                                    color: scheme.onSurfaceVariant)),
+                            const SizedBox(height: 6),
+                            AppValidationFeedback(
+                              controller: titleValidation,
+                              builder: (context, visual) => _VaultInputFocus(
+                                  color: visual.isInvalid
+                                      ? AppTokens.expense
+                                      : accent.primary,
+                                  child: TextField(
+                                    controller: titleController,
+                                    onChanged: (_) => titleValidation.clear(),
+                                    style: TextStyle(
+                                        color: scheme.onSurface,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w700),
+                                    decoration: InputDecoration(
+                                      hintText:
+                                          'Ví dụ: Đàn Guitar, Mua MacBook, Quỹ khẩn cấp',
+                                      hintStyle: TextStyle(
+                                          color: scheme.onSurfaceVariant,
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w400),
+                                      filled: true,
+                                      fillColor: inputFill,
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                              horizontal: 16, vertical: 12),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(16),
+                                        borderSide: BorderSide(
+                                          color: visual.borderColor(
+                                              accent.primary.withValues(
+                                                  alpha: isDark ? .25 : .20)),
+                                        ),
+                                      ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(16),
+                                        borderSide: BorderSide(
+                                          color: visual.borderColor(
+                                              accent.primary.withValues(
+                                                  alpha: isDark ? .25 : .20)),
+                                        ),
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(16),
+                                        borderSide: BorderSide(
+                                          color: visual.isInvalid
+                                              ? AppTokens.expense
+                                              : accent.primary,
+                                          width: visual.isInvalid ? 1.8 : 1.5,
+                                        ),
+                                      ),
+                                    ),
+                                  )),
                             ),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            borderSide: BorderSide(
-                              color: visual.borderColor(
-                                  scheme.outlineVariant.withValues(alpha: .4)),
-                            ),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            borderSide: BorderSide(
-                              color: visual.isInvalid
-                                  ? AppTokens.expense
-                                  : accent.primary,
-                              width: visual.isInvalid ? 1.8 : 1.4,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
 
-                    const SizedBox(height: 14),
+                            const SizedBox(height: 14),
 
-                    // CHỌN BIỂU TƯỢNG EMOJI
-                    Text('CHỌN BIỂU TƯỢNG',
-                        style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                            color: scheme.onSurfaceVariant)),
-                    const SizedBox(height: 8),
-                    SizedBox(
-                      height: 44,
-                      child: ListView.separated(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: icons.length,
-                        separatorBuilder: (_, __) => const SizedBox(width: 8),
-                        itemBuilder: (context, i) {
-                          final icon = icons[i];
-                          final isSelected = icon == selectedIcon;
-                          return InkWell(
-                            onTap: () {
-                              HapticFeedback.selectionClick();
-                              setModalState(() => selectedIcon = icon);
-                            },
-                            borderRadius: BorderRadius.circular(12),
-                            child: Container(
-                              width: 44,
+                            // CHỌN BIỂU TƯỢNG EMOJI
+                            Text('CHỌN BIỂU TƯỢNG',
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w800,
+                                    color: scheme.onSurfaceVariant)),
+                            const SizedBox(height: 8),
+                            SizedBox(
                               height: 44,
-                              decoration: BoxDecoration(
-                                color: isSelected
-                                    ? accent.primary
-                                    : scheme.surfaceContainerHighest,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                    color: isSelected
-                                        ? accent.primary
-                                        : Colors.transparent),
-                              ),
-                              alignment: Alignment.center,
-                              child: Icon(
-                                _resolveGoalIcon(icon),
-                                size: 20,
-                                color: isSelected
-                                    ? scheme.onPrimary
-                                    : scheme.onSurfaceVariant,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-
-                    const SizedBox(height: 14),
-
-                    // CHỌN MÀU SẮC
-                    Text('CHỌN MÀU CHỦ ĐẠO',
-                        style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                            color: scheme.onSurfaceVariant)),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: colors.map((hex) {
-                        final isSelected = hex == selectedColor;
-                        final color = _parseColor(hex);
-                        return GestureDetector(
-                          onTap: () {
-                            HapticFeedback.selectionClick();
-                            setModalState(() => selectedColor = hex);
-                          },
-                          child: Container(
-                            margin: const EdgeInsets.only(right: 12),
-                            width: 32,
-                            height: 32,
-                            decoration: BoxDecoration(
-                              color: color,
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                  color: isSelected
-                                      ? scheme.onSurface
-                                      : Colors.transparent,
-                                  width: 2),
-                            ),
-                            child: isSelected
-                                ? Icon(Icons.check,
-                                    size: 16,
-                                    color: _parseColor(hex).computeLuminance() >
-                                            .45
-                                        ? Colors.black
-                                        : Colors.white)
-                                : null,
-                          ),
-                        );
-                      }).toList(),
-                    ),
-
-                    const SizedBox(height: 14),
-
-                    // SỐ TIỀN MỤC TIÊU
-                    Text('SỐ TIỀN MỤC TIÊU (₫)',
-                        style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                            color: scheme.onSurfaceVariant)),
-                    const SizedBox(height: 6),
-                    AppValidationFeedback(
-                      controller: targetValidation,
-                      builder: (context, visual) => TextField(
-                        controller: targetController,
-                        onChanged: (_) => targetValidation.clear(),
-                        keyboardType: TextInputType.number,
-                        style: TextStyle(
-                          color: visual.isInvalid
-                              ? AppTokens.expense
-                              : scheme.onSurface,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        decoration: InputDecoration(
-                          hintText: 'Ví dụ: 25000000',
-                          hintStyle: TextStyle(
-                              color: scheme.onSurfaceVariant, fontSize: 14),
-                          filled: true,
-                          fillColor: scheme.surfaceContainerHighest,
-                          contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 12),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            borderSide: BorderSide(
-                              color: visual.borderColor(
-                                  scheme.outlineVariant.withValues(alpha: .4)),
-                            ),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            borderSide: BorderSide(
-                              color: visual.borderColor(
-                                  scheme.outlineVariant.withValues(alpha: .4)),
-                            ),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            borderSide: BorderSide(
-                              color: visual.isInvalid
-                                  ? AppTokens.expense
-                                  : accent.primary,
-                              width: visual.isInvalid ? 1.8 : 1.4,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 14),
-
-                    // CHỌN HẠN CHÓT (TARGET DATE)
-                    Text('HẠN CHÓT ĐẠT MỤC TIÊU (TÙY CHỌN)',
-                        style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                            color: scheme.onSurfaceVariant)),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 12),
-                            decoration: BoxDecoration(
-                              color: scheme.surfaceContainerHighest,
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: Text(
-                              selectedTargetDate != null
-                                  ? DateFormat('dd/MM/yyyy')
-                                      .format(selectedTargetDate!)
-                                  : 'Chưa đặt hạn chót',
-                              style: TextStyle(
-                                color: selectedTargetDate != null
-                                    ? scheme.onSurface
-                                    : scheme.onSurfaceVariant,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
+                              child: ListView.separated(
+                                scrollDirection: Axis.horizontal,
+                                itemCount: icons.length,
+                                separatorBuilder: (_, __) =>
+                                    const SizedBox(width: 8),
+                                itemBuilder: (context, i) {
+                                  final icon = icons[i];
+                                  final isSelected = icon == selectedIcon;
+                                  return InkWell(
+                                    onTap: () {
+                                      HapticFeedback.selectionClick();
+                                      setModalState(() => selectedIcon = icon);
+                                    },
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: Container(
+                                      width: 44,
+                                      height: 44,
+                                      decoration: BoxDecoration(
+                                        color: isSelected
+                                            ? accent.primary
+                                            : (isDark
+                                                ? Colors.white
+                                                    .withValues(alpha: .05)
+                                                : Colors.white),
+                                        borderRadius: BorderRadius.circular(12),
+                                        boxShadow: isSelected
+                                            ? [
+                                                BoxShadow(
+                                                    color: accent.primary
+                                                        .withValues(alpha: .35),
+                                                    blurRadius: 8,
+                                                    offset: const Offset(0, 3))
+                                              ]
+                                            : null,
+                                        border: Border.all(
+                                            width: .8,
+                                            color: isSelected
+                                                ? accent.primary
+                                                : (isDark
+                                                    ? AppTokens.darkBorder
+                                                    : AppTokens.lightBorder)),
+                                      ),
+                                      alignment: Alignment.center,
+                                      child: Icon(
+                                        _resolveGoalIcon(icon),
+                                        size: isSelected ? 20 : 18,
+                                        color: isSelected
+                                            ? Colors.white
+                                            : (isDark
+                                                ? AppTokens.darkMuted
+                                                : AppTokens.lightMuted),
+                                      ),
+                                    ),
+                                  );
+                                },
                               ),
                             ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        IconButton(
-                          style: IconButton.styleFrom(
-                              backgroundColor: scheme.surfaceContainerHighest),
-                          icon: Icon(Icons.calendar_month_rounded,
-                              color: accent.primary),
-                          onPressed: () async {
-                            final picked = await showDatePicker(
-                              context: context,
-                              initialDate: selectedTargetDate ??
-                                  DateTime.now().add(const Duration(days: 90)),
-                              firstDate: DateTime.now(),
-                              lastDate: DateTime.now()
-                                  .add(const Duration(days: 3650)),
-                              builder: (ctx, child) {
-                                return Theme(
-                                  data: Theme.of(ctx).copyWith(
-                                    colorScheme: scheme.copyWith(
-                                      primary: accent.primary,
-                                      surface: scheme.surfaceContainerHighest,
+
+                            const SizedBox(height: 14),
+
+                            // CHỌN MÀU SẮC
+                            Text('CHỌN MÀU CHỦ ĐẠO',
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w800,
+                                    color: scheme.onSurfaceVariant)),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: colors.map((hex) {
+                                final isSelected = hex == selectedColor;
+                                final color = _parseColor(hex);
+                                return GestureDetector(
+                                  onTap: () {
+                                    HapticFeedback.selectionClick();
+                                    setModalState(() => selectedColor = hex);
+                                  },
+                                  child: Container(
+                                    margin: const EdgeInsets.only(right: 12),
+                                    width: 32,
+                                    height: 32,
+                                    decoration: BoxDecoration(
+                                      color: color,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                          color: isSelected
+                                              ? scheme.onSurface
+                                              : Colors.transparent,
+                                          width: 2),
+                                    ),
+                                    child: isSelected
+                                        ? Icon(Icons.check,
+                                            size: 16,
+                                            color: _parseColor(hex)
+                                                        .computeLuminance() >
+                                                    .45
+                                                ? Colors.black
+                                                : Colors.white)
+                                        : null,
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+
+                            const SizedBox(height: 14),
+
+                            // SỐ TIỀN MỤC TIÊU
+                            Text('SỐ TIỀN MỤC TIÊU (₫)',
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w800,
+                                    color: scheme.onSurfaceVariant)),
+                            const SizedBox(height: 6),
+                            AppValidationFeedback(
+                              controller: targetValidation,
+                              builder: (context, visual) => _VaultInputFocus(
+                                  color: visual.isInvalid
+                                      ? AppTokens.expense
+                                      : accent.primary,
+                                  child: TextField(
+                                    controller: targetController,
+                                    onChanged: (_) => targetValidation.clear(),
+                                    keyboardType: TextInputType.number,
+                                    style: TextStyle(
+                                      color: visual.isInvalid
+                                          ? AppTokens.expense
+                                          : scheme.onSurface,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                    decoration: InputDecoration(
+                                      hintText: 'Ví dụ: 25000000',
+                                      hintStyle: TextStyle(
+                                          color: scheme.onSurfaceVariant,
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w400),
+                                      filled: true,
+                                      fillColor: inputFill,
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                              horizontal: 16, vertical: 12),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(16),
+                                        borderSide: BorderSide(
+                                          color: visual.borderColor(
+                                              accent.primary.withValues(
+                                                  alpha: isDark ? .25 : .20)),
+                                        ),
+                                      ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(16),
+                                        borderSide: BorderSide(
+                                          color: visual.borderColor(
+                                              accent.primary.withValues(
+                                                  alpha: isDark ? .25 : .20)),
+                                        ),
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(16),
+                                        borderSide: BorderSide(
+                                          color: visual.isInvalid
+                                              ? AppTokens.expense
+                                              : accent.primary,
+                                          width: visual.isInvalid ? 1.8 : 1.5,
+                                        ),
+                                      ),
+                                    ),
+                                  )),
+                            ),
+
+                            const SizedBox(height: 14),
+
+                            // CHỌN HẠN CHÓT (TARGET DATE)
+                            Text('HẠN CHÓT ĐẠT MỤC TIÊU (TÙY CHỌN)',
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w800,
+                                    color: scheme.onSurfaceVariant)),
+                            const SizedBox(height: 6),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 14, vertical: 12),
+                                    decoration: BoxDecoration(
+                                      color: inputFill,
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(
+                                          color: accent.primary.withValues(
+                                              alpha: isDark ? .25 : .20)),
+                                    ),
+                                    child: Text(
+                                      selectedTargetDate != null
+                                          ? DateFormat('dd/MM/yyyy')
+                                              .format(selectedTargetDate!)
+                                          : 'Chưa đặt hạn chót',
+                                      style: TextStyle(
+                                        color: selectedTargetDate != null
+                                            ? scheme.onSurface
+                                            : scheme.onSurfaceVariant,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                     ),
                                   ),
-                                  child: child!,
-                                );
-                              },
-                            );
-                            if (picked != null) {
-                              setModalState(() => selectedTargetDate = picked);
-                            }
-                          },
-                        ),
-                        if (selectedTargetDate != null)
-                          IconButton(
-                            icon: Icon(Icons.clear_rounded,
-                                color: scheme.onSurfaceVariant, size: 18),
-                            onPressed: () =>
-                                setModalState(() => selectedTargetDate = null),
-                          ),
-                      ],
-                    ),
+                                ),
+                                const SizedBox(width: 8),
+                                IconButton(
+                                  style: IconButton.styleFrom(
+                                      backgroundColor: accent.primary
+                                          .withValues(alpha: .12)),
+                                  icon: Icon(Icons.calendar_month_rounded,
+                                      color: accent.primary),
+                                  onPressed: () async {
+                                    final picked = await showDatePicker(
+                                      context: context,
+                                      initialDate: selectedTargetDate ??
+                                          DateTime.now()
+                                              .add(const Duration(days: 90)),
+                                      firstDate: DateTime.now(),
+                                      lastDate: DateTime.now()
+                                          .add(const Duration(days: 3650)),
+                                      builder: (ctx, child) {
+                                        return Theme(
+                                          data: Theme.of(ctx).copyWith(
+                                            colorScheme: scheme.copyWith(
+                                              primary: accent.primary,
+                                              surface: inputFill,
+                                            ),
+                                          ),
+                                          child: child!,
+                                        );
+                                      },
+                                    );
+                                    if (picked != null) {
+                                      setModalState(
+                                          () => selectedTargetDate = picked);
+                                    }
+                                  },
+                                ),
+                                if (selectedTargetDate != null)
+                                  IconButton(
+                                    icon: Icon(Icons.clear_rounded,
+                                        color: scheme.onSurfaceVariant,
+                                        size: 18),
+                                    onPressed: () => setModalState(
+                                        () => selectedTargetDate = null),
+                                  ),
+                              ],
+                            ),
 
-                    const SizedBox(height: 24),
+                            const SizedBox(height: 24),
 
-                    // NÚT LƯU
-                    SizedBox(
-                      width: double.infinity,
-                      height: 50,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: accent.primary,
-                          foregroundColor: scheme.onPrimary,
-                          elevation: 2,
-                          shadowColor: accent.primary.withValues(alpha: .2),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(18)),
-                        ),
-                        onPressed: () async {
-                          final title = titleController.text.trim();
-                          final targetAmount =
-                              double.tryParse(targetController.text.trim()) ??
-                                  0.0;
+                            // NÚT LƯU
+                            SizedBox(
+                              width: double.infinity,
+                              height: 50,
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: accent.primary,
+                                  foregroundColor: scheme.onPrimary,
+                                  elevation: 2,
+                                  shadowColor:
+                                      accent.primary.withValues(alpha: .2),
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(18)),
+                                ),
+                                onPressed: () async {
+                                  final title = titleController.text.trim();
+                                  final targetAmount = double.tryParse(
+                                          targetController.text.trim()) ??
+                                      0.0;
 
-                          final titleInvalid = title.isEmpty;
-                          final targetInvalid = targetAmount <= 0;
-                          if (titleInvalid || targetInvalid) {
-                            if (titleInvalid) {
-                              titleValidation.reject(
-                                emitHaptic: !targetInvalid,
-                              );
-                            }
-                            if (targetInvalid) {
-                              targetValidation.reject();
-                            }
-                            return;
-                          }
+                                  final titleInvalid = title.isEmpty;
+                                  final targetInvalid = targetAmount <= 0;
+                                  if (titleInvalid || targetInvalid) {
+                                    if (titleInvalid) {
+                                      titleValidation.reject(
+                                        emitHaptic: !targetInvalid,
+                                      );
+                                    }
+                                    if (targetInvalid) {
+                                      targetValidation.reject();
+                                    }
+                                    return;
+                                  }
 
-                          final db = ref.read(databaseProvider);
-                          if (existingGoal == null) {
-                            await db.createSavingsGoal(
-                              id: 'goal_${DateTime.now().millisecondsSinceEpoch}',
-                              title: title,
-                              icon: selectedIcon,
-                              colorHex: selectedColor,
-                              targetAmount: targetAmount,
-                              targetDate: selectedTargetDate,
-                            );
-                          } else {
-                            await db.updateSavingsGoal(
-                              id: existingGoal.id,
-                              title: title,
-                              icon: selectedIcon,
-                              colorHex: selectedColor,
-                              targetAmount: targetAmount,
-                              targetDate: selectedTargetDate,
-                            );
-                          }
+                                  final db = ref.read(databaseProvider);
+                                  if (existingGoal == null) {
+                                    await db.createSavingsGoal(
+                                      id: 'goal_${DateTime.now().millisecondsSinceEpoch}',
+                                      title: title,
+                                      icon: selectedIcon,
+                                      colorHex: selectedColor,
+                                      targetAmount: targetAmount,
+                                      targetDate: selectedTargetDate,
+                                    );
+                                  } else {
+                                    await db.updateSavingsGoal(
+                                      id: existingGoal.id,
+                                      title: title,
+                                      icon: selectedIcon,
+                                      colorHex: selectedColor,
+                                      targetAmount: targetAmount,
+                                      targetDate: selectedTargetDate,
+                                    );
+                                  }
 
-                          if (context.mounted) {
-                            AppFeedback.showSuccess(
-                              context,
-                              existingGoal == null
-                                  ? '✓ Đã tạo hũ tiết kiệm "$title"'
-                                  : '✓ Đã cập nhật hũ tiết kiệm "$title"',
-                            );
-                          }
-                          if (modalCtx.mounted) Navigator.of(modalCtx).pop();
-                        },
-                        child: Text(
-                          existingGoal == null
-                              ? 'Tạo Hũ Tiết Kiệm'
-                              : 'Lưu Thay Đổi',
-                          style: const TextStyle(
-                              fontSize: 14, fontWeight: FontWeight.w800),
+                                  if (context.mounted) {
+                                    AppFeedback.showSuccess(
+                                      context,
+                                      existingGoal == null
+                                          ? '✓ Đã tạo hũ tiết kiệm "$title"'
+                                          : '✓ Đã cập nhật hũ tiết kiệm "$title"',
+                                    );
+                                  }
+                                  if (modalCtx.mounted) {
+                                    Navigator.of(modalCtx).pop();
+                                  }
+                                },
+                                child: Text(
+                                  existingGoal == null
+                                      ? 'Tạo Hũ Tiết Kiệm'
+                                      : 'Lưu Thay Đổi',
+                                  style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w800),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ),
-                  ],
-                ),
-              ),
-            );
+                    )));
           },
         );
       },
@@ -1989,19 +2034,23 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
   // ============================================================================
   void _showDeleteGoalDialog(
       BuildContext context, SavingsGoal goal, AppDatabase db) {
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final inputFill = isDark ? const Color(0xFF1A212D) : Colors.white;
     if (goal.currentAmount <= 0) {
       showDialog<void>(
         context: context,
         builder: (ctx) => AlertDialog(
-          backgroundColor: const Color(0xFF1F2937),
-          title: const Text('Xác nhận xóa hũ',
-              style: TextStyle(color: Colors.white, fontSize: 16)),
+          backgroundColor: scheme.surface,
+          title: Text('Xác nhận xóa hũ',
+              style: TextStyle(color: scheme.onSurface, fontSize: 16)),
           content: Text('Bạn có chắc muốn xóa hũ "${goal.title}" không?',
-              style: const TextStyle(color: Colors.white70, fontSize: 13)),
+              style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 13)),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Hủy', style: TextStyle(color: Colors.white54)),
+              child:
+                  Text('Hủy', style: TextStyle(color: scheme.onSurfaceVariant)),
             ),
             TextButton(
               onPressed: () async {
@@ -2034,13 +2083,13 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
             return StatefulBuilder(
               builder: (ctx, setDialogState) {
                 return AlertDialog(
-                  backgroundColor: const Color(0xFF1F2937),
+                  backgroundColor: scheme.surface,
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(20)),
-                  title: const Text(
+                  title: Text(
                     'Hoàn trả số dư trước khi xóa',
                     style: TextStyle(
-                        color: Colors.white,
+                        color: scheme.onSurface,
                         fontSize: 16,
                         fontWeight: FontWeight.w800),
                   ),
@@ -2050,46 +2099,33 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                     children: [
                       CurrencyText(
                         'Hũ này đang có số dư ${_formatCurrency(goal.currentAmount)}. Vui lòng chọn ví để hoàn trả toàn bộ số tiền này trước khi xóa hũ:',
-                        style: const TextStyle(
-                            color: Colors.white70, fontSize: 13, height: 1.4),
+                        style: TextStyle(
+                            color: scheme.onSurfaceVariant,
+                            fontSize: 13,
+                            height: 1.4),
                       ),
                       const SizedBox(height: 14),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF111827),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.white12),
-                        ),
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<String>(
-                            value: refundWalletId,
-                            dropdownColor: const Color(0xFF111827),
-                            isExpanded: true,
-                            items: wallets.map((w) {
-                              return DropdownMenuItem<String>(
-                                value: w.id,
-                                child: Text(w.name,
-                                    style: const TextStyle(
-                                        color: Colors.white, fontSize: 13)),
-                              );
-                            }).toList(),
-                            onChanged: (val) {
-                              if (val != null) {
-                                setDialogState(() => refundWalletId = val);
-                              }
-                            },
-                          ),
-                        ),
+                      FlowyDropdown<String>(
+                        value: refundWalletId,
+                        dropdownColor: inputFill,
+                        isExpanded: true,
+                        items: walletPickerItems(wallets),
+                        itemsStream:
+                            db.watchAllWallets().map(walletPickerItems),
+                        title: 'Chuyển vào ví',
+                        onChanged: (val) {
+                          if (val != null) {
+                            setDialogState(() => refundWalletId = val);
+                          }
+                        },
                       ),
                     ],
                   ),
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.of(dialogCtx).pop(),
-                      child: const Text('Hủy',
-                          style: TextStyle(color: Colors.white54)),
+                      child: Text('Hủy',
+                          style: TextStyle(color: scheme.onSurfaceVariant)),
                     ),
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(
@@ -2109,9 +2145,9 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
                                 );
                               }
                             },
-                      child: const Text('Hoàn tiền & Xóa',
+                      child: Text('Hoàn tiền & Xóa',
                           style: TextStyle(
-                              color: Colors.white,
+                              color: scheme.onSurface,
                               fontWeight: FontWeight.bold)),
                     ),
                   ],
@@ -2172,8 +2208,6 @@ class _VaultDepositSheetState extends ConsumerState<_VaultDepositSheet> {
     final sheetSurface =
         isDark ? const Color(0xFF111827) : const Color(0xFFF8FAFC);
     final cardSurface = isDark ? const Color(0xFF1E2430) : Colors.white;
-    final borderColor =
-        isDark ? const Color(0xFF2E384D) : const Color(0xFFE2E8F0);
     final primaryText = isDark ? Colors.white : const Color(0xFF0F172A);
     final mutedText =
         isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
@@ -2293,14 +2327,6 @@ class _VaultDepositSheetState extends ConsumerState<_VaultDepositSheet> {
                         12,
                         10,
                       ),
-                      decoration: BoxDecoration(
-                        color: cardSurface,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: borderColor,
-                          width: 0.8,
-                        ),
-                      ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -2314,86 +2340,37 @@ class _VaultDepositSheetState extends ConsumerState<_VaultDepositSheet> {
                             ),
                           ),
                           const SizedBox(height: 3),
-                          DropdownButtonHideUnderline(
-                            child: DropdownButton<String>(
-                              value: selectedWalletId,
-                              dropdownColor: isDark
-                                  ? const Color(0xFF1E2430)
-                                  : Colors.white,
-                              isExpanded: true,
-                              borderRadius: BorderRadius.circular(16),
-                              icon: Icon(
-                                Icons.chevron_right_rounded,
-                                color: mutedText,
-                              ),
-                              hint: Text(
-                                'Chọn nguồn tiền',
-                                style: theme.textTheme.bodyMedium?.copyWith(
-                                  color: mutedText,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              items: wallets.map((wallet) {
-                                return DropdownMenuItem<String>(
-                                  value: wallet.id,
-                                  child: Row(
-                                    children: [
-                                      Container(
-                                        width: 30,
-                                        height: 30,
-                                        decoration: BoxDecoration(
-                                          color: accent.primary
-                                              .withValues(alpha: 0.10),
-                                          borderRadius:
-                                              BorderRadius.circular(9),
-                                        ),
-                                        child: Icon(
-                                          Icons.account_balance_wallet_outlined,
-                                          size: 16,
-                                          color: accent.primary,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 9),
-                                      Expanded(
-                                        child: Text(
-                                          wallet.name,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: theme.textTheme.bodyMedium
-                                              ?.copyWith(
-                                            fontSize: 12.5,
-                                            fontWeight: FontWeight.w700,
-                                            color: primaryText,
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Flexible(
-                                        child: Text(
-                                          'Khả dụng: ${_formatCurrency(wallet.balance)}',
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: theme.textTheme.labelSmall
-                                              ?.copyWith(
-                                            fontSize: 10.5,
-                                            fontWeight: FontWeight.w700,
-                                            color: accent.primary,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              }).toList(),
-                              onChanged: (value) {
-                                if (value == null) return;
-                                setState(() {
-                                  selectedWalletId = value;
-                                  enteredAmountStr = '';
-                                  amountValidation.clear();
-                                });
-                              },
+                          FlowyDropdown<String>(
+                            value: selectedWalletId,
+                            dropdownColor:
+                                isDark ? const Color(0xFF1E2430) : Colors.white,
+                            isExpanded: true,
+                            borderRadius: BorderRadius.circular(16),
+                            icon: Icon(
+                              Icons.chevron_right_rounded,
+                              color: mutedText,
                             ),
+                            hint: Text(
+                              'Chọn nguồn tiền',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: mutedText,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            items: walletPickerItems(wallets),
+                            itemsStream: ref
+                                .read(databaseProvider)
+                                .watchAllWallets()
+                                .map(walletPickerItems),
+                            title: 'Chọn nguồn tiền',
+                            onChanged: (value) {
+                              if (value == null) return;
+                              setState(() {
+                                selectedWalletId = value;
+                                enteredAmountStr = '';
+                                amountValidation.clear();
+                              });
+                            },
                           ),
                         ],
                       ),
@@ -2409,10 +2386,17 @@ class _VaultDepositSheetState extends ConsumerState<_VaultDepositSheet> {
                         ),
                         decoration: BoxDecoration(
                           color: cardSurface,
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                                color: accent.primary.withValues(alpha: .04),
+                                blurRadius: 10,
+                                offset: const Offset(0, 3))
+                          ],
                           border: Border.all(
-                            color: visual.borderColor(borderColor),
-                            width: visual.isInvalid ? 1.8 : 0.8,
+                            color: visual.borderColor(
+                                accent.primary.withValues(alpha: .35)),
+                            width: visual.isInvalid ? 1.8 : 1.2,
                           ),
                         ),
                         child: Row(
@@ -2695,4 +2679,34 @@ Widget _buildInlineNumpad({
     horizontalPadding: 18,
     rowSpacing: 6,
   );
+}
+
+/// Focus glow follows the descendant input without owning its editing state.
+class _VaultInputFocus extends StatefulWidget {
+  const _VaultInputFocus({required this.color, required this.child});
+  final Color color;
+  final Widget child;
+  @override
+  State<_VaultInputFocus> createState() => _VaultInputFocusState();
+}
+
+class _VaultInputFocusState extends State<_VaultInputFocus> {
+  bool _focused = false;
+  @override
+  Widget build(BuildContext context) => Focus(
+        canRequestFocus: false,
+        onFocusChange: (value) => setState(() => _focused = value),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: _focused
+                  ? [
+                      BoxShadow(
+                          color: widget.color.withValues(alpha: .14),
+                          blurRadius: 4)
+                    ]
+                  : null),
+          child: widget.child,
+        ),
+      );
 }

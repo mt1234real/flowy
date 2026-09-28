@@ -1,3 +1,4 @@
+import '../../../widgets/flowy_selection_picker.dart';
 // ==============================================================================
 // File: lib/features/onboarding/widgets/step_wallet_widget.dart
 // Architecture: Onboarding Step 1 - Initial Wealth Source Setup
@@ -20,7 +21,6 @@ import 'package:intl/intl.dart';
 import '../../../theme/app_theme.dart';
 import '../controllers/onboarding_controller.dart';
 
-import '../../../widgets/sliding_segmented_bar.dart';
 class StepWalletWidget extends ConsumerStatefulWidget {
   final VoidCallback onNext;
   final VoidCallback onSkip;
@@ -50,10 +50,14 @@ class _StepWalletWidgetState extends ConsumerState<StepWalletWidget> {
     super.initState();
     final state = ref.read(onboardingControllerProvider);
     _cashController = TextEditingController(
-      text: state.cashBalance > 0 ? _formatter.format(state.cashBalance.round()) : '',
+      text: state.cashBalance > 0
+          ? _formatter.format(state.cashBalance.round())
+          : '',
     );
     _bankController = TextEditingController(
-      text: state.bankBalance > 0 ? _formatter.format(state.bankBalance.round()) : '',
+      text: state.bankBalance > 0
+          ? _formatter.format(state.bankBalance.round())
+          : '',
     );
     _extraWalletController = TextEditingController();
   }
@@ -66,7 +70,8 @@ class _StepWalletWidgetState extends ConsumerState<StepWalletWidget> {
     super.dispose();
   }
 
-  void _onAmountChanged(String val, void Function(double) updateCallback, TextEditingController controller) {
+  void _onAmountChanged(String val, void Function(double) updateCallback,
+      TextEditingController controller) {
     final cleanDigits = val.replaceAll(RegExp(r'[^0-9]'), '');
     if (cleanDigits.isEmpty) {
       updateCallback(0.0);
@@ -103,7 +108,8 @@ class _StepWalletWidgetState extends ConsumerState<StepWalletWidget> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: accent.primary.withValues(alpha: isDark ? 0.25 : 0.12),
                   borderRadius: BorderRadius.circular(10),
@@ -164,7 +170,9 @@ class _StepWalletWidgetState extends ConsumerState<StepWalletWidget> {
             onChanged: (val) {
               _onAmountChanged(
                 val,
-                    (amt) => ref.read(onboardingControllerProvider.notifier).updateCashBalance(amt),
+                (amt) => ref
+                    .read(onboardingControllerProvider.notifier)
+                    .updateCashBalance(amt),
                 _cashController,
               );
             },
@@ -183,7 +191,9 @@ class _StepWalletWidgetState extends ConsumerState<StepWalletWidget> {
             onChanged: (val) {
               _onAmountChanged(
                 val,
-                    (amt) => ref.read(onboardingControllerProvider.notifier).updateBankBalance(amt),
+                (amt) => ref
+                    .read(onboardingControllerProvider.notifier)
+                    .updateBankBalance(amt),
                 _bankController,
               );
             },
@@ -210,14 +220,19 @@ class _StepWalletWidgetState extends ConsumerState<StepWalletWidget> {
                     children: [
                       Row(
                         children: [
-                          Text(_extraWalletType == 'savings' ? '🐖' : '📱', style: const TextStyle(fontSize: 22)),
+                          Text(_extraWalletType == 'savings' ? '🐖' : '📱',
+                              style: const TextStyle(fontSize: 22)),
                           const SizedBox(width: 8),
                           Text(
-                            _extraWalletType == 'savings' ? 'Két Tiết kiệm' : 'Ví điện tử (Momo/ZaloPay)',
+                            _extraWalletType == 'savings'
+                                ? 'Két Tiết kiệm'
+                                : 'Ví điện tử (Momo/ZaloPay)',
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w800,
-                              color: isDark ? AppTokens.darkText : AppTokens.lightText,
+                              color: isDark
+                                  ? AppTokens.darkText
+                                  : AppTokens.lightText,
                             ),
                           ),
                         ],
@@ -236,34 +251,20 @@ class _StepWalletWidgetState extends ConsumerState<StepWalletWidget> {
                   const SizedBox(height: 10),
 
                   // Toggle chọn loại ví mở rộng — shared preserved sliding engine
-                  SlidingSegmentedBar<String>(
-                    height: 40,
-                    duration: const Duration(milliseconds: 185),
-                    overshootPx: 1.6,
-                    debugLabel: 'Onboarding.extraWalletType',
-                    selectedValue: _extraWalletType,
-                    trackColor: isDark ? AppTokens.darkCardSubtle : AppTokens.lightCardSubtle,
-                    trackBorderColor: Colors.transparent,
-                    indicatorColor: accent.primary.withValues(alpha: isDark ? 0.25 : 0.15),
-                    indicatorBorderColor: accent.primary,
-                    selectedTextColor: accent.primary,
-                    mutedTextColor: isDark ? AppTokens.darkText : AppTokens.lightText,
-                    items: const [
-                      SlidingSegmentedItem<String>(
-                        value: 'savings',
-                        label: 'Tiết kiệm',
-                        leadingText: '🐖',
-                      ),
-                      SlidingSegmentedItem<String>(
-                        value: 'ewallet',
-                        label: 'Ví điện tử',
-                        leadingText: '📱',
-                      ),
-                    ],
-                    onValueChanged: (type) {
-                      setState(() => _extraWalletType = type);
-                    },
-                  ),
+                  FlowyDropdown<String>(
+                      title: 'Chọn loại ví',
+                      value: _extraWalletType,
+                      items: const [
+                        DropdownMenuItem(
+                            value: 'savings', child: Text('Tiết kiệm')),
+                        DropdownMenuItem(
+                            value: 'ewallet', child: Text('Ví điện tử'))
+                      ],
+                      onChanged: (type) {
+                        if (type != null) {
+                          setState(() => _extraWalletType = type);
+                        }
+                      }),
                   const SizedBox(height: 12),
 
                   TextField(
@@ -273,9 +274,13 @@ class _StepWalletWidgetState extends ConsumerState<StepWalletWidget> {
                     onChanged: (val) {
                       _onAmountChanged(
                         val,
-                            (amt) {
-                          final curBank = ref.read(onboardingControllerProvider).bankBalance;
-                          ref.read(onboardingControllerProvider.notifier).updateBankBalance(curBank + amt);
+                        (amt) {
+                          final curBank = ref
+                              .read(onboardingControllerProvider)
+                              .bankBalance;
+                          ref
+                              .read(onboardingControllerProvider.notifier)
+                              .updateBankBalance(curBank + amt);
                         },
                         _extraWalletController,
                       );
@@ -289,8 +294,11 @@ class _StepWalletWidgetState extends ConsumerState<StepWalletWidget> {
                       hintText: '0',
                       suffixText: '₫',
                       filled: true,
-                      fillColor: isDark ? AppTokens.darkCardSubtle : AppTokens.lightCardSubtle,
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                      fillColor: isDark
+                          ? AppTokens.darkCardSubtle
+                          : AppTokens.lightCardSubtle,
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14)),
                     ),
                   ),
                 ],
@@ -303,7 +311,8 @@ class _StepWalletWidgetState extends ConsumerState<StepWalletWidget> {
               child: TextButton.icon(
                 style: TextButton.styleFrom(
                   foregroundColor: accent.primary,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14)),
                 ),
                 onPressed: () {
                   HapticFeedback.selectionClick();
@@ -328,7 +337,8 @@ class _StepWalletWidgetState extends ConsumerState<StepWalletWidget> {
                 backgroundColor: accent.primary,
                 foregroundColor: Colors.white,
                 elevation: 2,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(18)),
               ),
               onPressed: () {
                 HapticFeedback.mediumImpact();
@@ -347,8 +357,12 @@ class _StepWalletWidgetState extends ConsumerState<StepWalletWidget> {
               onPressed: () {
                 HapticFeedback.selectionClick();
                 // Mặc định số dư là 0 ₫ và chuyển bước kế tiếp
-                ref.read(onboardingControllerProvider.notifier).updateCashBalance(0.0);
-                ref.read(onboardingControllerProvider.notifier).updateBankBalance(0.0);
+                ref
+                    .read(onboardingControllerProvider.notifier)
+                    .updateCashBalance(0.0);
+                ref
+                    .read(onboardingControllerProvider.notifier)
+                    .updateBankBalance(0.0);
                 widget.onNext();
               },
               child: Text(
@@ -381,7 +395,8 @@ class _StepWalletWidgetState extends ConsumerState<StepWalletWidget> {
       decoration: BoxDecoration(
         color: isDark ? AppTokens.darkCard : AppTokens.lightCard,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
+        border: Border.all(
+            color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
@@ -416,14 +431,16 @@ class _StepWalletWidgetState extends ConsumerState<StepWalletWidget> {
                       style: TextStyle(
                         fontSize: 14.5,
                         fontWeight: FontWeight.w800,
-                        color: isDark ? AppTokens.darkText : AppTokens.lightText,
+                        color:
+                            isDark ? AppTokens.darkText : AppTokens.lightText,
                       ),
                     ),
                     Text(
                       subtitle,
                       style: TextStyle(
                         fontSize: 11.5,
-                        color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                        color:
+                            isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
                       ),
                     ),
                   ],
@@ -432,7 +449,6 @@ class _StepWalletWidgetState extends ConsumerState<StepWalletWidget> {
             ],
           ),
           const SizedBox(height: 14),
-
           TextField(
             controller: controller,
             keyboardType: TextInputType.number,
@@ -448,7 +464,9 @@ class _StepWalletWidgetState extends ConsumerState<StepWalletWidget> {
               hintStyle: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w900,
-                color: isDark ? AppTokens.darkMuted.withValues(alpha: 0.5) : AppTokens.lightMuted.withValues(alpha: 0.5),
+                color: isDark
+                    ? AppTokens.darkMuted.withValues(alpha: 0.5)
+                    : AppTokens.lightMuted.withValues(alpha: 0.5),
               ),
               suffixText: '₫',
               suffixStyle: TextStyle(
@@ -457,15 +475,21 @@ class _StepWalletWidgetState extends ConsumerState<StepWalletWidget> {
                 color: accent.primary,
               ),
               filled: true,
-              fillColor: isDark ? AppTokens.darkCardSubtle : AppTokens.lightCardSubtle,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              fillColor:
+                  isDark ? AppTokens.darkCardSubtle : AppTokens.lightCardSubtle,
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide(color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
+                borderSide: BorderSide(
+                    color:
+                        isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide(color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
+                borderSide: BorderSide(
+                    color:
+                        isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),
@@ -477,6 +501,4 @@ class _StepWalletWidgetState extends ConsumerState<StepWalletWidget> {
       ),
     );
   }
-
-
 }

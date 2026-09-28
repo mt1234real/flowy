@@ -16,6 +16,7 @@ import 'package:local_auth/local_auth.dart';
 
 import '../core/animation/app_animation_policy.dart';
 import '../services/vault_security_service.dart';
+import '../core/feedback/app_feedback.dart';
 import '../theme/app_theme.dart';
 import '../widgets/precision_numpad.dart';
 import '../widgets/vault_security_surface.dart';
@@ -147,7 +148,8 @@ class _VaultAuthScreenState extends ConsumerState<VaultAuthScreen>
 
   Future<void> _authenticateWithBiometrics() async {
     if (!ref.read(vaultBiometricsProvider)) return;
-    if (_isLockedOut ||
+    if (_verifyingPin ||
+        _isLockedOut ||
         _isUnlocking ||
         _isAuthenticatingBiometrics ||
         _isRejectingPin) {
@@ -190,7 +192,8 @@ class _VaultAuthScreenState extends ConsumerState<VaultAuthScreen>
   }
 
   void _onKeyPress(String digit, int pinLength) {
-    if (_isLockedOut ||
+    if (_verifyingPin ||
+        _isLockedOut ||
         _isUnlocking ||
         _isRejectingPin ||
         _isAuthenticatingBiometrics ||
@@ -209,7 +212,8 @@ class _VaultAuthScreenState extends ConsumerState<VaultAuthScreen>
   }
 
   void _onBackspace() {
-    if (_isLockedOut ||
+    if (_verifyingPin ||
+        _isLockedOut ||
         _isUnlocking ||
         _isRejectingPin ||
         _isAuthenticatingBiometrics) {
@@ -224,7 +228,8 @@ class _VaultAuthScreenState extends ConsumerState<VaultAuthScreen>
   }
 
   void _clearPin() {
-    if (_isLockedOut ||
+    if (_verifyingPin ||
+        _isLockedOut ||
         _isUnlocking ||
         _isRejectingPin ||
         _isAuthenticatingBiometrics) {
@@ -238,42 +243,57 @@ class _VaultAuthScreenState extends ConsumerState<VaultAuthScreen>
     });
   }
 
+  bool _verifyingPin = false;
+
   Future<void> _verifyPin() async {
-    final expectedPin = widget.customPin ?? ref.read(vaultPinProvider);
+    if (_verifyingPin) return;
+    _verifyingPin = true;
+    try {
+      final valid = widget.customPin != null
+          ? _enteredPin == widget.customPin
+          : await ref.read(vaultSecurityServiceProvider).verifyPin(_enteredPin);
+      if (!mounted) return;
+      if (valid) {
+        _onSuccess();
+        return;
+      }
 
-    if (_enteredPin == expectedPin) {
-      _onSuccess();
-      return;
+      _failedAttempts++;
+      _attemptWindow.failedAttempts = _failedAttempts;
+      if (_failedAttempts >= 3) {
+        _attemptWindow.lockedUntil =
+            DateTime.now().add(const Duration(seconds: 30));
+        _resumeLockout();
+      }
+      HapticFeedback.heavyImpact();
+
+      setState(() {
+        _isRejectingPin = true;
+        _pinErrorActive = true;
+      });
+
+      await _pinRejectController.animateTo(
+        1.0,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.linear,
+      );
+
+      if (!mounted) return;
+
+      _pinRejectController.value = 0.0;
+      setState(() {
+        _enteredPin = '';
+        _pinErrorActive = false;
+        _isRejectingPin = false;
+      });
+    } catch (_) {
+      if (mounted) {
+        AppFeedback.showError(
+            context, 'Chưa đọc được cấu hình bảo mật. Vui lòng thử lại.');
+      }
+    } finally {
+      _verifyingPin = false;
     }
-
-    _failedAttempts++;
-    _attemptWindow.failedAttempts = _failedAttempts;
-    if (_failedAttempts >= 3) {
-      _attemptWindow.lockedUntil =
-          DateTime.now().add(const Duration(seconds: 30));
-      _resumeLockout();
-    }
-    HapticFeedback.heavyImpact();
-
-    setState(() {
-      _isRejectingPin = true;
-      _pinErrorActive = true;
-    });
-
-    await _pinRejectController.animateTo(
-      1.0,
-      duration: const Duration(milliseconds: 200),
-      curve: Curves.linear,
-    );
-
-    if (!mounted) return;
-
-    _pinRejectController.value = 0.0;
-    setState(() {
-      _enteredPin = '';
-      _pinErrorActive = false;
-      _isRejectingPin = false;
-    });
   }
 
   Future<void> _onSuccess() async {

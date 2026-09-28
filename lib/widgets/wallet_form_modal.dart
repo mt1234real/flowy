@@ -1,3 +1,4 @@
+import 'flowy_selection_picker.dart';
 // ==============================================================================
 // File: lib/widgets/wallet_form_modal.dart
 // Architecture: Executive Wealth Source Creation & Update Sheet (Schema V6)
@@ -31,9 +32,9 @@ class WalletFormModal extends ConsumerStatefulWidget {
   });
 
   static Future<void> show(
-      BuildContext context, {
-        Wallet? existingWallet,
-      }) {
+    BuildContext context, {
+    Wallet? existingWallet,
+  }) {
     HapticFeedback.selectionClick();
     return AppAnimationPolicy.showFluidSheet<void>(
       context: context,
@@ -61,7 +62,7 @@ class _WalletFormModalState extends ConsumerState<WalletFormModal> {
   int? _paymentDueDay;
   bool _isSubmitting = false;
   final AppValidationFeedbackController _nameFeedback =
-  AppValidationFeedbackController();
+      AppValidationFeedbackController();
 
   final List<String> _colorSwatches = [
     '#10B981', // Emerald
@@ -136,7 +137,8 @@ class _WalletFormModalState extends ConsumerState<WalletFormModal> {
     try {
       final db = ref.read(databaseProvider);
       final double? creditLimit = _selectedType == 'credit'
-          ? double.tryParse(_creditLimitController.text.replaceAll(RegExp(r'[^0-9.]'), ''))
+          ? double.tryParse(
+              _creditLimitController.text.replaceAll(RegExp(r'[^0-9.]'), ''))
           : null;
 
       if (_isEditing) {
@@ -156,8 +158,8 @@ class _WalletFormModalState extends ConsumerState<WalletFormModal> {
         }
       } else {
         final double rawBalance = double.tryParse(
-          _balanceController.text.replaceAll(RegExp(r'[^0-9.-]'), ''),
-        ) ??
+              _balanceController.text.replaceAll(RegExp(r'[^0-9.-]'), ''),
+            ) ??
             0.0;
         final newId = 'w_${DateTime.now().millisecondsSinceEpoch}';
 
@@ -211,10 +213,14 @@ class _WalletFormModalState extends ConsumerState<WalletFormModal> {
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
           child: Container(
-            padding: EdgeInsets.fromLTRB(20, 14, 20, MediaQuery.of(context).viewInsets.bottom + 24),
+            padding: EdgeInsets.fromLTRB(
+                20, 14, 20, MediaQuery.of(context).viewInsets.bottom + 24),
             decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF0F172A).withValues(alpha: 0.98) : Colors.white.withValues(alpha: 0.98),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+              color: isDark
+                  ? const Color(0xFF0F172A).withValues(alpha: 0.98)
+                  : Colors.white.withValues(alpha: 0.98),
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(28)),
               border: Border.all(
                 color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder,
               ),
@@ -245,11 +251,15 @@ class _WalletFormModalState extends ConsumerState<WalletFormModal> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          _isEditing ? 'Chỉnh Sửa Nguồn Tiền' : 'Tạo Nguồn Tiền Mới',
+                          _isEditing
+                              ? 'Chỉnh Sửa Nguồn Tiền'
+                              : 'Tạo Nguồn Tiền Mới',
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w800,
-                            color: isDark ? AppTokens.darkText : AppTokens.lightText,
+                            color: isDark
+                                ? AppTokens.darkText
+                                : AppTokens.lightText,
                           ),
                         ),
                         IconButton(
@@ -257,7 +267,9 @@ class _WalletFormModalState extends ConsumerState<WalletFormModal> {
                           icon: Icon(
                             Icons.close_rounded,
                             size: 20,
-                            color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                            color: isDark
+                                ? AppTokens.darkMuted
+                                : AppTokens.lightMuted,
                           ),
                         ),
                       ],
@@ -271,8 +283,7 @@ class _WalletFormModalState extends ConsumerState<WalletFormModal> {
                         final restingBorder = isDark
                             ? AppTokens.darkBorder
                             : AppTokens.lightBorder;
-                        final borderColor =
-                        visual.borderColor(restingBorder);
+                        final borderColor = visual.borderColor(restingBorder);
 
                         return TextField(
                           controller: _nameController,
@@ -289,7 +300,7 @@ class _WalletFormModalState extends ConsumerState<WalletFormModal> {
                           ),
                           decoration: InputDecoration(
                             labelText:
-                            'Tên ví / Tài khoản (vd: VCB Tiền lương, Momo, Visa)',
+                                'Tên ví / Tài khoản (vd: VCB Tiền lương, Momo, Visa)',
                             labelStyle: TextStyle(
                               fontSize: 12,
                               color: isDark
@@ -297,7 +308,7 @@ class _WalletFormModalState extends ConsumerState<WalletFormModal> {
                                   : AppTokens.lightMuted,
                             ),
                             prefixIcon:
-                            const Icon(Icons.wallet_rounded, size: 20),
+                                const Icon(Icons.wallet_rounded, size: 20),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(14),
                               borderSide: BorderSide(color: borderColor),
@@ -330,7 +341,8 @@ class _WalletFormModalState extends ConsumerState<WalletFormModal> {
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
-                        color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                        color:
+                            isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -345,9 +357,15 @@ class _WalletFormModalState extends ConsumerState<WalletFormModal> {
                           overshootPx: 1.6,
                           debugLabel: 'WalletForm.type',
                           selectedValue: _selectedType,
-                          trackColor: isDark ? AppTokens.darkCard : AppTokens.lightCardSubtle,
-                          trackBorderColor: isDark ? AppTokens.darkBorder : AppTokens.lightBorder,
-                          mutedTextColor: isDark ? AppTokens.darkMuted : AppTokens.lightText,
+                          trackColor: isDark
+                              ? AppTokens.darkCard
+                              : AppTokens.lightCardSubtle,
+                          trackBorderColor: isDark
+                              ? AppTokens.darkBorder
+                              : AppTokens.lightBorder,
+                          mutedTextColor: isDark
+                              ? AppTokens.darkMuted
+                              : AppTokens.lightText,
                           items: const [
                             SlidingSegmentedItem<String>(
                               value: 'cash',
@@ -387,22 +405,29 @@ class _WalletFormModalState extends ConsumerState<WalletFormModal> {
                     if (!_isEditing) ...[
                       TextField(
                         controller: _balanceController,
-                        keyboardType: const TextInputType.numberWithOptions(signed: true),
-                        style: currencyTextStyle(context, TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                          color: accent.primary,
-                        )),
+                        keyboardType:
+                            const TextInputType.numberWithOptions(signed: true),
+                        style: currencyTextStyle(
+                            context,
+                            TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: accent.primary,
+                            )),
                         decoration: InputDecoration(
                           labelText: _selectedType == 'credit'
                               ? 'Dư nợ ban đầu (số âm vd: -5000000)'
                               : 'Số dư ban đầu (₫)',
                           labelStyle: TextStyle(
                             fontSize: 12,
-                            color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                            color: isDark
+                                ? AppTokens.darkMuted
+                                : AppTokens.lightMuted,
                           ),
-                          prefixIcon: const Icon(Icons.monetization_on_outlined, size: 20),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                          prefixIcon: const Icon(Icons.monetization_on_outlined,
+                              size: 20),
+                          border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14)),
                         ),
                       ),
                       const SizedBox(height: 14),
@@ -413,10 +438,14 @@ class _WalletFormModalState extends ConsumerState<WalletFormModal> {
                       Container(
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
-                          color: isDark ? AppTokens.darkCard : AppTokens.lightCardSubtle,
+                          color: isDark
+                              ? AppTokens.darkCard
+                              : AppTokens.lightCardSubtle,
                           borderRadius: BorderRadius.circular(18),
                           border: Border.all(
-                            color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder,
+                            color: isDark
+                                ? AppTokens.darkBorder
+                                : AppTokens.lightBorder,
                           ),
                         ),
                         child: Column(
@@ -424,14 +453,17 @@ class _WalletFormModalState extends ConsumerState<WalletFormModal> {
                           children: [
                             Row(
                               children: [
-                                const Icon(Icons.credit_score_rounded, color: Colors.amber, size: 18),
+                                const Icon(Icons.credit_score_rounded,
+                                    color: Colors.amber, size: 18),
                                 const SizedBox(width: 8),
                                 Text(
                                   'Cấu hình Thẻ Tín Dụng & Dư Nợ',
                                   style: TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w800,
-                                    color: isDark ? AppTokens.darkText : AppTokens.lightText,
+                                    color: isDark
+                                        ? AppTokens.darkText
+                                        : AppTokens.lightText,
                                   ),
                                 ),
                               ],
@@ -440,18 +472,26 @@ class _WalletFormModalState extends ConsumerState<WalletFormModal> {
                             TextField(
                               controller: _creditLimitController,
                               keyboardType: TextInputType.number,
-                              style: currencyTextStyle(context, TextStyle(
-                                fontSize: 14,
-                                color: isDark ? AppTokens.darkText : AppTokens.lightText,
-                              )),
+                              style: currencyTextStyle(
+                                  context,
+                                  TextStyle(
+                                    fontSize: 14,
+                                    color: isDark
+                                        ? AppTokens.darkText
+                                        : AppTokens.lightText,
+                                  )),
                               decoration: InputDecoration(
-                                labelText: 'Hạn mức tín dụng tối đa (vd: 50.000.000 ₫)',
+                                labelText:
+                                    'Hạn mức tín dụng tối đa (vd: 50.000.000 ₫)',
                                 labelStyle: TextStyle(
                                   fontSize: 11,
-                                  color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                                  color: isDark
+                                      ? AppTokens.darkMuted
+                                      : AppTokens.lightMuted,
                                 ),
                                 isDense: true,
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12)),
                               ),
                             ),
                             const SizedBox(height: 12),
@@ -459,51 +499,73 @@ class _WalletFormModalState extends ConsumerState<WalletFormModal> {
                               children: [
                                 // Dropdown ngày sao kê
                                 Expanded(
-                                  child: DropdownButtonFormField<int>(
+                                  child: FlowyDropdown<int>(
                                     value: _statementDay,
                                     decoration: InputDecoration(
                                       labelText: 'Ngày sao kê',
                                       labelStyle: TextStyle(
                                         fontSize: 11,
-                                        color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                                        color: isDark
+                                            ? AppTokens.darkMuted
+                                            : AppTokens.lightMuted,
                                       ),
                                       isDense: true,
-                                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                              horizontal: 10, vertical: 8),
+                                      border: OutlineInputBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(12)),
                                     ),
-                                    dropdownColor: isDark ? AppTokens.darkCard : Colors.white,
+                                    dropdownColor: isDark
+                                        ? AppTokens.darkCard
+                                        : Colors.white,
                                     items: List.generate(31, (i) => i + 1)
                                         .map((d) => DropdownMenuItem(
-                                      value: d,
-                                      child: Text('Ngày $d', style: const TextStyle(fontSize: 12)),
-                                    ))
+                                              value: d,
+                                              child: Text('Ngày $d',
+                                                  style: const TextStyle(
+                                                      fontSize: 12)),
+                                            ))
                                         .toList(),
-                                    onChanged: (val) => setState(() => _statementDay = val),
+                                    onChanged: (val) =>
+                                        setState(() => _statementDay = val),
                                   ),
                                 ),
                                 const SizedBox(width: 10),
                                 // Dropdown ngày đến hạn thanh toán
                                 Expanded(
-                                  child: DropdownButtonFormField<int>(
+                                  child: FlowyDropdown<int>(
                                     value: _paymentDueDay,
                                     decoration: InputDecoration(
                                       labelText: 'Hạn thanh toán',
                                       labelStyle: TextStyle(
                                         fontSize: 11,
-                                        color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                                        color: isDark
+                                            ? AppTokens.darkMuted
+                                            : AppTokens.lightMuted,
                                       ),
                                       isDense: true,
-                                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                              horizontal: 10, vertical: 8),
+                                      border: OutlineInputBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(12)),
                                     ),
-                                    dropdownColor: isDark ? AppTokens.darkCard : Colors.white,
+                                    dropdownColor: isDark
+                                        ? AppTokens.darkCard
+                                        : Colors.white,
                                     items: List.generate(31, (i) => i + 1)
                                         .map((d) => DropdownMenuItem(
-                                      value: d,
-                                      child: Text('Ngày $d', style: const TextStyle(fontSize: 12)),
-                                    ))
+                                              value: d,
+                                              child: Text('Ngày $d',
+                                                  style: const TextStyle(
+                                                      fontSize: 12)),
+                                            ))
                                         .toList(),
-                                    onChanged: (val) => setState(() => _paymentDueDay = val),
+                                    onChanged: (val) =>
+                                        setState(() => _paymentDueDay = val),
                                   ),
                                 ),
                               ],
@@ -520,7 +582,8 @@ class _WalletFormModalState extends ConsumerState<WalletFormModal> {
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
-                        color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                        color:
+                            isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -535,7 +598,8 @@ class _WalletFormModalState extends ConsumerState<WalletFormModal> {
                             child: InkWell(
                               onTap: () {
                                 HapticFeedback.selectionClick();
-                                setState(() => _selectedIcon = opt['name'] as String);
+                                setState(() =>
+                                    _selectedIcon = opt['name'] as String);
                               },
                               borderRadius: BorderRadius.circular(12),
                               child: Container(
@@ -544,16 +608,26 @@ class _WalletFormModalState extends ConsumerState<WalletFormModal> {
                                 decoration: BoxDecoration(
                                   color: isSelected
                                       ? accent.primary.withValues(alpha: 0.16)
-                                      : (isDark ? AppTokens.darkCard : AppTokens.lightCardSubtle),
+                                      : (isDark
+                                          ? AppTokens.darkCard
+                                          : AppTokens.lightCardSubtle),
                                   borderRadius: BorderRadius.circular(12),
                                   border: Border.all(
-                                    color: isSelected ? accent.primary : (isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
+                                    color: isSelected
+                                        ? accent.primary
+                                        : (isDark
+                                            ? AppTokens.darkBorder
+                                            : AppTokens.lightBorder),
                                   ),
                                 ),
                                 child: Icon(
                                   opt['icon'] as IconData,
                                   size: 18,
-                                  color: isSelected ? accent.primary : (isDark ? AppTokens.darkMuted : AppTokens.lightMuted),
+                                  color: isSelected
+                                      ? accent.primary
+                                      : (isDark
+                                          ? AppTokens.darkMuted
+                                          : AppTokens.lightMuted),
                                 ),
                               ),
                             ),
@@ -569,13 +643,15 @@ class _WalletFormModalState extends ConsumerState<WalletFormModal> {
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
-                        color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                        color:
+                            isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
                       ),
                     ),
                     const SizedBox(height: 8),
                     Row(
                       children: _colorSwatches.map((hex) {
-                        final isSelected = _selectedColor.toLowerCase() == hex.toLowerCase();
+                        final isSelected =
+                            _selectedColor.toLowerCase() == hex.toLowerCase();
                         final color = _parseColor(hex);
                         return Padding(
                           padding: const EdgeInsets.only(right: 10),
@@ -591,18 +667,23 @@ class _WalletFormModalState extends ConsumerState<WalletFormModal> {
                               decoration: BoxDecoration(
                                 color: color,
                                 shape: BoxShape.circle,
-                                border: isSelected ? Border.all(color: Colors.white, width: 3) : null,
+                                border: isSelected
+                                    ? Border.all(color: Colors.white, width: 3)
+                                    : null,
                                 boxShadow: isSelected
                                     ? [
-                                  BoxShadow(
-                                    color: color.withValues(alpha: 0.5),
-                                    blurRadius: 8,
-                                    spreadRadius: 1,
-                                  ),
-                                ]
+                                        BoxShadow(
+                                          color: color.withValues(alpha: 0.5),
+                                          blurRadius: 8,
+                                          spreadRadius: 1,
+                                        ),
+                                      ]
                                     : null,
                               ),
-                              child: isSelected ? const Icon(Icons.check, color: Colors.white, size: 16) : null,
+                              child: isSelected
+                                  ? const Icon(Icons.check,
+                                      color: Colors.white, size: 16)
+                                  : null,
                             ),
                           ),
                         );
@@ -618,19 +699,23 @@ class _WalletFormModalState extends ConsumerState<WalletFormModal> {
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
-                          color: isDark ? AppTokens.darkText : AppTokens.lightText,
+                          color:
+                              isDark ? AppTokens.darkText : AppTokens.lightText,
                         ),
                       ),
                       subtitle: Text(
                         'Thích hợp cho sổ tiết kiệm hoặc tài khoản đóng băng.',
                         style: TextStyle(
                           fontSize: 11,
-                          color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                          color: isDark
+                              ? AppTokens.darkMuted
+                              : AppTokens.lightMuted,
                         ),
                       ),
                       value: _isExcludedFromTotal,
                       activeThumbColor: accent.primary,
-                      onChanged: (val) => setState(() => _isExcludedFromTotal = val),
+                      onChanged: (val) =>
+                          setState(() => _isExcludedFromTotal = val),
                     ),
 
                     SwitchListTile(
@@ -640,7 +725,8 @@ class _WalletFormModalState extends ConsumerState<WalletFormModal> {
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
-                          color: isDark ? AppTokens.darkText : AppTokens.lightText,
+                          color:
+                              isDark ? AppTokens.darkText : AppTokens.lightText,
                         ),
                       ),
                       value: _isDefault,
@@ -657,20 +743,23 @@ class _WalletFormModalState extends ConsumerState<WalletFormModal> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: accent.primary,
                           foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16)),
                           elevation: 2,
                         ),
                         onPressed: _isSubmitting ? null : _saveWallet,
                         child: _isSubmitting
                             ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                        )
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2, color: Colors.white),
+                              )
                             : Text(
-                          _isEditing ? 'LƯU THAY ĐỔI' : 'TẠO NGUỒN TIỀN',
-                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
-                        ),
+                                _isEditing ? 'LƯU THAY ĐỔI' : 'TẠO NGUỒN TIỀN',
+                                style: const TextStyle(
+                                    fontSize: 14, fontWeight: FontWeight.w800),
+                              ),
                       ),
                     ),
                   ],
@@ -682,6 +771,4 @@ class _WalletFormModalState extends ConsumerState<WalletFormModal> {
       ),
     );
   }
-
-
 }

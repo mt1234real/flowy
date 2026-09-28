@@ -18,12 +18,8 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:math';
-import 'dart:typed_data';
 
-import 'package:archive/archive_io.dart';
 import 'package:crypto/crypto.dart';
-import 'package:encrypt/encrypt.dart' as enc;
 import 'package:extension_google_sign_in_as_googleapis_auth/extension_google_sign_in_as_googleapis_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -36,6 +32,15 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/database.dart';
+import '../theme/app_theme.dart';
+import '../widgets/backup_progress_curtain.dart';
+import '../features/notifications/notification_preferences.dart';
+import '../features/insights/insights_data.dart';
+import '../screens/ledger_screen.dart' show cycleStartDaysByMonthProvider;
+import 'auth_profile_service.dart';
+import 'vault_security_service.dart';
+import 'backup_capsule.dart';
+import 'backup_schedule.dart';
 
 /// Helper chuyển đổi và lọc sạch các trường properties nullable từ Google Drive API
 Map<String, String> _sanitizeProperties(Map<String, String?>? raw) {
@@ -74,7 +79,9 @@ class CloudBackupItem {
 
   String get formattedSize {
     if (sizeBytes < 1024) return '$sizeBytes B';
-    if (sizeBytes < 1024 * 1024) return '${(sizeBytes / 1024).toStringAsFixed(1)} KB';
+    if (sizeBytes < 1024 * 1024) {
+      return '${(sizeBytes / 1024).toStringAsFixed(1)} KB';
+    }
     return '${(sizeBytes / (1024 * 1024)).toStringAsFixed(2)} MB';
   }
 
@@ -229,6 +236,7 @@ class CloudBackupService {
   final Ref _ref;
 
   Timer? _debounceTimer;
+  bool _silentAuth = false;
 
   CloudBackupService({
     required AppDatabase db,
@@ -246,26 +254,11 @@ class CloudBackupService {
 
   /// Kích hoạt bộ đếm debounce 3 phút sau mỗi lần ghi chép mới
   Future<void> notifyDataChanged() async {
+    final prefs = await SharedPreferences.getInstance();
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final cadenceIndex = prefs.getInt('pfm_backup_cadence_mode') ?? 1;
-
-      // 0 = afterEachEntry (Debounce 3 phút)
-      if (cadenceIndex == 0) {
-        _debounceTimer?.cancel();
-        debugPrint('[Flowy Cloud] Nhận tín hiệu ghi chép mới. Lên lịch sao lưu sau 3 phút debounce...');
-
-        _debounceTimer = Timer(const Duration(minutes: 3), () async {
-          debugPrint('[Flowy Cloud] Đủ 3 phút debounce! Kích hoạt tự động sao lưu ngầm lên Google Drive...');
-          try {
-            await performBackup(silent: true);
-          } catch (e) {
-            debugPrint('[Flowy Cloud] Lỗi tự động sao lưu: $e');
-          }
-        });
-      }
-    } catch (e) {
-      debugPrint('[Flowy Cloud] Lỗi notifyDataChanged: $e');
+      await scheduleEntryBackup(prefs);
+    } catch (error) {
+      debugPrint('Backup scheduling unavailable: $error');
     }
   }
 
@@ -273,7 +266,7 @@ class CloudBackupService {
   Future<drive.DriveApi> _getDriveApi() async {
     GoogleSignInAccount? account = _googleSignIn.currentUser;
     account ??= await _googleSignIn.signInSilently();
-    account ??= await _googleSignIn.signIn();
+    if (!_silentAuth) account ??= await _googleSignIn.signIn();
 
     if (account == null) {
       throw Exception('Chưa đăng nhập Google hoặc người dùng hủy xác thực.');
@@ -292,9 +285,10 @@ class CloudBackupService {
     GoogleSignInAccount? account = _googleSignIn.currentUser;
     account ??= await _googleSignIn.signInSilently();
 
-    final userIdentifier = (account?.id != null && account!.id.isNotEmpty)
-        ? account.id.trim()
-        : (account?.email.toLowerCase().trim() ?? 'flowy_universal_user_account');
+    if (account == null) {
+      throw StateError('Cần đăng nhập Google để sử dụng bản sao lưu này');
+    }
+    final userIdentifier = account.id.trim();
 
     final pepperBytes = utf8.encode(_appFixedPepper);
     final dataBytes = utf8.encode(userIdentifier);
@@ -375,20 +369,10 @@ class CloudBackupService {
 
   /// 🌟 TẠO BẢN SAO LƯU DỰ PHÒNG KHẨN CẤP TRÊN MÁY (EMERGENCY SNAPSHOT)
   Future<void> createEmergencyLocalSnapshot() async {
-    try {
-      await _db.customStatement('PRAGMA wal_checkpoint(FULL);');
-
-      final dbFolder = await getApplicationDocumentsDirectory();
-      final mainDbFile = File(p.join(dbFolder.path, 'pfm_local_vault.sqlite'));
-      final emergencyFile = File(p.join(dbFolder.path, 'old_account_unsaved.bak'));
-
-      if (await mainDbFile.exists()) {
-        await mainDbFile.copy(emergencyFile.path);
-        debugPrint('[Flowy Cloud] Đã tạo emergency snapshot an toàn: ${emergencyFile.path}');
-      }
-    } catch (e) {
-      debugPrint('[Flowy Cloud] Lỗi tạo emergency snapshot: $e');
-    }
+    final folder = await getApplicationDocumentsDirectory();
+    final file = File(p.join(folder.path,
+        'old_account_unsaved_${DateTime.now().microsecondsSinceEpoch}.bak'));
+    await _db.customStatement('VACUUM INTO ?', [file.path]);
   }
 
   /// 🌟 NGẮT PHIÊN GOOGLE VÀ LÀM SẠCH KẾT NỐI (ZERO DATA LOCK-IN)
@@ -405,6 +389,8 @@ class CloudBackupService {
 
   /// Thực thi sao lưu và đồng bộ StateNotifier
   Future<CloudBackupItem> performBackup({bool silent = false}) async {
+    if (_busy) throw StateError('Một tác vụ sao lưu đang chạy');
+    _silentAuth = silent;
     final notifier = _ref.read(cloudBackupNotifierProvider.notifier);
 
     if (!silent) {
@@ -420,24 +406,39 @@ class CloudBackupService {
         },
       );
 
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+          'flowy_last_backup_at', item.createdTime.toIso8601String());
       notifier.updateSuccess(item);
-      _ref.read(backupSyncNotifierProvider.notifier).markAsUpToDate();
+      if (!silent) {
+        _ref.read(backupSyncNotifierProvider.notifier).markAsUpToDate();
+      }
       return item;
     } catch (e) {
       if (!silent) {
-        notifier.updateFailure('Lỗi sao lưu: ${e.toString().replaceAll('Exception: ', '')}');
+        notifier.updateFailure(
+            'Lỗi sao lưu: ${e.toString().replaceAll('Exception: ', '')}');
       }
       rethrow;
     }
   }
 
   /// Tạo bản sao lưu hoàn chỉnh lên Google Drive AppData
+  static bool _busy = false;
+
   Future<CloudBackupItem> createBackup({
-    void Function(CloudBackupStatus status, String message, double progress)? onProgress,
+    void Function(CloudBackupStatus status, String message, double progress)?
+        onProgress,
   }) async {
+    if (_busy) throw StateError('Một tác vụ sao lưu đang chạy');
+    _busy = true;
+    final progress = _ref.read(backupOperationProvider.notifier);
+    progress.state = 'Đang chuẩn bị bản sao lưu…';
     Directory? tempDir;
     try {
-      onProgress?.call(CloudBackupStatus.checkpointing, 'Đang đồng bộ sổ cái CSDL...', 0.15);
+      final driveApi = await _getDriveApi();
+      onProgress?.call(
+          CloudBackupStatus.checkpointing, 'Đang đồng bộ sổ cái CSDL...', 0.15);
 
       await _db.customStatement('PRAGMA wal_checkpoint(FULL);');
 
@@ -445,76 +446,74 @@ class CloudBackupService {
       final dbFile = File(p.join(dbFolder.path, 'pfm_local_vault.sqlite'));
 
       if (!await dbFile.exists()) {
-        throw Exception('Không tìm thấy tệp cơ sở dữ liệu gốc: pfm_local_vault.sqlite');
+        throw Exception(
+            'Không tìm thấy tệp cơ sở dữ liệu gốc: pfm_local_vault.sqlite');
       }
 
       final cacheDir = await getTemporaryDirectory();
       final timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
-      tempDir = Directory(p.join(cacheDir.path, 'backup_$timestamp'))..createSync(recursive: true);
+      tempDir = await Directory(p.join(cacheDir.path, 'backup_${timestamp}_'))
+          .createTemp();
 
       final tempDbCopy = File(p.join(tempDir.path, 'pfm_local_vault.sqlite'));
-      await dbFile.copy(tempDbCopy.path);
+      await _db.customStatement('VACUUM INTO ?', [tempDbCopy.path]);
+      final prefs = await SharedPreferences.getInstance();
+      final preferences = await exportBackupPreferences(prefs);
+      preferences['notification_cycle_snapshot'] =
+          jsonEncode(_ref.read(cycleStartDaysByMonthProvider));
+      final security =
+          await _ref.read(vaultSecurityServiceProvider).exportManifest();
+      security['biometricsEnabled'] =
+          prefs.getBool('vault_biometrics_enabled') ?? true;
+      for (final entry in {
+        'preferences_manifest.json': preferences,
+        'security_manifest.json': security,
+        'backup_metadata.json': {
+          'version': 4,
+          'schema_version': _db.schemaVersion,
+          'created_at': DateTime.now().toIso8601String(),
+          'device': Platform.operatingSystem
+        },
+      }.entries) {
+        await File(p.join(tempDir.path, entry.key))
+            .writeAsString(jsonEncode(entry.value), flush: true);
+      }
 
-      onProgress?.call(CloudBackupStatus.encrypting, 'Đang nén và mã hóa AES-GCM 256-bit...', 0.40);
+      onProgress?.call(CloudBackupStatus.encrypting,
+          'Đang nén và mã hóa AES-GCM 256-bit...', 0.40);
 
-      // 1. Nén ZIP
-      final zipFilePath = p.join(tempDir.path, 'database.zip');
-      final encoder = ZipFileEncoder();
-      encoder.create(zipFilePath);
-      await encoder.addFile(tempDbCopy);
-      encoder.close();
-
-      final zipBytes = await File(zipFilePath).readAsBytes();
-
-      // 2. Mã hóa AES-GCM 256-bit với Deterministic Cross-Device Key
+      progress.state = 'Đang nén và mã hóa bản sao lưu…';
       final keyBytes = await _getOrCreateDeterministicKey();
-      final key = enc.Key(Uint8List.fromList(keyBytes));
+      final encryptedPath =
+          await compute(packBackup, {'folder': tempDir.path, 'key': keyBytes});
+      final finalEncryptedFile = File(encryptedPath);
+      progress.state = 'Đang tải bản sao lưu lên Google Drive…';
 
-      final secureRandom = Random.secure();
-      final ivBytes = Uint8List.fromList(List<int>.generate(16, (_) => secureRandom.nextInt(256)));
-      final iv = enc.IV(ivBytes);
-
-      final encrypter = enc.Encrypter(enc.AES(key, mode: enc.AESMode.gcm));
-      final encryptedData = encrypter.encryptBytes(zipBytes, iv: iv);
-
-      // Cấu trúc payload chuẩn: [16 bytes IV] + [Ciphertext + Auth Tag]
-      final payload = BytesBuilder(copy: false)
-        ..add(ivBytes)
-        ..add(encryptedData.bytes);
-
-      final finalEncryptedFile = File(p.join(tempDir.path, 'pfm_vault_backup_$timestamp.enc'));
-      await finalEncryptedFile.writeAsBytes(payload.toBytes(), flush: true);
-
-      onProgress?.call(CloudBackupStatus.uploading, 'Đang tải lên thư mục an toàn Google Drive...', 0.70);
+      onProgress?.call(CloudBackupStatus.uploading,
+          'Đang tải lên thư mục an toàn Google Drive...', 0.70);
 
       // 3. Tải lên Google Drive AppData
-      final driveApi = await _getDriveApi();
-      final txs = await _db.select(_db.transactions).get();
-      final debtTxs = await _db.select(_db.debtTransactions).get();
-      final wallets = await _db.select(_db.wallets).get();
-
-      DateTime? maxTxDate;
-      for (final t in txs) {
-        if (maxTxDate == null || t.date.isAfter(maxTxDate)) {
-          maxTxDate = t.date;
-        }
-      }
-      for (final d in debtTxs) {
-        if (maxTxDate == null || d.date.isAfter(maxTxDate)) {
-          maxTxDate = d.date;
-        }
-      }
+      final statistics = await compute(backupStatistics, tempDbCopy.path);
+      final latest = statistics['latest']!;
+      final maxTxDate = latest == 0
+          ? null
+          : DateTime.fromMillisecondsSinceEpoch(latest * 1000);
 
       final driveFile = drive.File()
         ..name = 'pfm_vault_backup_$timestamp.enc'
         ..parents = [_appDataFolderName]
         ..description = 'PFM Vault Encrypted Backup'
         ..properties = {
-          'version': '3',
+          'version': '4',
+          'theme': prefs.getString(kPrefKeyAccentPreset) ?? 'grass',
+          'font':
+              prefs.getString(kPrefKeyCurrencyFont) ?? kCurrencyFontFollowApp,
+          'has_preferences': 'true',
+          'has_vault_pin': 'true',
           'schema_version': _db.schemaVersion.toString(),
           'device': Platform.operatingSystem,
-          'tx_count': (txs.length + debtTxs.length).toString(),
-          'wallet_count': wallets.length.toString(),
+          'tx_count': statistics['transactions'].toString(),
+          'wallet_count': statistics['wallets'].toString(),
           'latest_tx_date': maxTxDate?.toIso8601String() ?? '',
           'timestamp': DateTime.now().toIso8601String(),
         };
@@ -530,12 +529,14 @@ class CloudBackupService {
         $fields: 'id, name, size, createdTime, properties',
       );
 
-      onProgress?.call(CloudBackupStatus.success, 'Sao lưu thành công lên Google Drive!', 1.0);
+      onProgress?.call(CloudBackupStatus.success,
+          'Sao lưu thành công lên Google Drive!', 1.0);
 
       return CloudBackupItem(
         fileId: uploadedFile.id ?? '',
         fileName: uploadedFile.name ?? 'pfm_vault_backup_$timestamp.enc',
-        sizeBytes: int.tryParse(uploadedFile.size ?? '0') ?? await finalEncryptedFile.length(),
+        sizeBytes: int.tryParse(uploadedFile.size ?? '0') ??
+            await finalEncryptedFile.length(),
         createdTime: uploadedFile.createdTime ?? DateTime.now(),
         properties: _sanitizeProperties(uploadedFile.properties),
       );
@@ -544,6 +545,8 @@ class CloudBackupService {
       onProgress?.call(CloudBackupStatus.failure, 'Lỗi sao lưu: $e', 0.0);
       rethrow;
     } finally {
+      _busy = false;
+      progress.state = null;
       if (tempDir != null && tempDir.existsSync()) {
         try {
           tempDir.deleteSync(recursive: true);
@@ -566,7 +569,9 @@ class CloudBackupService {
 
       final items = <CloudBackupItem>[];
       for (final f in fileList.files ?? <drive.File>[]) {
-        if (f.name != null && f.name!.startsWith('pfm_vault_backup_') && f.name!.endsWith('.enc')) {
+        if (f.name != null &&
+            f.name!.startsWith('pfm_vault_backup_') &&
+            f.name!.endsWith('.enc')) {
           items.add(
             CloudBackupItem(
               fileId: f.id ?? '',
@@ -598,7 +603,8 @@ class CloudBackupService {
       ) as drive.Media;
 
       final cacheDir = await getTemporaryDirectory();
-      tempDir = Directory(p.join(cacheDir.path, 'restore_${DateTime.now().millisecondsSinceEpoch}'))
+      tempDir = Directory(p.join(
+          cacheDir.path, 'restore_${DateTime.now().millisecondsSinceEpoch}'))
         ..createSync(recursive: true);
 
       final encFile = File(p.join(tempDir.path, 'downloaded.enc'));
@@ -606,85 +612,179 @@ class CloudBackupService {
       await media.stream.pipe(sink);
       await sink.close();
 
-      final fileBytes = await encFile.readAsBytes();
-      if (fileBytes.length <= 16) {
-        throw Exception('Tệp sao lưu bị lỗi hoặc kích thước không hợp lệ.');
-      }
-
-      // Trích xuất chính xác 16 bytes IV từ header
-      final ivBytes = Uint8List.sublistView(fileBytes, 0, 16);
-      final cipherBytes = Uint8List.sublistView(fileBytes, 16);
-
       final keyBytes = await _getOrCreateDeterministicKey();
-      final key = enc.Key(Uint8List.fromList(keyBytes));
-      final iv = enc.IV(ivBytes);
-
-      List<int> decryptedZipBytes;
-      try {
-        final encrypter = enc.Encrypter(enc.AES(key, mode: enc.AESMode.gcm));
-        decryptedZipBytes = encrypter.decryptBytes(enc.Encrypted(cipherBytes), iv: iv);
-      } catch (e) {
-        debugPrint('[CloudBackupService] Lỗi giải mã AES: $e');
-        throw Exception('Bản sao lưu không tương thích hoặc được tạo từ một tài khoản Google khác.');
-      }
-
-      final archive = ZipDecoder().decodeBytes(decryptedZipBytes);
-      File? extractedSqliteFile;
-
-      for (final file in archive) {
-        if (file.isFile && file.name.endsWith('.sqlite')) {
-          extractedSqliteFile = File(p.join(tempDir.path, 'decrypted_inspection.sqlite'));
-          await extractedSqliteFile.writeAsBytes(file.content as List<int>, flush: true);
-          break;
-        }
-      }
-
-      if (extractedSqliteFile == null || !extractedSqliteFile.existsSync()) {
-        throw Exception('Không tìm thấy tệp CSDL hợp lệ trong file nén sao lưu.');
-      }
-
-      return extractedSqliteFile;
+      final extracted = await compute(unpackBackup, {
+        'folder': tempDir.path,
+        'key': keyBytes,
+        'schema': _db.schemaVersion
+      });
+      return File(extracted);
     } catch (e) {
-      debugPrint('CloudBackupService: downloadAndDecryptBackup error: $e');
+      if (tempDir != null && await tempDir.exists()) {
+        await tempDir.delete(recursive: true);
+      }
       rethrow;
     }
   }
 
   /// 🌟 THỰC THI KHÔI PHỤC TỪ CLOUD CÓ TẠO SNAPSHOT .BAK ROLLBACK
   Future<void> performRestoreFromCloud(String fileId) async {
-    File? decryptedFile;
+    final file = await downloadAndDecryptBackup(fileId);
     try {
-      decryptedFile = await downloadAndDecryptBackup(fileId);
-
-      // 1. Ép xả WAL log
-      await _db.customStatement('PRAGMA wal_checkpoint(FULL);');
-
-      final dbFolder = await getApplicationDocumentsDirectory();
-      final mainDbFile = File(p.join(dbFolder.path, 'pfm_local_vault.sqlite'));
-      final walFile = File(p.join(dbFolder.path, 'pfm_local_vault.sqlite-wal'));
-      final shmFile = File(p.join(dbFolder.path, 'pfm_local_vault.sqlite-shm'));
-      final backupBakFile = File(p.join(dbFolder.path, 'pfm_local_vault.sqlite.bak'));
-
-      // 2. Tạo snapshot an toàn pfm_local_vault.sqlite.bak
-      if (await mainDbFile.exists()) {
-        await mainDbFile.copy(backupBakFile.path);
+      final snapshot = await snapshotForInspection();
+      try {
+        final statistics = backupStatistics(snapshot.path);
+        if (statistics['transactions']! > 0 || statistics['wallets']! > 0) {
+          throw StateError(
+              'Thiết bị đã có dữ liệu. Hãy mở Chi tiết bản sao lưu để đối soát trước.');
+        }
+      } finally {
+        await snapshot.parent.delete(recursive: true);
       }
-
-      // 3. Xóa các tệp phụ WAL và SHM
-      if (await walFile.exists()) await walFile.delete();
-      if (await shmFile.exists()) await shmFile.delete();
-
-      // 4. Ghi đè file mới từ Cloud
-      await decryptedFile.copy(mainDbFile.path);
-
-      // 5. Invalidate toàn bộ providers CSDL
-      _ref.invalidate(databaseProvider);
-      _ref.read(backupSyncNotifierProvider.notifier).markAsUpToDate();
+      await restorePreparedBackup(file);
     } finally {
-      if (decryptedFile != null && decryptedFile.existsSync()) {
+      if (await file.parent.exists()) await file.parent.delete(recursive: true);
+    }
+  }
+
+  Future<File> snapshotForInspection() async {
+    final folder = await getTemporaryDirectory();
+    final dir =
+        await Directory(p.join(folder.path, 'flowy_inspection_')).createTemp();
+    final file = File(p.join(dir.path, 'local.sqlite'));
+    await _db.customStatement('VACUUM INTO ?', [file.path]);
+    return file;
+  }
+
+  /// The prepared file is a validated staging copy; no live DB is overwritten
+  /// until a durable local recovery set exists and Drift has fully closed.
+  Future<void> restorePreparedBackup(File file,
+      {BackupReconciliation? reconciliation,
+      Set<String> selected = const {},
+      Map<String, String> walletMapping = const {}}) async {
+    if (_busy) throw StateError('Một tác vụ sao lưu đang chạy');
+    _busy = true;
+    _debounceTimer?.cancel();
+    final progress = _ref.read(backupOperationProvider.notifier);
+    progress.state = 'Đang kiểm tra bản khôi phục…';
+    late SharedPreferences prefs;
+    late Map<String, Object> beforePrefs;
+    late Map<String, dynamic> beforeSecurity;
+    late File mainFile;
+    late Directory recovery;
+    RandomAccessFile? restoreGuard;
+    var closed = false;
+    var replacing = false;
+    try {
+      prefs = await SharedPreferences.getInstance();
+      beforePrefs = await exportBackupPreferences(prefs);
+      final securityService = _ref.read(vaultSecurityServiceProvider);
+      beforeSecurity = await securityService.exportManifest();
+      final folder = await getApplicationDocumentsDirectory();
+      mainFile = File(p.join(folder.path, 'pfm_local_vault.sqlite'));
+      recovery = Directory(p.join(folder.path, 'restore_recovery'));
+      if (await File(p.join(recovery.path, 'pending')).exists()) {
+        throw StateError(
+            'Có lần khôi phục chưa hoàn tất. Hãy mở lại ứng dụng để phục hồi trước.');
+      }
+      restoreGuard = await File(p.join(folder.path, 'restore_access.lock'))
+          .open(mode: FileMode.append);
+      await restoreGuard.lock(FileLock.blockingExclusive);
+      validateBackupDatabase(file.path, _db.schemaVersion);
+      if (reconciliation != null &&
+          ledgerFingerprint(mainFile.path) != reconciliation.fingerprint) {
+        throw StateError(
+            'Dữ liệu trên máy đã thay đổi. Hãy mở lại bản sao lưu để đối soát.');
+      }
+      final stagedFile =
+          await file.copy(p.join(file.parent.path, 'staged.sqlite'));
+      if (reconciliation != null && selected.isNotEmpty) {
+        await compute(_reconcileInBackground, {
+          'path': stagedFile.path,
+          'diff': reconciliation,
+          'selected': selected,
+          'mapping': walletMapping
+        });
+      }
+      final settings =
+          readManifest(file.parent.path, 'preferences_manifest.json');
+      final security = readManifest(file.parent.path, 'security_manifest.json');
+      if (settings != null) validatePreferences(settings);
+      if (security != null) VaultSecurityConfig.fromJson(security);
+      if (await recovery.exists()) {
+        // Retain earlier recovery sets rather than silently overwriting them.
+        await recovery.rename(
+            '${recovery.path}_${DateTime.now().microsecondsSinceEpoch}');
+      }
+      await recovery.create();
+      await _db.customStatement(
+          'VACUUM INTO ?', [p.join(recovery.path, 'pfm_local_vault.sqlite')]);
+      await File(p.join(recovery.path, 'preferences_manifest.json'))
+          .writeAsString(jsonEncode(beforePrefs), flush: true);
+      await File(p.join(recovery.path, 'security_manifest.json'))
+          .writeAsString(jsonEncode(beforeSecurity), flush: true);
+      await File(p.join(recovery.path, 'pending'))
+          .writeAsString('prepared', flush: true);
+      progress.state = 'Đang khôi phục dữ liệu và thiết lập…';
+      await _db.close();
+      closed = true;
+      // Capture again after all queued Drift writes have drained during close.
+      await mainFile.copy(p.join(recovery.path, 'pfm_local_vault.sqlite'));
+      if (reconciliation != null &&
+          ledgerFingerprint(mainFile.path) != reconciliation.fingerprint) {
+        throw StateError(
+            'Có giao dịch vừa thay đổi. Hãy mở lại đối soát trước khi khôi phục.');
+      }
+      await File(p.join(recovery.path, 'pending'))
+          .writeAsString('installing', flush: true);
+      replacing = true;
+      for (final suffix in ['-wal', '-shm']) {
+        final sidecar = File('${mainFile.path}$suffix');
+        if (await sidecar.exists()) await sidecar.delete();
+      }
+      await stagedFile.copy(mainFile.path);
+      if (settings != null) await applyBackupPreferences(prefs, settings);
+      if (security != null) {
+        await VaultSecurityService.restoreManifest(security);
+      }
+      await prefs.setBool('flowy_restored_private', true);
+      await File(p.join(recovery.path, 'pending')).delete();
+    } catch (_) {
+      if (replacing) {
+        await File(p.join(recovery.path, 'pfm_local_vault.sqlite'))
+            .copy(mainFile.path);
+        await applyBackupPreferences(prefs, beforePrefs);
+        await VaultSecurityService.restoreManifest(beforeSecurity);
+        final marker = File(p.join(recovery.path, 'pending'));
+        if (await marker.exists()) await marker.delete();
+      }
+      if (closed && !replacing) {
+        final marker = File(p.join(recovery.path, 'pending'));
+        if (await marker.exists()) await marker.delete();
+      }
+      rethrow;
+    } finally {
+      if (restoreGuard != null) {
         try {
-          decryptedFile.parent.deleteSync(recursive: true);
-        } catch (_) {}
+          await restoreGuard.unlock();
+        } finally {
+          await restoreGuard.close();
+        }
+      }
+      _busy = false;
+      progress.state = null;
+      if (closed) {
+        _ref.invalidate(themeModeProvider);
+        _ref.invalidate(accentPresetProvider);
+        _ref.invalidate(fontFamilyProvider);
+        _ref.invalidate(currencyFontProvider);
+        _ref.invalidate(notificationPreferencesProvider);
+        _ref.invalidate(classificationSchemesProvider);
+        _ref.invalidate(userProfileNotifierProvider);
+        _ref.invalidate(vaultSecurityServiceProvider);
+        _ref.invalidate(vaultBiometricsProvider);
+        _ref.invalidate(cycleStartDaysByMonthProvider);
+        _ref.invalidate(databaseProvider);
       }
     }
   }
@@ -720,7 +820,8 @@ class BackupSyncNotifier extends StateNotifier<BackupSyncState> {
   }
 
   void markAsUpToDate() {
-    state = state.copyWith(status: BackupSyncStatus.upToDate, isDismissed: true);
+    state =
+        state.copyWith(status: BackupSyncStatus.upToDate, isDismissed: true);
   }
 
   /// Quét ngầm Google Drive appDataFolder và so sánh thời gian giao dịch mới nhất
@@ -734,6 +835,7 @@ class BackupSyncNotifier extends StateNotifier<BackupSyncState> {
 
     try {
       final backups = await _service.listBackups();
+      if (!mounted) return;
       if (backups.isEmpty) {
         state = state.copyWith(status: BackupSyncStatus.upToDate);
         return;
@@ -763,14 +865,17 @@ class BackupSyncNotifier extends StateNotifier<BackupSyncState> {
       if (latestLocalTxDate == null) {
         isCloudNewer = cloudMetadata.transactionCount > 0;
       } else {
-        if (cloudLatestTxDate != null && cloudLatestTxDate.isAfter(latestLocalTxDate)) {
+        if (cloudLatestTxDate != null &&
+            cloudLatestTxDate.isAfter(latestLocalTxDate)) {
           isCloudNewer = true;
         } else if (cloudBackupTime.isAfter(latestLocalTxDate) &&
-            cloudMetadata.transactionCount > (localTxs.length + localDebtTxs.length)) {
+            cloudMetadata.transactionCount >
+                (localTxs.length + localDebtTxs.length)) {
           isCloudNewer = true;
         }
       }
 
+      if (!mounted) return;
       if (isCloudNewer) {
         state = state.copyWith(
           status: BackupSyncStatus.foundNewer,
@@ -782,6 +887,7 @@ class BackupSyncNotifier extends StateNotifier<BackupSyncState> {
       }
     } catch (e) {
       debugPrint('[BackupSyncNotifier] Lỗi quét kiểm tra backup: $e');
+      if (!mounted) return;
       state = state.copyWith(
         status: BackupSyncStatus.error,
         errorMessage: e.toString(),
@@ -796,7 +902,7 @@ class BackupSyncNotifier extends StateNotifier<BackupSyncState> {
 }
 
 final backupSyncNotifierProvider =
-StateNotifierProvider<BackupSyncNotifier, BackupSyncState>((ref) {
+    StateNotifierProvider<BackupSyncNotifier, BackupSyncState>((ref) {
   final service = ref.watch(cloudBackupServiceProvider);
   final db = ref.watch(databaseProvider);
   final googleSignIn = GoogleSignIn(
@@ -830,7 +936,8 @@ class CloudBackupNotifier extends StateNotifier<CloudBackupState> {
     );
   }
 
-  void updateProgress(CloudBackupStatus status, String message, double progress) {
+  void updateProgress(
+      CloudBackupStatus status, String message, double progress) {
     state = state.copyWith(
       status: status,
       message: message,
@@ -842,7 +949,8 @@ class CloudBackupNotifier extends StateNotifier<CloudBackupState> {
     final updatedBackups = [item, ...state.backups];
     state = state.copyWith(
       status: CloudBackupStatus.success,
-      message: 'Sao lưu thành công lúc ${DateFormat('HH:mm dd/MM/yyyy').format(DateTime.now())}',
+      message:
+          'Sao lưu thành công lúc ${DateFormat('HH:mm dd/MM/yyyy').format(DateTime.now())}',
       progress: 1.0,
       backups: updatedBackups,
       lastBackupTime: item.createdTime,
@@ -860,6 +968,7 @@ class CloudBackupNotifier extends StateNotifier<CloudBackupState> {
   Future<void> loadBackups() async {
     try {
       final backups = await _service.listBackups();
+      if (!mounted) return;
       DateTime? latestTime;
       if (backups.isNotEmpty) {
         latestTime = backups.first.createdTime;
@@ -880,7 +989,8 @@ class CloudBackupNotifier extends StateNotifier<CloudBackupState> {
   Future<void> deleteBackup(String fileId) async {
     try {
       await _service.deleteBackup(fileId);
-      final updatedList = state.backups.where((b) => b.fileId != fileId).toList();
+      final updatedList =
+          state.backups.where((b) => b.fileId != fileId).toList();
       state = state.copyWith(backups: updatedList);
     } catch (e) {
       debugPrint('CloudBackupNotifier: deleteBackup error: $e');
@@ -890,7 +1000,12 @@ class CloudBackupNotifier extends StateNotifier<CloudBackupState> {
 }
 
 final cloudBackupNotifierProvider =
-StateNotifierProvider<CloudBackupNotifier, CloudBackupState>((ref) {
+    StateNotifierProvider<CloudBackupNotifier, CloudBackupState>((ref) {
   final service = ref.watch(cloudBackupServiceProvider);
   return CloudBackupNotifier(service);
 });
+void _reconcileInBackground(Map<String, dynamic> args) => reconcileBackup(
+    args['path'] as String,
+    args['diff'] as BackupReconciliation,
+    args['selected'] as Set<String>,
+    args['mapping'] as Map<String, String>);

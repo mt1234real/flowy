@@ -1,3 +1,4 @@
+import '../../widgets/flowy_selection_picker.dart';
 import '../../widgets/preserved_balance_tumbler.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -94,62 +95,17 @@ class _SpendingInsightsScreenState
     return '${difference > 0 ? '↑' : '↓'} $percent · ${difference > 0 ? '+' : '−'}${_display(difference.abs())}';
   }
 
-  Future<T?> _sheet<T>(String title,
-          Widget Function(BuildContext, ScrollController) content) =>
-      AppAnimationPolicy.showFluidSheet<T>(
-          context: context,
-          builder: (sheetContext, controller) => Material(
-              color: Theme.of(sheetContext).colorScheme.surface,
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(24)),
-              clipBehavior: Clip.antiAlias,
-              child: SafeArea(
-                  top: false,
-                  child: SizedBox(
-                      height: MediaQuery.sizeOf(sheetContext).height * .72,
-                      child: Column(children: [
-                        Padding(
-                            padding: const EdgeInsets.all(20),
-                            child: Text(title,
-                                style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w800))),
-                        Expanded(child: content(sheetContext, controller!))
-                      ])))));
-
   Future<void> _chooseWallets(List<Wallet> wallets) async {
-    final draft = {..._wallets};
-    final result = await _sheet<Set<String>>(
-        'Chọn ví',
-        (ctx, scroll) => StatefulBuilder(
-            builder: (ctx, update) => ListView(
-                    controller: scroll,
-                    physics: const ClampingScrollPhysics(),
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    children: [
-                      CheckboxListTile(
-                          title: const Text('Tất cả ví'),
-                          value: draft.isEmpty,
-                          onChanged: (_) => update(draft.clear)),
-                      for (final wallet in wallets)
-                        CheckboxListTile(
-                            title: Text(wallet.name),
-                            subtitle: wallet.isArchived
-                                ? const Text('Đã lưu trữ')
-                                : null,
-                            value: draft.contains(wallet.id),
-                            onChanged: (selected) => update(() {
-                                  selected == true
-                                      ? draft.add(wallet.id)
-                                      : draft.remove(wallet.id);
-                                })),
-                      TextButton(
-                          onPressed: () => update(draft.clear),
-                          child: const Text('Đặt lại')),
-                      FilledButton(
-                          onPressed: () => Navigator.pop(ctx, draft),
-                          child: const Text('Áp dụng')),
-                    ])));
+    final result = await showFlowyPicker<String>(
+        context: context,
+        title: 'Chọn ví',
+        items: walletPickerItems(wallets),
+        selected: _wallets,
+        multiple: true,
+        itemsStream: ref
+            .read(databaseProvider)
+            .watchAllWallets(includeArchived: true)
+            .map(walletPickerItems));
     if (result == null && mounted) setState(() => _periodReset++);
     if (result != null && mounted) {
       HapticFeedback.lightImpact();
@@ -200,46 +156,31 @@ class _SpendingInsightsScreenState
 
   Future<void> _chooseScheme(InsightsData data) async {
     final schemes = ref.read(classificationSchemesProvider);
-    final choice = await _sheet<String>(
-        'Phân tích theo',
-        (ctx, scroll) => ListView(
-                controller: scroll,
-                physics: const ClampingScrollPhysics(),
-                children: [
-                  ListTile(
-                      title: const Text('Danh mục'),
-                      trailing:
-                          _schemeId == null ? const Icon(Icons.check) : null,
-                      onTap: () => Navigator.pop(ctx, 'category')),
-                  ListTile(
-                      title: const Text('Phân bổ theo ví'),
-                      onTap: () => Navigator.pop(ctx, '__wallets')),
-                  ListTile(
-                      title: const Text('Thiết yếu / Tùy ý'),
-                      onTap: () => Navigator.pop(ctx, '__nature')),
-                  for (final scheme in schemes)
-                    ListTile(
-                        title: Text(scheme.name),
-                        trailing: _schemeId == scheme.id
-                            ? const Icon(Icons.check)
-                            : null,
-                        onTap: () => Navigator.pop(ctx, scheme.id)),
-                  const Divider(),
-                  const ListTile(title: Text('Thêm góc nhìn (tùy chọn)')),
-                  for (final preset in [
-                    'Thiết yếu / Tùy ý',
-                    'Cố định / Linh hoạt',
-                    'Bills / Daily / Lifestyle'
-                  ])
-                    ListTile(
-                        leading: const Icon(Icons.add),
-                        title: Text(preset),
-                        onTap: () => Navigator.pop(ctx, 'preset:$preset')),
-                  ListTile(
-                      leading: const Icon(Icons.add),
-                      title: const Text('Tạo góc nhìn mới'),
-                      onTap: () => Navigator.pop(ctx, 'create')),
-                ]));
+    final selection = await showFlowyPicker<String>(
+        context: context,
+        title: 'Phân tích theo',
+        selected: {
+          _schemeId ?? 'category'
+        },
+        items: [
+          const DropdownMenuItem(value: 'category', child: Text('Danh mục')),
+          const DropdownMenuItem(
+              value: '__wallets', child: Text('Phân bổ theo ví')),
+          const DropdownMenuItem(
+              value: '__nature', child: Text('Thiết yếu / Tùy ý')),
+          for (final scheme in schemes)
+            DropdownMenuItem(value: scheme.id, child: Text(scheme.name)),
+          for (final preset in [
+            'Thiết yếu / Tùy ý',
+            'Cố định / Linh hoạt',
+            'Bills / Daily / Lifestyle'
+          ])
+            DropdownMenuItem(
+                value: 'preset:$preset', child: Text('Thêm góc nhìn: $preset')),
+          const DropdownMenuItem(
+              value: 'create', child: Text('Tạo góc nhìn mới')),
+        ]);
+    final choice = selection?.firstOrNull;
     if (choice == null || !mounted) return;
     HapticFeedback.selectionClick();
     if (choice == 'create') {
@@ -576,7 +517,7 @@ class _SpendingInsightsScreenState
             _periodControl(),
             const SizedBox(height: 8),
             Row(children: [
-              PopupMenuButton<CategoryType>(
+              FlowySelectionMenu<CategoryType>(
                   tooltip: 'Loại dòng tiền',
                   initialValue: _type,
                   onSelected: (value) => setState(() {
@@ -722,7 +663,7 @@ class _SpendingInsightsScreenState
                   child: Text(expense ? 'Chi theo nhóm' : 'Thu theo nhóm',
                       style: const TextStyle(
                           fontSize: 18, fontWeight: FontWeight.w800))),
-              PopupMenuButton<int>(
+              FlowySelectionMenu<int>(
                   tooltip: 'Sắp xếp nhóm',
                   initialValue: _sort,
                   onSelected: (value) => setState(() => _sort = value),
@@ -738,7 +679,7 @@ class _SpendingInsightsScreenState
                           '${_sort == 0 ? 'Chi nhiều nhất' : _sort == 1 ? 'Nhiều giao dịch' : 'Tăng nhiều nhất'} ⌄',
                           style: const TextStyle(fontSize: 11.5)))),
               if (expense)
-                PopupMenuButton<String>(
+                FlowySelectionMenu<String>(
                     tooltip: 'Lọc phân loại',
                     initialValue: _classification,
                     onSelected: (value) => setState(() {

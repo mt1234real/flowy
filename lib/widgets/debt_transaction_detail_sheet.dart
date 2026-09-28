@@ -1,3 +1,4 @@
+import 'flowy_selection_picker.dart';
 // ==============================================================================
 // File: lib/widgets/debt_transaction_detail_sheet.dart
 // Architecture: Debt Transaction Action Sheet with Dedicated 4x4 Fintech Numpad & Full Edit Flow
@@ -33,7 +34,8 @@ import '../theme/app_theme.dart';
 import '../widgets/currency_text.dart';
 
 // StreamProvider nội bộ lấy danh sách ví phục vụ chọn ví thanh toán
-final _detailWalletsStreamProvider = StreamProvider.autoDispose<List<Wallet>>((ref) {
+final _detailWalletsStreamProvider =
+    StreamProvider.autoDispose<List<Wallet>>((ref) {
   final db = ref.watch(databaseProvider);
   return db.select(db.wallets).watch();
 });
@@ -47,10 +49,12 @@ class DebtTransactionDetailSheet extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<DebtTransactionDetailSheet> createState() => _DebtTransactionDetailSheetState();
+  ConsumerState<DebtTransactionDetailSheet> createState() =>
+      _DebtTransactionDetailSheetState();
 }
 
-class _DebtTransactionDetailSheetState extends ConsumerState<DebtTransactionDetailSheet> {
+class _DebtTransactionDetailSheetState
+    extends ConsumerState<DebtTransactionDetailSheet> {
   late DebtTransaction _currentTx;
 
   @override
@@ -60,7 +64,8 @@ class _DebtTransactionDetailSheetState extends ConsumerState<DebtTransactionDeta
   }
 
   String _formatCurrency(double amount, [String currency = '₫']) {
-    final formatter = NumberFormat.currency(locale: 'vi_VN', symbol: currency, decimalDigits: 0);
+    final formatter = NumberFormat.currency(
+        locale: 'vi_VN', symbol: currency, decimalDigits: 0);
     return formatter.format(amount);
   }
 
@@ -68,12 +73,12 @@ class _DebtTransactionDetailSheetState extends ConsumerState<DebtTransactionDeta
   // 🌟 MODAL THU / TRẢ NỢ TÍCH HỢP NUMPAD 4x4 (ZERO OS KEYBOARD DEPENDENCY)
   // ============================================================================
   void _openQuickRepayModal(
-      BuildContext context,
-      DebtContact contact,
-      List<Wallet> wallets,
-      double remainingAmount,
-      bool isLend,
-      ) {
+    BuildContext context,
+    DebtContact contact,
+    List<Wallet> wallets,
+    double remainingAmount,
+    bool isLend,
+  ) {
     HapticFeedback.selectionClick();
 
     AppAnimationPolicy.showFluidSheet(
@@ -96,11 +101,11 @@ class _DebtTransactionDetailSheetState extends ConsumerState<DebtTransactionDeta
   // 🌟 MODAL CHỈNH SỬA KHOẢN NỢ TOÀN DIỆN (ROLLBACK & RE-APPLY ACID)
   // ============================================================================
   Future<void> _openEditDebtModal(
-      BuildContext context,
-      DebtContact contact,
-      List<DebtContact> contacts,
-      List<Wallet> wallets,
-      ) async {
+    BuildContext context,
+    DebtContact contact,
+    List<DebtContact> contacts,
+    List<Wallet> wallets,
+  ) async {
     HapticFeedback.selectionClick();
 
     final amountFeedback = AppValidationFeedbackController();
@@ -128,15 +133,23 @@ class _DebtTransactionDetailSheetState extends ConsumerState<DebtTransactionDeta
           return StatefulBuilder(
             builder: (ctx, setModalState) {
               return ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(28)),
                 child: BackdropFilter(
                   filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
                   child: Container(
-                    padding: EdgeInsets.fromLTRB(20, 12, 20, MediaQuery.of(ctx).viewInsets.bottom + 24),
+                    padding: EdgeInsets.fromLTRB(
+                        20, 12, 20, MediaQuery.of(ctx).viewInsets.bottom + 24),
                     decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF151C28).withValues(alpha: 0.98) : Colors.white.withValues(alpha: 0.98),
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-                      border: Border.all(color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
+                      color: isDark
+                          ? const Color(0xFF151C28).withValues(alpha: 0.98)
+                          : Colors.white.withValues(alpha: 0.98),
+                      borderRadius:
+                          const BorderRadius.vertical(top: Radius.circular(28)),
+                      border: Border.all(
+                          color: isDark
+                              ? AppTokens.darkBorder
+                              : AppTokens.lightBorder),
                     ),
                     child: SafeArea(
                       top: false,
@@ -150,7 +163,8 @@ class _DebtTransactionDetailSheetState extends ConsumerState<DebtTransactionDeta
                                 width: 42,
                                 height: 4,
                                 decoration: BoxDecoration(
-                                  color: isDark ? Colors.white24 : Colors.black26,
+                                  color:
+                                      isDark ? Colors.white24 : Colors.black26,
                                   borderRadius: BorderRadius.circular(2),
                                 ),
                               ),
@@ -165,12 +179,15 @@ class _DebtTransactionDetailSheetState extends ConsumerState<DebtTransactionDeta
                                   style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w800,
-                                    color: isDark ? AppTokens.darkText : AppTokens.lightText,
+                                    color: isDark
+                                        ? AppTokens.darkText
+                                        : AppTokens.lightText,
                                   ),
                                 ),
                                 IconButton(
                                   visualDensity: VisualDensity.compact,
-                                  icon: const Icon(Icons.close_rounded, size: 20),
+                                  icon:
+                                      const Icon(Icons.close_rounded, size: 20),
                                   onPressed: () => Navigator.of(modalCtx).pop(),
                                 ),
                               ],
@@ -183,7 +200,9 @@ class _DebtTransactionDetailSheetState extends ConsumerState<DebtTransactionDeta
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w700,
-                                color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                                color: isDark
+                                    ? AppTokens.darkMuted
+                                    : AppTokens.lightMuted,
                               ),
                             ),
                             const SizedBox(height: 6),
@@ -194,7 +213,7 @@ class _DebtTransactionDetailSheetState extends ConsumerState<DebtTransactionDeta
                                     ? AppTokens.darkBorder
                                     : AppTokens.lightBorder;
                                 final borderColor =
-                                visual.borderColor(restingBorder);
+                                    visual.borderColor(restingBorder);
 
                                 return TextField(
                                   controller: amountController,
@@ -219,22 +238,20 @@ class _DebtTransactionDetailSheetState extends ConsumerState<DebtTransactionDeta
                                     fillColor: isDark
                                         ? AppTokens.darkCard
                                         : AppTokens.lightCardSubtle,
-                                    contentPadding:
-                                    const EdgeInsets.symmetric(
+                                    contentPadding: const EdgeInsets.symmetric(
                                       horizontal: 14,
                                       vertical: 12,
                                     ),
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(14),
                                       borderSide:
-                                      BorderSide(color: borderColor),
+                                          BorderSide(color: borderColor),
                                     ),
                                     enabledBorder: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(14),
                                       borderSide: BorderSide(
                                         color: borderColor,
-                                        width:
-                                        visual.isInvalid ? 1.8 : 1.0,
+                                        width: visual.isInvalid ? 1.8 : 1.0,
                                       ),
                                     ),
                                     focusedBorder: OutlineInputBorder(
@@ -255,10 +272,10 @@ class _DebtTransactionDetailSheetState extends ConsumerState<DebtTransactionDeta
                                     if (cleanDigits.isEmpty) {
                                       currentAmountVal = 0.0;
                                       amountController.value =
-                                      const TextEditingValue(
+                                          const TextEditingValue(
                                         text: '',
                                         selection:
-                                        TextSelection.collapsed(offset: 0),
+                                            TextSelection.collapsed(offset: 0),
                                       );
                                       return;
                                     }
@@ -270,13 +287,12 @@ class _DebtTransactionDetailSheetState extends ConsumerState<DebtTransactionDeta
                                     final formatted = formatter.format(
                                       currentAmountVal.round(),
                                     );
-                                    amountController.value =
-                                        TextEditingValue(
-                                          text: formatted,
-                                          selection: TextSelection.collapsed(
-                                            offset: formatted.length,
-                                          ),
-                                        );
+                                    amountController.value = TextEditingValue(
+                                      text: formatted,
+                                      selection: TextSelection.collapsed(
+                                        offset: formatted.length,
+                                      ),
+                                    );
                                   },
                                 );
                               },
@@ -289,26 +305,39 @@ class _DebtTransactionDetailSheetState extends ConsumerState<DebtTransactionDeta
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w700,
-                                color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                                color: isDark
+                                    ? AppTokens.darkMuted
+                                    : AppTokens.lightMuted,
                               ),
                             ),
                             const SizedBox(height: 6),
-                            DropdownButtonFormField<String>(
+                            FlowyDropdown<String>(
                               value: selectedContactId,
+                              title: 'Chọn đối tác',
                               decoration: InputDecoration(
                                 filled: true,
-                                fillColor: isDark ? AppTokens.darkCard : AppTokens.lightCardSubtle,
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                                fillColor: isDark
+                                    ? AppTokens.darkCard
+                                    : AppTokens.lightCardSubtle,
+                                contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 14, vertical: 10),
+                                border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(14)),
                                 enabledBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(14),
-                                  borderSide: BorderSide(color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
+                                  borderSide: BorderSide(
+                                      color: isDark
+                                          ? AppTokens.darkBorder
+                                          : AppTokens.lightBorder),
                                 ),
                               ),
                               items: contacts.map((c) {
                                 return DropdownMenuItem(
                                   value: c.id,
-                                  child: Text(c.name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                                  child: Text(c.name,
+                                      style: const TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600)),
                                 );
                               }).toList(),
                               onChanged: (val) {
@@ -325,31 +354,37 @@ class _DebtTransactionDetailSheetState extends ConsumerState<DebtTransactionDeta
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w700,
-                                color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                                color: isDark
+                                    ? AppTokens.darkMuted
+                                    : AppTokens.lightMuted,
                               ),
                             ),
                             const SizedBox(height: 6),
-                            DropdownButtonFormField<String>(
+                            FlowyDropdown<String>(
                               value: selectedWalletId,
                               decoration: InputDecoration(
                                 filled: true,
-                                fillColor: isDark ? AppTokens.darkCard : AppTokens.lightCardSubtle,
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                                fillColor: isDark
+                                    ? AppTokens.darkCard
+                                    : AppTokens.lightCardSubtle,
+                                contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 14, vertical: 10),
+                                border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(14)),
                                 enabledBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(14),
-                                  borderSide: BorderSide(color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
+                                  borderSide: BorderSide(
+                                      color: isDark
+                                          ? AppTokens.darkBorder
+                                          : AppTokens.lightBorder),
                                 ),
                               ),
-                              items: wallets.map((w) {
-                                return DropdownMenuItem(
-                                  value: w.id,
-                                  child: CurrencyText(
-                                    '${w.name} (${_formatCurrency(w.balance)})',
-                                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                                  ),
-                                );
-                              }).toList(),
+                              items: walletPickerItems(wallets),
+                              itemsStream: ref
+                                  .read(databaseProvider)
+                                  .watchAllWallets()
+                                  .map(walletPickerItems),
+                              title: 'Chọn nguồn tiền',
                               onChanged: (val) {
                                 if (val != null) {
                                   setModalState(() => selectedWalletId = val);
@@ -363,14 +398,17 @@ class _DebtTransactionDetailSheetState extends ConsumerState<DebtTransactionDeta
                               children: [
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         'Ngày giao dịch',
                                         style: TextStyle(
                                           fontSize: 11,
                                           fontWeight: FontWeight.w700,
-                                          color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                                          color: isDark
+                                              ? AppTokens.darkMuted
+                                              : AppTokens.lightMuted,
                                         ),
                                       ),
                                       const SizedBox(height: 6),
@@ -380,7 +418,8 @@ class _DebtTransactionDetailSheetState extends ConsumerState<DebtTransactionDeta
                                             context: ctx,
                                             initialDate: selectedDate,
                                             firstDate: DateTime(2020),
-                                            lastDate: DateTime.now().add(const Duration(days: 365)),
+                                            lastDate: DateTime.now()
+                                                .add(const Duration(days: 365)),
                                           );
                                           if (picked != null) {
                                             setModalState(() {
@@ -396,19 +435,32 @@ class _DebtTransactionDetailSheetState extends ConsumerState<DebtTransactionDeta
                                         },
                                         borderRadius: BorderRadius.circular(14),
                                         child: Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 12, vertical: 11),
                                           decoration: BoxDecoration(
-                                            color: isDark ? AppTokens.darkCard : AppTokens.lightCardSubtle,
-                                            borderRadius: BorderRadius.circular(14),
-                                            border: Border.all(color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
+                                            color: isDark
+                                                ? AppTokens.darkCard
+                                                : AppTokens.lightCardSubtle,
+                                            borderRadius:
+                                                BorderRadius.circular(14),
+                                            border: Border.all(
+                                                color: isDark
+                                                    ? AppTokens.darkBorder
+                                                    : AppTokens.lightBorder),
                                           ),
                                           child: Row(
                                             children: [
-                                              const Icon(Icons.calendar_today_rounded, size: 14),
+                                              const Icon(
+                                                  Icons.calendar_today_rounded,
+                                                  size: 14),
                                               const SizedBox(width: 8),
                                               Text(
-                                                DateFormat('dd/MM/yyyy').format(selectedDate),
-                                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                                                DateFormat('dd/MM/yyyy')
+                                                    .format(selectedDate),
+                                                style: const TextStyle(
+                                                    fontSize: 12,
+                                                    fontWeight:
+                                                        FontWeight.w700),
                                               ),
                                             ],
                                           ),
@@ -420,14 +472,17 @@ class _DebtTransactionDetailSheetState extends ConsumerState<DebtTransactionDeta
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         'Hạn trả (tùy chọn)',
                                         style: TextStyle(
                                           fontSize: 11,
                                           fontWeight: FontWeight.w700,
-                                          color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                                          color: isDark
+                                              ? AppTokens.darkMuted
+                                              : AppTokens.lightMuted,
                                         ),
                                       ),
                                       const SizedBox(height: 6),
@@ -435,34 +490,54 @@ class _DebtTransactionDetailSheetState extends ConsumerState<DebtTransactionDeta
                                         onTap: () async {
                                           final picked = await showDatePicker(
                                             context: ctx,
-                                            initialDate: selectedDueDate ?? DateTime.now().add(const Duration(days: 7)),
+                                            initialDate: selectedDueDate ??
+                                                DateTime.now().add(
+                                                    const Duration(days: 7)),
                                             firstDate: DateTime(2020),
-                                            lastDate: DateTime.now().add(const Duration(days: 1825)),
+                                            lastDate: DateTime.now().add(
+                                                const Duration(days: 1825)),
                                           );
-                                          setModalState(() => selectedDueDate = picked);
+                                          setModalState(
+                                              () => selectedDueDate = picked);
                                         },
                                         borderRadius: BorderRadius.circular(14),
                                         child: Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 12, vertical: 11),
                                           decoration: BoxDecoration(
-                                            color: isDark ? AppTokens.darkCard : AppTokens.lightCardSubtle,
-                                            borderRadius: BorderRadius.circular(14),
-                                            border: Border.all(color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
+                                            color: isDark
+                                                ? AppTokens.darkCard
+                                                : AppTokens.lightCardSubtle,
+                                            borderRadius:
+                                                BorderRadius.circular(14),
+                                            border: Border.all(
+                                                color: isDark
+                                                    ? AppTokens.darkBorder
+                                                    : AppTokens.lightBorder),
                                           ),
                                           child: Row(
                                             children: [
-                                              const Icon(Icons.event_available_rounded, size: 14),
+                                              const Icon(
+                                                  Icons.event_available_rounded,
+                                                  size: 14),
                                               const SizedBox(width: 8),
                                               Text(
                                                 selectedDueDate != null
-                                                    ? DateFormat('dd/MM/yyyy').format(selectedDueDate!)
+                                                    ? DateFormat('dd/MM/yyyy')
+                                                        .format(
+                                                            selectedDueDate!)
                                                     : 'Chưa đặt',
                                                 style: TextStyle(
                                                   fontSize: 12,
                                                   fontWeight: FontWeight.w700,
                                                   color: selectedDueDate != null
-                                                      ? (isDark ? AppTokens.darkText : AppTokens.lightText)
-                                                      : (isDark ? AppTokens.darkMuted : AppTokens.lightMuted),
+                                                      ? (isDark
+                                                          ? AppTokens.darkText
+                                                          : AppTokens.lightText)
+                                                      : (isDark
+                                                          ? AppTokens.darkMuted
+                                                          : AppTokens
+                                                              .lightMuted),
                                                 ),
                                               ),
                                             ],
@@ -482,22 +557,35 @@ class _DebtTransactionDetailSheetState extends ConsumerState<DebtTransactionDeta
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w700,
-                                color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                                color: isDark
+                                    ? AppTokens.darkMuted
+                                    : AppTokens.lightMuted,
                               ),
                             ),
                             const SizedBox(height: 6),
                             TextField(
                               controller: noteController,
-                              style: TextStyle(fontSize: 13, color: isDark ? AppTokens.darkText : AppTokens.lightText),
+                              style: TextStyle(
+                                  fontSize: 13,
+                                  color: isDark
+                                      ? AppTokens.darkText
+                                      : AppTokens.lightText),
                               decoration: InputDecoration(
                                 hintText: 'Nhập ghi chú khoản nợ...',
                                 filled: true,
-                                fillColor: isDark ? AppTokens.darkCard : AppTokens.lightCardSubtle,
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                                fillColor: isDark
+                                    ? AppTokens.darkCard
+                                    : AppTokens.lightCardSubtle,
+                                contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 14, vertical: 10),
+                                border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(14)),
                                 enabledBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(14),
-                                  borderSide: BorderSide(color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
+                                  borderSide: BorderSide(
+                                      color: isDark
+                                          ? AppTokens.darkBorder
+                                          : AppTokens.lightBorder),
                                 ),
                               ),
                             ),
@@ -511,7 +599,8 @@ class _DebtTransactionDetailSheetState extends ConsumerState<DebtTransactionDeta
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: const Color(0xFF10B981),
                                   foregroundColor: Colors.white,
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(14)),
                                   elevation: 2,
                                 ),
                                 onPressed: () async {
@@ -531,7 +620,9 @@ class _DebtTransactionDetailSheetState extends ConsumerState<DebtTransactionDeta
                                     amount: currentAmountVal,
                                     date: selectedDate,
                                     dueDate: selectedDueDate,
-                                    note: noteController.text.trim().isEmpty ? null : noteController.text.trim(),
+                                    note: noteController.text.trim().isEmpty
+                                        ? null
+                                        : noteController.text.trim(),
                                     isSettled: _currentTx.isSettled,
                                     createdAt: _currentTx.createdAt,
                                   );
@@ -546,7 +637,9 @@ class _DebtTransactionDetailSheetState extends ConsumerState<DebtTransactionDeta
                                   ref.invalidate(unifiedLedgerStreamProvider);
                                   ref.invalidate(debtSummaryStreamProvider);
                                   ref.invalidate(debtContactsStreamProvider);
-                                  ref.invalidate(debtTransactionsByContactStreamProvider(selectedContactId));
+                                  ref.invalidate(
+                                      debtTransactionsByContactStreamProvider(
+                                          selectedContactId));
 
                                   HapticFeedback.mediumImpact();
 
@@ -563,7 +656,10 @@ class _DebtTransactionDetailSheetState extends ConsumerState<DebtTransactionDeta
                                 },
                                 child: const Text(
                                   'LƯU THAY ĐỔI',
-                                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, letterSpacing: 0.3),
+                                  style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 0.3),
                                 ),
                               ),
                             ),
@@ -593,14 +689,17 @@ class _DebtTransactionDetailSheetState extends ConsumerState<DebtTransactionDeta
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Xác nhận xóa khoản nợ'),
-        content: const Text('Bạn có chắc chắn muốn xóa giao dịch này? Số dư ví và dư nợ đối tác sẽ được hoàn trả chính xác.'),
+        content: const Text(
+            'Bạn có chắc chắn muốn xóa giao dịch này? Số dư ví và dư nợ đối tác sẽ được hoàn trả chính xác.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
             child: const Text('HỦY BỎ'),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppTokens.expense, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: AppTokens.expense,
+                foregroundColor: Colors.white),
             onPressed: () => Navigator.of(ctx).pop(true),
             child: const Text('XÓA'),
           ),
@@ -619,7 +718,8 @@ class _DebtTransactionDetailSheetState extends ConsumerState<DebtTransactionDeta
       ref.invalidate(unifiedLedgerStreamProvider);
       ref.invalidate(debtSummaryStreamProvider);
       ref.invalidate(debtContactsStreamProvider);
-      ref.invalidate(debtTransactionsByContactStreamProvider(_currentTx.contactId));
+      ref.invalidate(
+          debtTransactionsByContactStreamProvider(_currentTx.contactId));
 
       if (!context.mounted) return;
 
@@ -637,16 +737,22 @@ class _DebtTransactionDetailSheetState extends ConsumerState<DebtTransactionDeta
             children: [
               Icon(Icons.shield_outlined, color: AppTokens.expense, size: 24),
               SizedBox(width: 8),
-              Text('Không thể xóa khoản vay', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+              Text('Không thể xóa khoản vay',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
             ],
           ),
           content: Text(
-            e.toString().replaceAll('Exception: ', '').replaceAll('StateError: ', ''),
+            e
+                .toString()
+                .replaceAll('Exception: ', '')
+                .replaceAll('StateError: ', ''),
             style: const TextStyle(fontSize: 13, height: 1.4),
           ),
           actions: [
             ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: AppTokens.expense, foregroundColor: Colors.white),
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTokens.expense,
+                  foregroundColor: Colors.white),
               onPressed: () => Navigator.of(ctx).pop(),
               child: const Text('ĐÃ HIỂU'),
             ),
@@ -667,12 +773,13 @@ class _DebtTransactionDetailSheetState extends ConsumerState<DebtTransactionDeta
 
     final contactsAsync = ref.watch(debtContactsStreamProvider);
     final walletsAsync = ref.watch(_detailWalletsStreamProvider);
-    final contactTxsAsync = ref.watch(debtTransactionsByContactStreamProvider(tx.contactId));
+    final contactTxsAsync =
+        ref.watch(debtTransactionsByContactStreamProvider(tx.contactId));
 
     final contacts = contactsAsync.valueOrNull ?? [];
     final wallets = walletsAsync.valueOrNull ?? [];
     final contact = contacts.firstWhere(
-          (c) => c.id == tx.contactId,
+      (c) => c.id == tx.contactId,
       orElse: () => DebtContact(
         id: tx.contactId,
         name: 'Đối tác',
@@ -682,7 +789,7 @@ class _DebtTransactionDetailSheetState extends ConsumerState<DebtTransactionDeta
       ),
     );
     final wallet = wallets.firstWhere(
-          (w) => w.id == tx.walletId,
+      (w) => w.id == tx.walletId,
       orElse: () => Wallet(
         id: tx.walletId,
         name: 'Ví',
@@ -703,14 +810,22 @@ class _DebtTransactionDetailSheetState extends ConsumerState<DebtTransactionDeta
     // Tính toán tiến độ hoàn trả dựa trên các giao dịch đối ứng liên kết
     final contactTxs = contactTxsAsync.valueOrNull ?? [];
     final relevantRepayments = contactTxs.where((t) {
-      if (isLend) return t.type == 'COLLECT' && t.date.isAfter(tx.date.subtract(const Duration(minutes: 1)));
-      if (isBorrow) return t.type == 'REPAY' && t.date.isAfter(tx.date.subtract(const Duration(minutes: 1)));
+      if (isLend) {
+        return t.type == 'COLLECT' &&
+            t.date.isAfter(tx.date.subtract(const Duration(minutes: 1)));
+      }
+      if (isBorrow) {
+        return t.type == 'REPAY' &&
+            t.date.isAfter(tx.date.subtract(const Duration(minutes: 1)));
+      }
       return false;
     }).toList();
 
-    final repaidAmount = relevantRepayments.fold(0.0, (sum, t) => sum + t.amount);
+    final repaidAmount =
+        relevantRepayments.fold(0.0, (sum, t) => sum + t.amount);
     final remainingAmount = (tx.amount - repaidAmount).clamp(0.0, tx.amount);
-    final progressPercent = tx.amount > 0 ? (repaidAmount / tx.amount).clamp(0.0, 1.0) : 1.0;
+    final progressPercent =
+        tx.amount > 0 ? (repaidAmount / tx.amount).clamp(0.0, 1.0) : 1.0;
 
     String actionTitle = '';
     bool isMoneyIn = false;
@@ -740,7 +855,8 @@ class _DebtTransactionDetailSheetState extends ConsumerState<DebtTransactionDeta
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF151C28) : Colors.white,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-          border: Border.all(color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
+          border: Border.all(
+              color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
         ),
         child: SafeArea(
           top: false,
@@ -775,13 +891,19 @@ class _DebtTransactionDetailSheetState extends ConsumerState<DebtTransactionDeta
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w800,
-                            color: isDark ? AppTokens.darkText : AppTokens.lightText,
+                            color: isDark
+                                ? AppTokens.darkText
+                                : AppTokens.lightText,
                           ),
                         ),
                         const SizedBox(height: 2),
                         Text(
                           '${wallet.name} • ${DateFormat('HH:mm, dd/MM/yyyy').format(tx.date)}',
-                          style: TextStyle(fontSize: 11, color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted),
+                          style: TextStyle(
+                              fontSize: 11,
+                              color: isDark
+                                  ? AppTokens.darkMuted
+                                  : AppTokens.lightMuted),
                         ),
                       ],
                     ),
@@ -792,10 +914,12 @@ class _DebtTransactionDetailSheetState extends ConsumerState<DebtTransactionDeta
                         icon: const Icon(Icons.edit_rounded, size: 20),
                         color: const Color(0xFF0EA5E9),
                         tooltip: 'Chỉnh sửa khoản nợ',
-                        onPressed: () => _openEditDebtModal(context, contact, contacts, wallets),
+                        onPressed: () => _openEditDebtModal(
+                            context, contact, contacts, wallets),
                       ),
                       IconButton(
-                        icon: const Icon(Icons.delete_outline_rounded, size: 20),
+                        icon:
+                            const Icon(Icons.delete_outline_rounded, size: 20),
                         color: AppTokens.expense,
                         tooltip: 'Xóa giao dịch',
                         onPressed: () => _handleDeleteWithSafety(context),
@@ -812,11 +936,14 @@ class _DebtTransactionDetailSheetState extends ConsumerState<DebtTransactionDeta
                 children: [
                   Text(
                     '${isMoneyIn ? '+' : '-'}${_formatCurrency(tx.amount)}',
-                    style: currencyTextStyle(context, TextStyle(
-                      fontSize: 26,
-                      fontWeight: FontWeight.w900,
-                      color: isMoneyIn ? AppTokens.income : AppTokens.expense,
-                    )),
+                    style: currencyTextStyle(
+                        context,
+                        TextStyle(
+                          fontSize: 26,
+                          fontWeight: FontWeight.w900,
+                          color:
+                              isMoneyIn ? AppTokens.income : AppTokens.expense,
+                        )),
                   ),
                   if (tx.note != null && tx.note!.isNotEmpty) ...[
                     const SizedBox(width: 10),
@@ -825,7 +952,12 @@ class _DebtTransactionDetailSheetState extends ConsumerState<DebtTransactionDeta
                         '• ${tx.note!}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted),
+                        style: TextStyle(
+                            fontSize: 12,
+                            fontStyle: FontStyle.italic,
+                            color: isDark
+                                ? AppTokens.darkMuted
+                                : AppTokens.lightMuted),
                       ),
                     ),
                   ],
@@ -839,9 +971,13 @@ class _DebtTransactionDetailSheetState extends ConsumerState<DebtTransactionDeta
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: isDark ? AppTokens.darkCard : AppTokens.lightCardSubtle,
+                    color:
+                        isDark ? AppTokens.darkCard : AppTokens.lightCardSubtle,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
+                    border: Border.all(
+                        color: isDark
+                            ? AppTokens.darkBorder
+                            : AppTokens.lightBorder),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -851,7 +987,12 @@ class _DebtTransactionDetailSheetState extends ConsumerState<DebtTransactionDeta
                         children: [
                           Text(
                             isLend ? 'Tiến độ thu hồi nợ' : 'Tiến độ trả nợ',
-                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted),
+                            style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: isDark
+                                    ? AppTokens.darkMuted
+                                    : AppTokens.lightMuted),
                           ),
                           Text(
                             '${(progressPercent * 100).toStringAsFixed(0)}%',
@@ -860,7 +1001,9 @@ class _DebtTransactionDetailSheetState extends ConsumerState<DebtTransactionDeta
                               fontWeight: FontWeight.w800,
                               color: progressPercent >= 1.0
                                   ? const Color(0xFF10B981)
-                                  : (progressPercent > 0 ? const Color(0xFF0EA5E9) : AppTokens.expense),
+                                  : (progressPercent > 0
+                                      ? const Color(0xFF0EA5E9)
+                                      : AppTokens.expense),
                             ),
                           ),
                         ],
@@ -871,11 +1014,14 @@ class _DebtTransactionDetailSheetState extends ConsumerState<DebtTransactionDeta
                         child: LinearProgressIndicator(
                           value: progressPercent,
                           minHeight: 8,
-                          backgroundColor: isDark ? Colors.white10 : Colors.black12,
+                          backgroundColor:
+                              isDark ? Colors.white10 : Colors.black12,
                           valueColor: AlwaysStoppedAnimation<Color>(
                             progressPercent >= 1.0
                                 ? const Color(0xFF10B981)
-                                : (progressPercent > 0 ? const Color(0xFF0EA5E9) : AppTokens.expense),
+                                : (progressPercent > 0
+                                    ? const Color(0xFF0EA5E9)
+                                    : AppTokens.expense),
                           ),
                         ),
                       ),
@@ -884,7 +1030,12 @@ class _DebtTransactionDetailSheetState extends ConsumerState<DebtTransactionDeta
                         isLend
                             ? 'Đã thu: ${_formatCurrency(repaidAmount)} / ${_formatCurrency(tx.amount)} (Còn nợ: ${_formatCurrency(remainingAmount)})'
                             : 'Đã trả: ${_formatCurrency(repaidAmount)} / ${_formatCurrency(tx.amount)} (Còn nợ: ${_formatCurrency(remainingAmount)})',
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: isDark ? AppTokens.darkText : AppTokens.lightText),
+                        style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: isDark
+                                ? AppTokens.darkText
+                                : AppTokens.lightText),
                       ),
                     ],
                   ),
@@ -901,14 +1052,21 @@ class _DebtTransactionDetailSheetState extends ConsumerState<DebtTransactionDeta
                     icon: const Icon(Icons.bolt_rounded, size: 18),
                     label: Text(
                       isLend ? 'GHI NHẬN THU NỢ' : 'GHI NHẬN TRẢ NỢ',
-                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, letterSpacing: 0.3),
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 13,
+                          letterSpacing: 0.3),
                     ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: isLend ? const Color(0xFF0EA5E9) : const Color(0xFFF43F5E),
+                      backgroundColor: isLend
+                          ? const Color(0xFF0EA5E9)
+                          : const Color(0xFFF43F5E),
                       foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14)),
                     ),
-                    onPressed: () => _openQuickRepayModal(context, contact, wallets, remainingAmount, isLend),
+                    onPressed: () => _openQuickRepayModal(
+                        context, contact, wallets, remainingAmount, isLend),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -921,12 +1079,18 @@ class _DebtTransactionDetailSheetState extends ConsumerState<DebtTransactionDeta
                   icon: const Icon(Icons.menu_book_rounded, size: 16),
                   label: Text(
                     'Xem sổ nợ của ${contact.name}',
-                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w700, fontSize: 12),
                   ),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: isDark ? AppTokens.darkText : AppTokens.lightText,
-                    side: BorderSide(color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    foregroundColor:
+                        isDark ? AppTokens.darkText : AppTokens.lightText,
+                    side: BorderSide(
+                        color: isDark
+                            ? AppTokens.darkBorder
+                            : AppTokens.lightBorder),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14)),
                   ),
                   onPressed: () {
                     Navigator.of(context).pop();
@@ -966,22 +1130,26 @@ class _QuickRepayNumpadSheet extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<_QuickRepayNumpadSheet> createState() => _QuickRepayNumpadSheetState();
+  ConsumerState<_QuickRepayNumpadSheet> createState() =>
+      _QuickRepayNumpadSheetState();
 }
 
-class _QuickRepayNumpadSheetState extends ConsumerState<_QuickRepayNumpadSheet> {
+class _QuickRepayNumpadSheetState
+    extends ConsumerState<_QuickRepayNumpadSheet> {
   late String _rawAmount;
   late String _selectedWalletId;
   late DateTime _selectedDate;
   late TextEditingController _cleanNoteController;
   final AppValidationFeedbackController _amountFeedback =
-  AppValidationFeedbackController();
+      AppValidationFeedbackController();
 
   @override
   void initState() {
     super.initState();
     _rawAmount = widget.remainingAmount.toInt().toString();
-    _selectedWalletId = widget.wallets.isNotEmpty ? widget.wallets.first.id : widget.parentTx.walletId;
+    _selectedWalletId = widget.wallets.isNotEmpty
+        ? widget.wallets.first.id
+        : widget.parentTx.walletId;
     _selectedDate = DateTime.now();
 
     // Ghi chú sạch, tự nhiên 100%, không chứa mã hack [#ref:...]
@@ -1000,7 +1168,8 @@ class _QuickRepayNumpadSheetState extends ConsumerState<_QuickRepayNumpadSheet> 
 
   String _formatDisplayAmount(String raw) {
     final val = double.tryParse(raw) ?? 0.0;
-    final formatter = NumberFormat.currency(locale: 'vi_VN', symbol: '₫', decimalDigits: 0);
+    final formatter =
+        NumberFormat.currency(locale: 'vi_VN', symbol: '₫', decimalDigits: 0);
     return formatter.format(val);
   }
 
@@ -1105,7 +1274,8 @@ class _QuickRepayNumpadSheetState extends ConsumerState<_QuickRepayNumpadSheet> 
     ref.invalidate(unifiedLedgerStreamProvider);
     ref.invalidate(debtSummaryStreamProvider);
     ref.invalidate(debtContactsStreamProvider);
-    ref.invalidate(debtTransactionsByContactStreamProvider(widget.parentTx.contactId));
+    ref.invalidate(
+        debtTransactionsByContactStreamProvider(widget.parentTx.contactId));
 
     if (!mounted) return;
 
@@ -1122,7 +1292,8 @@ class _QuickRepayNumpadSheetState extends ConsumerState<_QuickRepayNumpadSheet> 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final primaryColor = widget.isLend ? const Color(0xFF0EA5E9) : const Color(0xFFF43F5E);
+    final primaryColor =
+        widget.isLend ? const Color(0xFF0EA5E9) : const Color(0xFFF43F5E);
 
     return AppFeedbackDismissRegion(
       child: Container(
@@ -1130,7 +1301,8 @@ class _QuickRepayNumpadSheetState extends ConsumerState<_QuickRepayNumpadSheet> 
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF151C28) : Colors.white,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-          border: Border.all(color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
+          border: Border.all(
+              color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
         ),
         child: SafeArea(
           top: false,
@@ -1171,7 +1343,9 @@ class _QuickRepayNumpadSheetState extends ConsumerState<_QuickRepayNumpadSheet> 
               ),
               Text(
                 'Khoản nợ đối ứng: ${widget.contact.name} (${DateFormat('dd/MM/yyyy').format(widget.parentTx.date)})',
-                style: TextStyle(fontSize: 11, color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted),
+                style: TextStyle(
+                    fontSize: 11,
+                    color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted),
               ),
               const SizedBox(height: 10),
 
@@ -1179,10 +1353,8 @@ class _QuickRepayNumpadSheetState extends ConsumerState<_QuickRepayNumpadSheet> 
               AppValidationFeedback(
                 controller: _amountFeedback,
                 builder: (context, visual) {
-                  final baseBorder =
-                  primaryColor.withValues(alpha: 0.3);
-                  final borderColor =
-                  visual.borderColor(baseBorder);
+                  final baseBorder = primaryColor.withValues(alpha: 0.3);
+                  final borderColor = visual.borderColor(baseBorder);
 
                   return Container(
                     width: double.infinity,
@@ -1201,8 +1373,7 @@ class _QuickRepayNumpadSheetState extends ConsumerState<_QuickRepayNumpadSheet> 
                       ),
                     ),
                     child: Row(
-                      mainAxisAlignment:
-                      MainAxisAlignment.spaceBetween,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
                           'Số tiền ghi nhận',
@@ -1241,13 +1412,27 @@ class _QuickRepayNumpadSheetState extends ConsumerState<_QuickRepayNumpadSheet> 
                 physics: const BouncingScrollPhysics(),
                 child: Row(
                   children: [
-                    _buildQuickIncrementChip('Trả hết (${_formatDisplayAmount(widget.remainingAmount.toInt().toString())})', _onPayAllPressed, primaryColor, isDark, isHighlight: true),
+                    _buildQuickIncrementChip(
+                        'Trả hết (${_formatDisplayAmount(widget.remainingAmount.toInt().toString())})',
+                        _onPayAllPressed,
+                        primaryColor,
+                        isDark,
+                        isHighlight: true),
                     const SizedBox(width: 6),
-                    _buildQuickIncrementChip('+50k', () => _onIncrementPressed(50000), primaryColor, isDark),
+                    _buildQuickIncrementChip('+50k',
+                        () => _onIncrementPressed(50000), primaryColor, isDark),
                     const SizedBox(width: 6),
-                    _buildQuickIncrementChip('+100k', () => _onIncrementPressed(100000), primaryColor, isDark),
+                    _buildQuickIncrementChip(
+                        '+100k',
+                        () => _onIncrementPressed(100000),
+                        primaryColor,
+                        isDark),
                     const SizedBox(width: 6),
-                    _buildQuickIncrementChip('+500k', () => _onIncrementPressed(500000), primaryColor, isDark),
+                    _buildQuickIncrementChip(
+                        '+500k',
+                        () => _onIncrementPressed(500000),
+                        primaryColor,
+                        isDark),
                   ],
                 ),
               ),
@@ -1258,21 +1443,32 @@ class _QuickRepayNumpadSheetState extends ConsumerState<_QuickRepayNumpadSheet> 
                 children: [
                   Expanded(
                     flex: 4,
-                    child: DropdownButtonFormField<String>(
+                    child: FlowyDropdown<String>(
                       value: _selectedWalletId,
                       isDense: true,
-                      style: TextStyle(fontSize: 12, color: isDark ? AppTokens.darkText : AppTokens.lightText),
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: isDark
+                              ? AppTokens.darkText
+                              : AppTokens.lightText),
                       decoration: InputDecoration(
                         labelText: 'Ví nhận/trả',
                         labelStyle: const TextStyle(fontSize: 11),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 8),
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12)),
                       ),
-                      items: widget.wallets.map((w) {
-                        return DropdownMenuItem(value: w.id, child: Text(w.name, style: const TextStyle(fontSize: 12)));
-                      }).toList(),
+                      items: walletPickerItems(widget.wallets),
+                      itemsStream: ref
+                          .read(databaseProvider)
+                          .watchAllWallets()
+                          .map(walletPickerItems),
+                      title: 'Ví nhận/trả',
                       onChanged: (val) {
-                        if (val != null) setState(() => _selectedWalletId = val);
+                        if (val != null) {
+                          setState(() => _selectedWalletId = val);
+                        }
                       },
                     ),
                   ),
@@ -1281,12 +1477,18 @@ class _QuickRepayNumpadSheetState extends ConsumerState<_QuickRepayNumpadSheet> 
                     flex: 6,
                     child: TextField(
                       controller: _cleanNoteController,
-                      style: TextStyle(fontSize: 12, color: isDark ? AppTokens.darkText : AppTokens.lightText),
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: isDark
+                              ? AppTokens.darkText
+                              : AppTokens.lightText),
                       decoration: InputDecoration(
                         labelText: 'Ghi chú',
                         labelStyle: const TextStyle(fontSize: 11),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 8),
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12)),
                       ),
                     ),
                   ),
@@ -1309,13 +1511,15 @@ class _QuickRepayNumpadSheetState extends ConsumerState<_QuickRepayNumpadSheet> 
                   style: ElevatedButton.styleFrom(
                     backgroundColor: primaryColor,
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14)),
                     elevation: 1,
                   ),
                   onPressed: _submitRepayment,
                   child: Text(
                     widget.isLend ? 'XÁC NHẬN THU NỢ' : 'XÁC NHẬN TRẢ NỢ',
-                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+                    style: const TextStyle(
+                        fontSize: 14, fontWeight: FontWeight.w800),
                   ),
                 ),
               ),
@@ -1327,12 +1531,12 @@ class _QuickRepayNumpadSheetState extends ConsumerState<_QuickRepayNumpadSheet> 
   }
 
   Widget _buildQuickIncrementChip(
-      String label,
-      VoidCallback onTap,
-      Color primaryColor,
-      bool isDark, {
-        bool isHighlight = false,
-      }) {
+    String label,
+    VoidCallback onTap,
+    Color primaryColor,
+    bool isDark, {
+    bool isHighlight = false,
+  }) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(10),
@@ -1344,7 +1548,9 @@ class _QuickRepayNumpadSheetState extends ConsumerState<_QuickRepayNumpadSheet> 
               : (isDark ? AppTokens.darkCard : AppTokens.lightCardSubtle),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: isHighlight ? primaryColor : (isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
+            color: isHighlight
+                ? primaryColor
+                : (isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
           ),
         ),
         child: Text(
@@ -1352,7 +1558,9 @@ class _QuickRepayNumpadSheetState extends ConsumerState<_QuickRepayNumpadSheet> 
           style: TextStyle(
             fontSize: 11,
             fontWeight: isHighlight ? FontWeight.w800 : FontWeight.w600,
-            color: isHighlight ? primaryColor : (isDark ? AppTokens.darkText : AppTokens.lightText),
+            color: isHighlight
+                ? primaryColor
+                : (isDark ? AppTokens.darkText : AppTokens.lightText),
           ),
         ),
       ),
@@ -1394,19 +1602,23 @@ class _QuickRepayNumpadSheetState extends ConsumerState<_QuickRepayNumpadSheet> 
             const SizedBox(width: 8),
             _buildNumpadKey('9', () => _onDigitPressed('9'), isDark),
             const SizedBox(width: 8),
-            _buildNumpadKey('000', _onTripleZeroPressed, isDark, isAction: true),
+            _buildNumpadKey('000', _onTripleZeroPressed, isDark,
+                isAction: true),
           ],
         ),
         const SizedBox(height: 8),
         Row(
           children: [
-            _buildNumpadKey('+50k', () => _onIncrementPressed(50000), isDark, isAction: true),
+            _buildNumpadKey('+50k', () => _onIncrementPressed(50000), isDark,
+                isAction: true),
             const SizedBox(width: 8),
             _buildNumpadKey('0', () => _onDigitPressed('0'), isDark),
             const SizedBox(width: 8),
-            _buildNumpadKey('+100k', () => _onIncrementPressed(100000), isDark, isAction: true),
+            _buildNumpadKey('+100k', () => _onIncrementPressed(100000), isDark,
+                isAction: true),
             const SizedBox(width: 8),
-            _buildNumpadKey('+500k', () => _onIncrementPressed(500000), isDark, isAction: true),
+            _buildNumpadKey('+500k', () => _onIncrementPressed(500000), isDark,
+                isAction: true),
           ],
         ),
       ],
@@ -1414,11 +1626,11 @@ class _QuickRepayNumpadSheetState extends ConsumerState<_QuickRepayNumpadSheet> 
   }
 
   Widget _buildNumpadKey(
-      String label,
-      VoidCallback onTap,
-      bool isDark, {
-        bool isAction = false,
-      }) {
+    String label,
+    VoidCallback onTap,
+    bool isDark, {
+    bool isAction = false,
+  }) {
     return Expanded(
       child: Material(
         color: Colors.transparent,
@@ -1429,7 +1641,9 @@ class _QuickRepayNumpadSheetState extends ConsumerState<_QuickRepayNumpadSheet> 
             height: 44,
             decoration: BoxDecoration(
               color: isAction
-                  ? (isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.05))
+                  ? (isDark
+                      ? Colors.white.withValues(alpha: 0.08)
+                      : Colors.black.withValues(alpha: 0.05))
                   : (isDark ? AppTokens.darkCard : AppTokens.lightCardSubtle),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(

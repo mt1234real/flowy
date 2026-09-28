@@ -1,3 +1,4 @@
+import 'flowy_selection_picker.dart';
 // ==============================================================================
 // File: lib/widgets/quick_entry_sheet.dart
 // Architecture: Ergonomic Quick-Entry Sheet with Fluid Sheet Engine & Chromatic Precision
@@ -69,20 +70,26 @@ class QuickEntryDraft {
     this.debtDueDate,
   });
 
-  bool get hasData => (expression != '0' && expression.isNotEmpty) || note.trim().isNotEmpty;
+  bool get hasData =>
+      (expression != '0' && expression.isNotEmpty) || note.trim().isNotEmpty;
 }
 
 final quickEntryDraftProvider = StateProvider<QuickEntryDraft?>((ref) => null);
 
-final quickEntryWalletsStreamProvider = StreamProvider.autoDispose<List<Wallet>>((ref) {
+final quickEntryWalletsStreamProvider =
+    StreamProvider.autoDispose<List<Wallet>>((ref) {
   final db = ref.watch(databaseProvider);
   return (db.select(db.wallets)
-    ..where((w) => w.isArchived.equals(false))
-    ..orderBy([(w) => drift.OrderingTerm.asc(w.sortOrder), (w) => drift.OrderingTerm.asc(w.createdAt)]))
+        ..where((w) => w.isArchived.equals(false))
+        ..orderBy([
+          (w) => drift.OrderingTerm.asc(w.sortOrder),
+          (w) => drift.OrderingTerm.asc(w.createdAt)
+        ]))
       .watch();
 });
 
-final quickEntryDebtContactsStreamProvider = StreamProvider.autoDispose<List<DebtContact>>((ref) {
+final quickEntryDebtContactsStreamProvider =
+    StreamProvider.autoDispose<List<DebtContact>>((ref) {
   final db = ref.watch(databaseProvider);
   return db.watchAllDebtContacts();
 });
@@ -109,7 +116,8 @@ class _NumpadKey extends StatefulWidget {
   State<_NumpadKey> createState() => _NumpadKeyState();
 }
 
-class _NumpadKeyState extends State<_NumpadKey> with SingleTickerProviderStateMixin {
+class _NumpadKeyState extends State<_NumpadKey>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late final Animation<double> _scaleAnimation;
 
@@ -192,14 +200,14 @@ class QuickEntrySheet extends ConsumerStatefulWidget {
   });
 
   static Future<void> show(
-      BuildContext context, {
-        Transaction? initialTransaction,
-        DateTime? initialContextDate,
-        DebtContact? prefilledDebtContact,
-        double? prefilledAmount,
-        String? prefilledDebtType,
-        double? prefilledDailySafe,
-      }) {
+    BuildContext context, {
+    Transaction? initialTransaction,
+    DateTime? initialContextDate,
+    DebtContact? prefilledDebtContact,
+    double? prefilledAmount,
+    String? prefilledDebtType,
+    double? prefilledDailySafe,
+  }) {
     HapticFeedback.selectionClick();
     return AppAnimationPolicy.showFluidSheet(
       context: context,
@@ -222,7 +230,8 @@ class QuickEntrySheet extends ConsumerStatefulWidget {
   ConsumerState<QuickEntrySheet> createState() => _QuickEntrySheetState();
 }
 
-class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerProviderStateMixin {
+class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
+    with TickerProviderStateMixin {
   late CategoryType _activeTab;
   late String _expression;
   late final TextEditingController _noteController;
@@ -241,16 +250,13 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
   bool _isAmortized = false;
 
   final AppValidationFeedbackController _categoryFeedback =
-  AppValidationFeedbackController();
+      AppValidationFeedbackController();
   final AppValidationFeedbackController _debtContactFeedback =
-  AppValidationFeedbackController();
+      AppValidationFeedbackController();
 
   late final AnimationController _colorMorphController;
   late Animation<Color?> _colorMorphAnimation;
   Color _prevActiveColor = AppTokens.expense;
-
-  late final AnimationController _walletIconTiltController;
-  late final Animation<double> _walletIconTiltAnimation;
 
   late final AnimationController _headShakeController;
   late final Animation<double> _headShakeAnimation;
@@ -274,7 +280,8 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
     if (tx != null) {
       _activeTab = tx.type;
       _expression = tx.amount.toStringAsFixed(0);
-      _noteController = TextEditingController(text: tx.note ?? tx.merchant ?? '');
+      _noteController =
+          TextEditingController(text: tx.note ?? tx.merchant ?? '');
       _selectedDate = tx.date;
       _isAmortized = tx.note?.contains('#amortized') ?? false;
       _loadInitialEntities(tx);
@@ -282,9 +289,10 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
       _activeTab = CategoryType.debt;
       _selectedDebtContact = widget.prefilledDebtContact;
       _debtActionType = widget.prefilledDebtType ?? 'LEND';
-      _expression = widget.prefilledAmount != null && widget.prefilledAmount! > 0
-          ? widget.prefilledAmount!.toStringAsFixed(0)
-          : '0';
+      _expression =
+          widget.prefilledAmount != null && widget.prefilledAmount! > 0
+              ? widget.prefilledAmount!.toStringAsFixed(0)
+              : '0';
       _noteController = TextEditingController();
       _selectedDate = widget.initialContextDate ?? DateTime.now();
     } else {
@@ -302,9 +310,10 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
         _isAmortized = draft.note.contains('#amortized');
       } else {
         _activeTab = CategoryType.expense;
-        _expression = widget.prefilledAmount != null && widget.prefilledAmount! > 0
-            ? widget.prefilledAmount!.toStringAsFixed(0)
-            : '0';
+        _expression =
+            widget.prefilledAmount != null && widget.prefilledAmount! > 0
+                ? widget.prefilledAmount!.toStringAsFixed(0)
+                : '0';
         _noteController = TextEditingController();
 
         final ctxDate = widget.initialContextDate;
@@ -331,19 +340,10 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
       duration: const Duration(milliseconds: 160),
       debugLabel: 'QuickEntry.ColorMorph',
     );
-    _colorMorphAnimation = ColorTween(begin: initialColor, end: initialColor).animate(
+    _colorMorphAnimation =
+        ColorTween(begin: initialColor, end: initialColor).animate(
       CurvedAnimation(parent: _colorMorphController, curve: Curves.easeOut),
     );
-
-    _walletIconTiltController = AppAnimationPolicy.createController(
-      vsync: this,
-      duration: const Duration(milliseconds: 150),
-      debugLabel: 'QuickEntry.WalletTilt',
-    );
-    _walletIconTiltAnimation = TweenSequence<double>([
-      TweenSequenceItem(tween: Tween<double>(begin: 0.0, end: 0.21), weight: 45),
-      TweenSequenceItem(tween: Tween<double>(begin: 0.21, end: 0.0), weight: 55),
-    ]).animate(CurvedAnimation(parent: _walletIconTiltController, curve: Curves.easeOutBack));
 
     _headShakeController = AppAnimationPolicy.createController(
       vsync: this,
@@ -351,11 +351,16 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
       debugLabel: 'QuickEntry.HeadShake',
     );
     _headShakeAnimation = TweenSequence<double>([
-      TweenSequenceItem(tween: Tween<double>(begin: 0.0, end: -4.0), weight: 25),
-      TweenSequenceItem(tween: Tween<double>(begin: -4.0, end: 4.0), weight: 35),
-      TweenSequenceItem(tween: Tween<double>(begin: 4.0, end: -2.0), weight: 25),
-      TweenSequenceItem(tween: Tween<double>(begin: -2.0, end: 0.0), weight: 15),
-    ]).animate(CurvedAnimation(parent: _headShakeController, curve: Curves.easeInOutSine));
+      TweenSequenceItem(
+          tween: Tween<double>(begin: 0.0, end: -4.0), weight: 25),
+      TweenSequenceItem(
+          tween: Tween<double>(begin: -4.0, end: 4.0), weight: 35),
+      TweenSequenceItem(
+          tween: Tween<double>(begin: 4.0, end: -2.0), weight: 25),
+      TweenSequenceItem(
+          tween: Tween<double>(begin: -2.0, end: 0.0), weight: 15),
+    ]).animate(CurvedAnimation(
+        parent: _headShakeController, curve: Curves.easeInOutSine));
 
     _morphButtonController = AppAnimationPolicy.createController(
       vsync: this,
@@ -381,19 +386,25 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
   Future<void> _loadInitialEntities(Transaction tx) async {
     final db = ref.read(databaseProvider);
 
-    final cats = await (db.select(db.categories)..where((c) => c.id.equals(tx.categoryId))).get();
+    final cats = await (db.select(db.categories)
+          ..where((c) => c.id.equals(tx.categoryId)))
+        .get();
     if (cats.isNotEmpty && mounted) {
       setState(() => _selectedCategory = cats.first);
     }
 
-    final wallets = await (db.select(db.wallets)..where((w) => w.id.equals(tx.walletId))).get();
+    final wallets = await (db.select(db.wallets)
+          ..where((w) => w.id.equals(tx.walletId)))
+        .get();
     if (wallets.isNotEmpty && mounted) {
       setState(() => _selectedWallet = wallets.first);
     }
   }
 
   void _syncDraft() {
-    if (_isEditMode || _isSubmitting || widget.prefilledDebtContact != null) return;
+    if (_isEditMode || _isSubmitting || widget.prefilledDebtContact != null) {
+      return;
+    }
 
     final draft = QuickEntryDraft(
       expression: _expression,
@@ -418,7 +429,6 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
   void dispose() {
     _noteController.removeListener(_syncDraft);
     _colorMorphController.dispose();
-    _walletIconTiltController.dispose();
     _headShakeController.dispose();
     _morphButtonController.dispose();
     _checkIconController.dispose();
@@ -433,7 +443,9 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
     if (_activeTab == CategoryType.debt) {
       return _resolveDebtColor(_debtActionType);
     }
-    return _activeTab == CategoryType.expense ? AppTokens.expense : AppTokens.income;
+    return _activeTab == CategoryType.expense
+        ? AppTokens.expense
+        : AppTokens.income;
   }
 
   void _switchTab(CategoryType newTab) {
@@ -462,7 +474,8 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
   }
 
   String _formatCurrency(double amount, [String currency = '₫']) {
-    final formatter = NumberFormat.currency(locale: 'vi_VN', symbol: currency, decimalDigits: 0);
+    final formatter = NumberFormat.currency(
+        locale: 'vi_VN', symbol: currency, decimalDigits: 0);
     return formatter.format(amount);
   }
 
@@ -494,7 +507,9 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
           final op = tokens[idx];
           final prevNum = double.parse(pass1.removeLast());
           final nextNum = double.parse(tokens[idx + 1]);
-          final res = op == '*' ? prevNum * nextNum : (nextNum != 0 ? prevNum / nextNum : 0.0);
+          final res = op == '*'
+              ? prevNum * nextNum
+              : (nextNum != 0 ? prevNum / nextNum : 0.0);
           pass1.add(res.toString());
           idx += 2;
         } else {
@@ -601,199 +616,18 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
     }
   }
 
-  Future<void> _handleWalletPickerTap(List<Wallet> wallets, bool isDark, AppAccentPreset accent) async {
-    HapticFeedback.selectionClick();
-    await _walletIconTiltController.forward(from: 0.0);
-    if (!mounted) return;
-    _openWalletPickerModal(wallets, isDark, accent);
-  }
-
-  // ===========================================================================
-  // 🌟 MODAL CHỌN VÍ: FLUID SHEET MODE FIXED (VUỐT KÉO 1:1, KHÔNG BLUR)
-  // ===========================================================================
-  void _openWalletPickerModal(List<Wallet> wallets, bool isDark, AppAccentPreset accent) {
-    HapticFeedback.selectionClick();
-
-    AppAnimationPolicy.showFluidSheet(
-      context: context,
-      mode: FluidSheetMode.fixed,
-      enableBlur: false,
-      useRootNavigator: true,
-      isDismissible: true,
-      builder: (sheetContext, _) {
-        return ClipRRect(
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-          child: Container(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF151C28) : Colors.white,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-              border: Border.all(
-                color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder,
-                width: 1,
-              ),
-            ),
-            child: SafeArea(
-              top: false,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 44,
-                      height: 5,
-                      decoration: BoxDecoration(
-                        color: isDark ? Colors.white24 : Colors.black26,
-                        borderRadius: BorderRadius.circular(2.5),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Chọn nguồn tiền / Ví thanh toán',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                          color: isDark ? AppTokens.darkText : AppTokens.lightText,
-                        ),
-                      ),
-                      IconButton(
-                        visualDensity: VisualDensity.compact,
-                        icon: Icon(
-                          Icons.close_rounded,
-                          size: 18,
-                          color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
-                        ),
-                        onPressed: () {
-                          if (sheetContext.mounted && Navigator.of(sheetContext).canPop()) {
-                            Navigator.of(sheetContext).pop();
-                          }
-                        },
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-
-                  ...wallets.map((w) {
-                    final isSelected = (_selectedWallet?.id ?? wallets.first.id) == w.id;
-                    final walletColor = _parseColor(w.color);
-
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 8.0),
-                      child: InkWell(
-                        onTap: () {
-                          HapticFeedback.selectionClick();
-                          setState(() => _selectedWallet = w);
-                          _syncDraft();
-                          if (sheetContext.mounted && Navigator.of(sheetContext).canPop()) {
-                            Navigator.of(sheetContext).pop();
-                          }
-                        },
-                        borderRadius: BorderRadius.circular(16),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? walletColor.withValues(alpha: 0.12)
-                                : (isDark ? AppTokens.darkCard : AppTokens.lightCardSubtle),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: isSelected
-                                  ? walletColor
-                                  : (isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
-                              width: isSelected ? 1.8 : 1.0,
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 40,
-                                height: 40,
-                                decoration: BoxDecoration(
-                                  color: walletColor.withValues(alpha: 0.2),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Icon(
-                                  _resolveWalletIcon(w.type),
-                                  color: walletColor,
-                                  size: 20,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Text(
-                                          w.name,
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w700,
-                                            color: isDark ? AppTokens.darkText : AppTokens.lightText,
-                                          ),
-                                        ),
-                                        if (w.isDefault) ...[
-                                          const SizedBox(width: 6),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                                            decoration: BoxDecoration(
-                                              color: accent.primary.withValues(alpha: 0.16),
-                                              borderRadius: BorderRadius.circular(6),
-                                            ),
-                                            child: Text(
-                                              'Mặc định',
-                                              style: TextStyle(
-                                                fontSize: 9,
-                                                fontWeight: FontWeight.bold,
-                                                color: accent.primary,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ],
-                                    ),
-                                    CurrencyText(
-                                      'Số dư: ${_formatCurrency(w.balance)}',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              if (isSelected)
-                                Container(
-                                  padding: const EdgeInsets.all(4),
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: walletColor,
-                                  ),
-                                  child: const Icon(
-                                    Icons.check_rounded,
-                                    size: 14,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    );
-                  }),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
+  Future<void> _openWalletPickerModal(
+      List<Wallet> wallets, bool isDark, AppAccentPreset accent) async {
+    final db = ref.read(databaseProvider);
+    final id = await showFlowyWalletPicker(context, db, wallets,
+        title: 'Chọn nguồn tiền',
+        selected: _selectedWallet?.id ?? wallets.firstOrNull?.id);
+    if (!mounted || id == null) return;
+    final current = await (db.select(db.wallets)..where((w) => w.id.equals(id)))
+        .getSingleOrNull();
+    if (!mounted || current == null || current.isArchived) return;
+    setState(() => _selectedWallet = current);
+    _syncDraft();
   }
 
   void _openMiniCalendarModal(bool isDark, AppAccentPreset accent) {
@@ -883,31 +717,6 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
     _syncDraft();
   }
 
-  IconData _resolveWalletIcon(String type) {
-    switch (type.toLowerCase()) {
-      case 'bank':
-        return Icons.credit_card_rounded;
-      case 'ewallet':
-        return Icons.phone_android_rounded;
-      case 'credit':
-        return Icons.credit_card_rounded;
-      case 'savings':
-        return Icons.savings_rounded;
-      case 'cash':
-      default:
-        return Icons.account_balance_wallet_rounded;
-    }
-  }
-
-  Color _parseColor(String hexColor) {
-    try {
-      final hex = hexColor.replaceAll('#', '');
-      return Color(int.parse('FF$hex', radix: 16));
-    } catch (_) {
-      return const Color(0xFF10B981);
-    }
-  }
-
   Future<void> _confirmDeleteTransaction() async {
     final confirmed = await AppAnimationPolicy.showPreservedDialog<bool>(
       context: context,
@@ -933,7 +742,8 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
 
     if (confirmed == true && mounted) {
       final db = ref.read(databaseProvider);
-      await db.deleteTransactionWithBalanceReversal(widget.initialTransaction!.id);
+      await db
+          .deleteTransactionWithBalanceReversal(widget.initialTransaction!.id);
       HapticFeedback.mediumImpact();
 
       ref.read(cloudBackupServiceProvider).notifyDataChanged();
@@ -965,7 +775,9 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
     if (amount <= 0) return;
 
     final db = ref.read(databaseProvider);
-    final activeWallets = await (db.select(db.wallets)..where((w) => w.isArchived.equals(false))).get();
+    final activeWallets = await (db.select(db.wallets)
+          ..where((w) => w.isArchived.equals(false)))
+        .get();
     if (activeWallets.isEmpty) {
       if (!mounted) return;
       AppFeedback.showInfo(
@@ -976,7 +788,9 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
     }
 
     final targetWalletId = _selectedWallet?.id ??
-        activeWallets.firstWhere((w) => w.isDefault, orElse: () => activeWallets.first).id;
+        activeWallets
+            .firstWhere((w) => w.isDefault, orElse: () => activeWallets.first)
+            .id;
 
     if (_activeTab == CategoryType.debt) {
       if (_selectedDebtContact == null) {
@@ -1081,13 +895,13 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
       final noteString = _noteController.text.trim();
       final finalNote = _isAmortized
           ? (noteString.isEmpty
-          ? '#amortized'
-          : (noteString.contains('#amortized')
-          ? noteString
-          : '$noteString #amortized'))
+              ? '#amortized'
+              : (noteString.contains('#amortized')
+                  ? noteString
+                  : '$noteString #amortized'))
           : (noteString.isEmpty
-          ? null
-          : noteString.replaceAll('#amortized', '').trim());
+              ? null
+              : noteString.replaceAll('#amortized', '').trim());
 
       if (_isEditMode) {
         final oldTx = widget.initialTransaction!;
@@ -1189,17 +1003,22 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
 
   String _formatDateChipLabel(DateTime date) {
     final now = DateTime.now();
-    final isToday = date.year == now.year && date.month == now.month && date.day == now.day;
+    final isToday =
+        date.year == now.year && date.month == now.month && date.day == now.day;
     if (isToday) {
       return '📅 Hôm nay, ${DateFormat('dd/MM').format(date)}';
     }
     final yesterday = now.subtract(const Duration(days: 1));
-    final isYesterday = date.year == yesterday.year && date.month == yesterday.month && date.day == yesterday.day;
+    final isYesterday = date.year == yesterday.year &&
+        date.month == yesterday.month &&
+        date.day == yesterday.day;
     if (isYesterday) {
       return '📅 Hôm qua, ${DateFormat('dd/MM').format(date)}';
     }
     final dayBefore = now.subtract(const Duration(days: 2));
-    final isDayBefore = date.year == dayBefore.year && date.month == dayBefore.month && date.day == dayBefore.day;
+    final isDayBefore = date.year == dayBefore.year &&
+        date.month == dayBefore.month &&
+        date.day == dayBefore.day;
     if (isDayBefore) {
       return '📅 Hôm kia, ${DateFormat('dd/MM').format(date)}';
     }
@@ -1221,15 +1040,18 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
 
     final now = DateTime.now();
 
-    final isSelectedYesterday = _selectedDate.year == now.subtract(const Duration(days: 1)).year &&
+    final isSelectedYesterday = _selectedDate.year ==
+            now.subtract(const Duration(days: 1)).year &&
         _selectedDate.month == now.subtract(const Duration(days: 1)).month &&
         _selectedDate.day == now.subtract(const Duration(days: 1)).day;
 
-    final isSelectedDayBefore = _selectedDate.year == now.subtract(const Duration(days: 2)).year &&
+    final isSelectedDayBefore = _selectedDate.year ==
+            now.subtract(const Duration(days: 2)).year &&
         _selectedDate.month == now.subtract(const Duration(days: 2)).month &&
         _selectedDate.day == now.subtract(const Duration(days: 2)).day;
 
-    final bool hasDraftData = _expression != '0' || _noteController.text.trim().isNotEmpty;
+    final bool hasDraftData =
+        _expression != '0' || _noteController.text.trim().isNotEmpty;
     final bool canSubmit = calculatedAmount > 0 && !_isSubmitting;
     final bool requiredSelectionReady = _activeTab == CategoryType.debt
         ? _selectedDebtContact != null
@@ -1239,7 +1061,8 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
       child: AnimatedBuilder(
         animation: _colorMorphAnimation,
         builder: (context, _) {
-          final Color currentSemanticColor = _colorMorphAnimation.value ?? _resolveCurrentSemanticColor();
+          final Color currentSemanticColor =
+              _colorMorphAnimation.value ?? _resolveCurrentSemanticColor();
 
           return Container(
             constraints: BoxConstraints(
@@ -1247,7 +1070,8 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
             ),
             decoration: BoxDecoration(
               color: isDark ? AppTokens.darkBg : AppTokens.lightBg,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(24)),
               border: Border.all(
                 color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder,
                 width: 1,
@@ -1287,20 +1111,24 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
                               children: [
                                 Row(
                                   children: [
-                                    Icon(Icons.edit_note_rounded, size: 20, color: accent.primary),
+                                    Icon(Icons.edit_note_rounded,
+                                        size: 20, color: accent.primary),
                                     const SizedBox(width: 6),
                                     Text(
                                       'Chỉnh sửa giao dịch',
                                       style: TextStyle(
                                         fontSize: 16,
                                         fontWeight: FontWeight.w800,
-                                        color: isDark ? AppTokens.darkText : AppTokens.lightText,
+                                        color: isDark
+                                            ? AppTokens.darkText
+                                            : AppTokens.lightText,
                                       ),
                                     ),
                                   ],
                                 ),
                                 IconButton(
-                                  icon: const Icon(Icons.delete_outline_rounded, color: AppTokens.expense, size: 22),
+                                  icon: const Icon(Icons.delete_outline_rounded,
+                                      color: AppTokens.expense, size: 22),
                                   onPressed: _confirmDeleteTransaction,
                                 ),
                               ],
@@ -1322,19 +1150,22 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
                                 value: CategoryType.expense,
                                 label: 'Khoản chi',
                                 activeColor: AppTokens.expense,
-                                activeBackgroundColor: AppTokens.expense.withValues(alpha: 0.18),
+                                activeBackgroundColor:
+                                    AppTokens.expense.withValues(alpha: 0.18),
                               ),
                               SlidingSegmentedItem<CategoryType>(
                                 value: CategoryType.income,
                                 label: 'Khoản thu',
                                 activeColor: AppTokens.income,
-                                activeBackgroundColor: AppTokens.income.withValues(alpha: 0.18),
+                                activeBackgroundColor:
+                                    AppTokens.income.withValues(alpha: 0.18),
                               ),
                               SlidingSegmentedItem<CategoryType>(
                                 value: CategoryType.debt,
                                 label: 'Vay / Nợ',
                                 activeColor: const Color(0xFF10B981),
-                                activeBackgroundColor: const Color(0xFF10B981).withValues(alpha: 0.18),
+                                activeBackgroundColor: const Color(0xFF10B981)
+                                    .withValues(alpha: 0.18),
                               ),
                             ],
                           ),
@@ -1347,7 +1178,8 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
                         // ===============================================================
                         if (_activeTab == CategoryType.debt) ...[
                           Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                            padding:
+                                const EdgeInsets.symmetric(horizontal: 16.0),
                             child: SlidingSegmentedBar<String>(
                               height: 34,
                               fontSize: 11,
@@ -1392,7 +1224,8 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
                         // 🌟 KHỐI HIỂN THỊ SỐ TIỀN: 32SP & NHẢY SỐ TRƯỢT DỌC 140MS
                         // ===============================================================
                         Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 4.0),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 20.0, vertical: 4.0),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             crossAxisAlignment: CrossAxisAlignment.baseline,
@@ -1402,11 +1235,15 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Text(
-                                    _activeTab == CategoryType.debt ? 'Số tiền vay nợ' : 'Số tiền',
+                                    _activeTab == CategoryType.debt
+                                        ? 'Số tiền vay nợ'
+                                        : 'Số tiền',
                                     style: TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w600,
-                                      color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                                      color: isDark
+                                          ? AppTokens.darkMuted
+                                          : AppTokens.lightMuted,
                                     ),
                                   ),
                                   if (hasDraftData) ...[
@@ -1419,13 +1256,18 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
                                         height: 24,
                                         alignment: Alignment.center,
                                         decoration: BoxDecoration(
-                                          color: isDark ? Colors.white12 : Colors.black12,
-                                          borderRadius: BorderRadius.circular(12),
+                                          color: isDark
+                                              ? Colors.white12
+                                              : Colors.black12,
+                                          borderRadius:
+                                              BorderRadius.circular(12),
                                         ),
                                         child: Icon(
                                           Icons.close_rounded,
                                           size: 14,
-                                          color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                                          color: isDark
+                                              ? AppTokens.darkMuted
+                                              : AppTokens.lightMuted,
                                         ),
                                       ),
                                     ),
@@ -1442,18 +1284,21 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
                                       begin: const Offset(0.0, 0.08),
                                       end: Offset.zero,
                                     ).animate(animation),
-                                    child: FadeTransition(opacity: animation, child: child),
+                                    child: FadeTransition(
+                                        opacity: animation, child: child),
                                   );
                                 },
                                 child: Text(
                                   _formatCurrency(calculatedAmount),
                                   key: ValueKey<String>(_expression),
-                                  style: currencyTextStyle(context, TextStyle(
-                                    fontSize: 32,
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: -0.5,
-                                    color: currentSemanticColor,
-                                  )),
+                                  style: currencyTextStyle(
+                                      context,
+                                      TextStyle(
+                                        fontSize: 32,
+                                        fontWeight: FontWeight.w900,
+                                        letterSpacing: -0.5,
+                                        color: currentSemanticColor,
+                                      )),
                                 ),
                               ),
                             ],
@@ -1474,16 +1319,20 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
                               child: Container(
                                 padding: const EdgeInsets.all(10),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFF59E0B).withValues(alpha: 0.12),
+                                  color: const Color(0xFFF59E0B)
+                                      .withValues(alpha: 0.12),
                                   borderRadius: BorderRadius.circular(14),
-                                  border: Border.all(color: const Color(0xFFF59E0B), width: 1.5),
+                                  border: Border.all(
+                                      color: const Color(0xFFF59E0B),
+                                      width: 1.5),
                                 ),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Row(
                                       children: [
-                                        const Text('⚠️', style: TextStyle(fontSize: 14)),
+                                        const Text('⚠️',
+                                            style: TextStyle(fontSize: 14)),
                                         const SizedBox(width: 6),
                                         Expanded(
                                           child: CurrencyText(
@@ -1491,7 +1340,9 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
                                             style: TextStyle(
                                               fontSize: 11,
                                               fontWeight: FontWeight.w700,
-                                              color: isDark ? AppTokens.darkText : AppTokens.lightText,
+                                              color: isDark
+                                                  ? AppTokens.darkText
+                                                  : AppTokens.lightText,
                                             ),
                                           ),
                                         ),
@@ -1504,17 +1355,31 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
                                           child: InkWell(
                                             onTap: () {
                                               HapticFeedback.selectionClick();
-                                              setState(() => _isAmortized = true);
+                                              setState(
+                                                  () => _isAmortized = true);
                                               _syncDraft();
                                             },
-                                            borderRadius: BorderRadius.circular(8),
+                                            borderRadius:
+                                                BorderRadius.circular(8),
                                             child: Container(
-                                              padding: const EdgeInsets.symmetric(vertical: 6),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      vertical: 6),
                                               decoration: BoxDecoration(
-                                                color: _isAmortized ? const Color(0xFF10B981) : (isDark ? AppTokens.darkCard : Colors.white),
-                                                borderRadius: BorderRadius.circular(8),
+                                                color: _isAmortized
+                                                    ? const Color(0xFF10B981)
+                                                    : (isDark
+                                                        ? AppTokens.darkCard
+                                                        : Colors.white),
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
                                                 border: Border.all(
-                                                  color: _isAmortized ? const Color(0xFF10B981) : (isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
+                                                  color: _isAmortized
+                                                      ? const Color(0xFF10B981)
+                                                      : (isDark
+                                                          ? AppTokens.darkBorder
+                                                          : AppTokens
+                                                              .lightBorder),
                                                 ),
                                               ),
                                               child: Center(
@@ -1523,7 +1388,12 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
                                                   style: TextStyle(
                                                     fontSize: 11,
                                                     fontWeight: FontWeight.bold,
-                                                    color: _isAmortized ? Colors.white : (isDark ? AppTokens.darkText : AppTokens.lightText),
+                                                    color: _isAmortized
+                                                        ? Colors.white
+                                                        : (isDark
+                                                            ? AppTokens.darkText
+                                                            : AppTokens
+                                                                .lightText),
                                                   ),
                                                 ),
                                               ),
@@ -1535,17 +1405,31 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
                                           child: InkWell(
                                             onTap: () {
                                               HapticFeedback.selectionClick();
-                                              setState(() => _isAmortized = false);
+                                              setState(
+                                                  () => _isAmortized = false);
                                               _syncDraft();
                                             },
-                                            borderRadius: BorderRadius.circular(8),
+                                            borderRadius:
+                                                BorderRadius.circular(8),
                                             child: Container(
-                                              padding: const EdgeInsets.symmetric(vertical: 6),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      vertical: 6),
                                               decoration: BoxDecoration(
-                                                color: !_isAmortized ? const Color(0xFFF59E0B) : (isDark ? AppTokens.darkCard : Colors.white),
-                                                borderRadius: BorderRadius.circular(8),
+                                                color: !_isAmortized
+                                                    ? const Color(0xFFF59E0B)
+                                                    : (isDark
+                                                        ? AppTokens.darkCard
+                                                        : Colors.white),
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
                                                 border: Border.all(
-                                                  color: !_isAmortized ? const Color(0xFFF59E0B) : (isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
+                                                  color: !_isAmortized
+                                                      ? const Color(0xFFF59E0B)
+                                                      : (isDark
+                                                          ? AppTokens.darkBorder
+                                                          : AppTokens
+                                                              .lightBorder),
                                                 ),
                                               ),
                                               child: Center(
@@ -1554,7 +1438,12 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
                                                   style: TextStyle(
                                                     fontSize: 11,
                                                     fontWeight: FontWeight.bold,
-                                                    color: !_isAmortized ? Colors.white : (isDark ? AppTokens.darkText : AppTokens.lightText),
+                                                    color: !_isAmortized
+                                                        ? Colors.white
+                                                        : (isDark
+                                                            ? AppTokens.darkText
+                                                            : AppTokens
+                                                                .lightText),
                                                   ),
                                                 ),
                                               ),
@@ -1576,32 +1465,39 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
                         // ===============================================================
                         if (_activeTab != CategoryType.debt)
                           Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                            padding:
+                                const EdgeInsets.symmetric(horizontal: 16.0),
                             child: AppValidationFeedback(
                               controller: _categoryFeedback,
                               builder: (context, visual) {
                                 final restingBorder = _selectedCategory != null
-                                    ? currentSemanticColor.withValues(alpha: 0.5)
+                                    ? currentSemanticColor.withValues(
+                                        alpha: 0.5)
                                     : (isDark
-                                    ? AppTokens.darkBorder
-                                    : AppTokens.lightBorder);
+                                        ? AppTokens.darkBorder
+                                        : AppTokens.lightBorder);
 
                                 return InkWell(
                                   onTap: _openCategoryModal,
                                   borderRadius: BorderRadius.circular(16),
                                   child: Container(
                                     height: 46,
-                                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 14),
                                     decoration: BoxDecoration(
-                                      color: isDark ? AppTokens.darkCard : Colors.white,
+                                      color: isDark
+                                          ? AppTokens.darkCard
+                                          : Colors.white,
                                       borderRadius: BorderRadius.circular(14),
                                       border: Border.all(
-                                        color: visual.borderColor(restingBorder),
+                                        color:
+                                            visual.borderColor(restingBorder),
                                         width: visual.isInvalid ? 1.4 : 1.0,
                                       ),
                                       boxShadow: [
                                         BoxShadow(
-                                          color: Colors.black.withValues(alpha: 0.03),
+                                          color: Colors.black
+                                              .withValues(alpha: 0.03),
                                           blurRadius: 6,
                                           offset: const Offset(0, 2),
                                         ),
@@ -1612,8 +1508,10 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
                                         Container(
                                           padding: const EdgeInsets.all(6),
                                           decoration: BoxDecoration(
-                                            color: currentSemanticColor.withValues(alpha: 0.15),
-                                            borderRadius: BorderRadius.circular(10),
+                                            color: currentSemanticColor
+                                                .withValues(alpha: 0.15),
+                                            borderRadius:
+                                                BorderRadius.circular(10),
                                           ),
                                           child: Icon(
                                             Icons.folder_open_rounded,
@@ -1624,8 +1522,10 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
                                         const SizedBox(width: 10),
                                         Expanded(
                                           child: Column(
-                                            mainAxisAlignment: MainAxisAlignment.center,
-                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
                                             children: [
                                               Text(
                                                 'Danh mục giao dịch',
@@ -1645,13 +1545,15 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
                                                 style: TextStyle(
                                                   fontSize: 13,
                                                   fontWeight: FontWeight.w700,
-                                                  color: _selectedCategory != null
+                                                  color: _selectedCategory !=
+                                                          null
                                                       ? (isDark
-                                                      ? AppTokens.darkText
-                                                      : AppTokens.lightText)
+                                                          ? AppTokens.darkText
+                                                          : AppTokens.lightText)
                                                       : (isDark
-                                                      ? AppTokens.darkMuted
-                                                      : AppTokens.lightMuted),
+                                                          ? AppTokens.darkMuted
+                                                          : AppTokens
+                                                              .lightMuted),
                                                 ),
                                               ),
                                             ],
@@ -1674,7 +1576,8 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
 
                         if (_activeTab == CategoryType.debt)
                           Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                            padding:
+                                const EdgeInsets.symmetric(horizontal: 16.0),
                             child: AppValidationFeedback(
                               controller: _debtContactFeedback,
                               builder: (context, visual) {
@@ -1682,7 +1585,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
                                     ? AppTokens.darkBorder
                                     : AppTokens.lightBorder;
                                 final validationBorder =
-                                visual.borderColor(restingBorder);
+                                    visual.borderColor(restingBorder);
 
                                 return Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1690,13 +1593,17 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
                                     if (_selectedDebtContact != null)
                                       Container(
                                         height: 46,
-                                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 12),
                                         decoration: BoxDecoration(
-                                          color: currentSemanticColor.withValues(alpha: 0.12),
-                                          borderRadius: BorderRadius.circular(14),
+                                          color: currentSemanticColor
+                                              .withValues(alpha: 0.12),
+                                          borderRadius:
+                                              BorderRadius.circular(14),
                                           border: Border.all(
                                             color: visual.borderColor(
-                                              currentSemanticColor.withValues(alpha: 0.4),
+                                              currentSemanticColor.withValues(
+                                                  alpha: 0.4),
                                             ),
                                             width: visual.isInvalid ? 1.8 : 1.0,
                                           ),
@@ -1705,37 +1612,61 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
                                           children: [
                                             CircleAvatar(
                                               radius: 14,
-                                              backgroundColor: currentSemanticColor.withValues(alpha: 0.25),
-                                              child: Icon(Icons.person_rounded, size: 16, color: currentSemanticColor),
+                                              backgroundColor:
+                                                  currentSemanticColor
+                                                      .withValues(alpha: 0.25),
+                                              child: Icon(Icons.person_rounded,
+                                                  size: 16,
+                                                  color: currentSemanticColor),
                                             ),
                                             const SizedBox(width: 10),
                                             Expanded(
                                               child: Column(
-                                                mainAxisAlignment: MainAxisAlignment.center,
-                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                mainAxisAlignment:
+                                                    MainAxisAlignment.center,
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
                                                 children: [
                                                   Text(
                                                     _selectedDebtContact!.name,
                                                     style: TextStyle(
                                                       fontSize: 13,
-                                                      fontWeight: FontWeight.w800,
-                                                      color: isDark ? AppTokens.darkText : AppTokens.lightText,
+                                                      fontWeight:
+                                                          FontWeight.w800,
+                                                      color: isDark
+                                                          ? AppTokens.darkText
+                                                          : AppTokens.lightText,
                                                     ),
                                                   ),
                                                   CurrencyText(
-                                                    _selectedDebtContact!.netBalance > 0
+                                                    _selectedDebtContact!
+                                                                .netBalance >
+                                                            0
                                                         ? 'Đang nợ bạn: ${_formatCurrency(_selectedDebtContact!.netBalance)}'
-                                                        : (_selectedDebtContact!.netBalance < 0
-                                                        ? 'Bạn đang nợ: ${_formatCurrency(_selectedDebtContact!.netBalance.abs())}'
-                                                        : 'Đã tất toán sòng phẳng (0 ₫)'),
+                                                        : (_selectedDebtContact!
+                                                                    .netBalance <
+                                                                0
+                                                            ? 'Bạn đang nợ: ${_formatCurrency(_selectedDebtContact!.netBalance.abs())}'
+                                                            : 'Đã tất toán sòng phẳng (0 ₫)'),
                                                     style: TextStyle(
                                                       fontSize: 10,
-                                                      fontWeight: FontWeight.w600,
-                                                      color: _selectedDebtContact!.netBalance > 0
-                                                          ? const Color(0xFF10B981)
-                                                          : (_selectedDebtContact!.netBalance < 0
-                                                          ? AppTokens.expense
-                                                          : (isDark ? AppTokens.darkMuted : AppTokens.lightMuted)),
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      color: _selectedDebtContact!
+                                                                  .netBalance >
+                                                              0
+                                                          ? const Color(
+                                                              0xFF10B981)
+                                                          : (_selectedDebtContact!
+                                                                      .netBalance <
+                                                                  0
+                                                              ? AppTokens
+                                                                  .expense
+                                                              : (isDark
+                                                                  ? AppTokens
+                                                                      .darkMuted
+                                                                  : AppTokens
+                                                                      .lightMuted)),
                                                     ),
                                                   ),
                                                 ],
@@ -1745,13 +1676,20 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
                                               onTap: () {
                                                 HapticFeedback.selectionClick();
                                                 _debtContactFeedback.clear();
-                                                setState(() => _selectedDebtContact = null);
+                                                setState(() =>
+                                                    _selectedDebtContact =
+                                                        null);
                                                 _syncDraft();
                                               },
-                                              borderRadius: BorderRadius.circular(8),
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
                                               child: Padding(
-                                                padding: const EdgeInsets.all(4.0),
-                                                child: Icon(Icons.close_rounded, size: 16, color: currentSemanticColor),
+                                                padding:
+                                                    const EdgeInsets.all(4.0),
+                                                child: Icon(Icons.close_rounded,
+                                                    size: 16,
+                                                    color:
+                                                        currentSemanticColor),
                                               ),
                                             ),
                                           ],
@@ -1764,38 +1702,54 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
                                           controller: _contactSearchController,
                                           onChanged: (text) {
                                             setState(
-                                                  () => _isSearchingContact =
+                                              () => _isSearchingContact =
                                                   text.trim().isNotEmpty,
                                             );
                                           },
                                           style: TextStyle(
                                             fontSize: 13,
-                                            color: isDark ? AppTokens.darkText : AppTokens.lightText,
+                                            color: isDark
+                                                ? AppTokens.darkText
+                                                : AppTokens.lightText,
                                           ),
                                           decoration: InputDecoration(
-                                            hintText: 'Nhập tên người vay / nợ (vd: Nam, Hải Anh)...',
+                                            hintText:
+                                                'Nhập tên người vay / nợ (vd: Nam, Hải Anh)...',
                                             hintStyle: TextStyle(
                                               fontSize: 12,
-                                              color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                                              color: isDark
+                                                  ? AppTokens.darkMuted
+                                                  : AppTokens.lightMuted,
                                             ),
-                                            prefixIcon: Icon(Icons.person_outline_rounded, size: 18, color: currentSemanticColor),
+                                            prefixIcon: Icon(
+                                                Icons.person_outline_rounded,
+                                                size: 18,
+                                                color: currentSemanticColor),
                                             isDense: true,
-                                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                                            contentPadding:
+                                                const EdgeInsets.symmetric(
+                                                    horizontal: 14,
+                                                    vertical: 13),
                                             border: OutlineInputBorder(
-                                              borderRadius: BorderRadius.circular(14),
+                                              borderRadius:
+                                                  BorderRadius.circular(14),
                                               borderSide: BorderSide(
                                                 color: validationBorder,
                                               ),
                                             ),
                                             enabledBorder: OutlineInputBorder(
-                                              borderRadius: BorderRadius.circular(14),
+                                              borderRadius:
+                                                  BorderRadius.circular(14),
                                               borderSide: BorderSide(
                                                 color: validationBorder,
-                                                width: visual.isInvalid ? 1.8 : 1.0,
+                                                width: visual.isInvalid
+                                                    ? 1.8
+                                                    : 1.0,
                                               ),
                                             ),
                                             focusedBorder: OutlineInputBorder(
-                                              borderRadius: BorderRadius.circular(14),
+                                              borderRadius:
+                                                  BorderRadius.circular(14),
                                               borderSide: BorderSide(
                                                 color: visual.isInvalid
                                                     ? AppTokens.expense
@@ -1806,46 +1760,72 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
                                           ),
                                         ),
                                       ),
-
-                                    if (_isSearchingContact && _selectedDebtContact == null)
+                                    if (_isSearchingContact &&
+                                        _selectedDebtContact == null)
                                       debtContactsAsync.when(
                                         data: (contacts) {
-                                          final query = _contactSearchController.text.trim().toLowerCase();
-                                          final matched = contacts.where((c) => c.name.toLowerCase().contains(query)).toList();
-                                          final isExactMatch = matched.any((c) => c.name.toLowerCase() == query);
+                                          final query = _contactSearchController
+                                              .text
+                                              .trim()
+                                              .toLowerCase();
+                                          final matched = contacts
+                                              .where((c) => c.name
+                                                  .toLowerCase()
+                                                  .contains(query))
+                                              .toList();
+                                          final isExactMatch = matched.any(
+                                              (c) =>
+                                                  c.name.toLowerCase() ==
+                                                  query);
 
                                           return Container(
-                                            margin: const EdgeInsets.only(top: 6),
+                                            margin:
+                                                const EdgeInsets.only(top: 6),
                                             padding: const EdgeInsets.all(6),
                                             decoration: BoxDecoration(
-                                              color: isDark ? AppTokens.darkCard : Colors.white,
-                                              borderRadius: BorderRadius.circular(14),
+                                              color: isDark
+                                                  ? AppTokens.darkCard
+                                                  : Colors.white,
+                                              borderRadius:
+                                                  BorderRadius.circular(14),
                                               border: Border.all(
-                                                color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder,
+                                                color: isDark
+                                                    ? AppTokens.darkBorder
+                                                    : AppTokens.lightBorder,
                                               ),
                                               boxShadow: [
                                                 BoxShadow(
-                                                  color: Colors.black.withValues(alpha: 0.08),
+                                                  color: Colors.black
+                                                      .withValues(alpha: 0.08),
                                                   blurRadius: 8,
                                                   offset: const Offset(0, 3),
                                                 ),
                                               ],
                                             ),
                                             child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
                                               mainAxisSize: MainAxisSize.min,
                                               children: [
                                                 ...matched.map((c) {
                                                   return ListTile(
                                                     dense: true,
-                                                    visualDensity: VisualDensity.compact,
-                                                    leading: const Icon(Icons.account_circle_outlined, size: 20),
+                                                    visualDensity:
+                                                        VisualDensity.compact,
+                                                    leading: const Icon(
+                                                        Icons
+                                                            .account_circle_outlined,
+                                                        size: 20),
                                                     title: Text(
                                                       c.name,
                                                       style: TextStyle(
                                                         fontSize: 13,
-                                                        fontWeight: FontWeight.w700,
-                                                        color: isDark ? AppTokens.darkText : AppTokens.lightText,
+                                                        fontWeight:
+                                                            FontWeight.w700,
+                                                        color: isDark
+                                                            ? AppTokens.darkText
+                                                            : AppTokens
+                                                                .lightText,
                                                       ),
                                                     ),
                                                     subtitle: CurrencyText(
@@ -1854,38 +1834,68 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
                                                           : 'Đã tất toán',
                                                       style: TextStyle(
                                                         fontSize: 10,
-                                                        color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                                                        color: isDark
+                                                            ? AppTokens
+                                                                .darkMuted
+                                                            : AppTokens
+                                                                .lightMuted,
                                                       ),
                                                     ),
                                                     onTap: () {
-                                                      HapticFeedback.selectionClick();
+                                                      HapticFeedback
+                                                          .selectionClick();
                                                       setState(() {
-                                                        _selectedDebtContact = c;
-                                                        _contactSearchController.clear();
-                                                        _isSearchingContact = false;
+                                                        _selectedDebtContact =
+                                                            c;
+                                                        _contactSearchController
+                                                            .clear();
+                                                        _isSearchingContact =
+                                                            false;
                                                       });
-                                                      _debtContactFeedback.clear();
+                                                      _debtContactFeedback
+                                                          .clear();
                                                       _syncDraft();
                                                     },
                                                   );
                                                 }),
-                                                if (!isExactMatch && _contactSearchController.text.trim().isNotEmpty)
+                                                if (!isExactMatch &&
+                                                    _contactSearchController
+                                                        .text
+                                                        .trim()
+                                                        .isNotEmpty)
                                                   InkWell(
-                                                    onTap: () => _createContactOnTheFly(_contactSearchController.text),
-                                                    borderRadius: BorderRadius.circular(10),
+                                                    onTap: () =>
+                                                        _createContactOnTheFly(
+                                                            _contactSearchController
+                                                                .text),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            10),
                                                     child: Padding(
-                                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                                      padding: const EdgeInsets
+                                                          .symmetric(
+                                                          horizontal: 12,
+                                                          vertical: 10),
                                                       child: Row(
                                                         children: [
-                                                          Icon(Icons.person_add_alt_1_rounded, size: 18, color: currentSemanticColor),
-                                                          const SizedBox(width: 8),
+                                                          Icon(
+                                                              Icons
+                                                                  .person_add_alt_1_rounded,
+                                                              size: 18,
+                                                              color:
+                                                                  currentSemanticColor),
+                                                          const SizedBox(
+                                                              width: 8),
                                                           Expanded(
                                                             child: Text(
                                                               '+ Thêm mới "${_contactSearchController.text.trim()}" vào danh bạ nợ',
                                                               style: TextStyle(
                                                                 fontSize: 12,
-                                                                fontWeight: FontWeight.w800,
-                                                                color: currentSemanticColor,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w800,
+                                                                color:
+                                                                    currentSemanticColor,
                                                               ),
                                                             ),
                                                           ),
@@ -1920,7 +1930,9 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
                                     controller: _noteController,
                                     style: TextStyle(
                                       fontSize: 12,
-                                      color: isDark ? AppTokens.darkText : AppTokens.lightText,
+                                      color: isDark
+                                          ? AppTokens.darkText
+                                          : AppTokens.lightText,
                                     ),
                                     decoration: InputDecoration(
                                       hintText: _activeTab == CategoryType.debt
@@ -1928,20 +1940,28 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
                                           : 'Ghi chú / Cửa hàng...',
                                       hintStyle: TextStyle(
                                         fontSize: 12,
-                                        color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                                        color: isDark
+                                            ? AppTokens.darkMuted
+                                            : AppTokens.lightMuted,
                                       ),
                                       isDense: true,
-                                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                              horizontal: 14, vertical: 13),
                                       border: OutlineInputBorder(
                                         borderRadius: BorderRadius.circular(14),
                                         borderSide: BorderSide(
-                                          color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder,
+                                          color: isDark
+                                              ? AppTokens.darkBorder
+                                              : AppTokens.lightBorder,
                                         ),
                                       ),
                                       enabledBorder: OutlineInputBorder(
                                         borderRadius: BorderRadius.circular(14),
                                         borderSide: BorderSide(
-                                          color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder,
+                                          color: isDark
+                                              ? AppTokens.darkBorder
+                                              : AppTokens.lightBorder,
                                         ),
                                       ),
                                     ),
@@ -1949,78 +1969,27 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
                                 ),
                               ),
                               const SizedBox(width: 8),
-
                               walletsAsync.when(
                                 data: (wallets) {
                                   if (wallets.isEmpty) return const SizedBox();
 
-                                  _selectedWallet ??= wallets.firstWhere(
+                                  _selectedWallet = wallets
+                                          .where((w) =>
+                                              w.id == _selectedWallet?.id)
+                                          .firstOrNull ??
+                                      wallets.firstWhere(
                                         (w) => w.isDefault,
-                                    orElse: () => wallets.first,
-                                  );
+                                        orElse: () => wallets.first,
+                                      );
 
-                                  return InkWell(
-                                    onTap: () => _handleWalletPickerTap(wallets, isDark, accent),
-                                    borderRadius: BorderRadius.circular(14),
-                                    child: Container(
-                                      height: 46,
-                                      padding: const EdgeInsets.symmetric(horizontal: 10),
-                                      constraints: const BoxConstraints(minWidth: 110, maxWidth: 140),
-                                      decoration: BoxDecoration(
-                                        color: isDark ? AppTokens.darkCard : Colors.white,
-                                        borderRadius: BorderRadius.circular(14),
-                                        border: Border.all(
-                                          color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder,
-                                        ),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Colors.black.withValues(alpha: 0.02),
-                                            blurRadius: 4,
-                                            offset: const Offset(0, 1),
-                                          ),
-                                        ],
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          AnimatedBuilder(
-                                            animation: _walletIconTiltAnimation,
-                                            builder: (context, child) {
-                                              return Transform.rotate(
-                                                angle: _walletIconTiltAnimation.value,
-                                                child: child,
-                                              );
-                                            },
-                                            child: Icon(
-                                              _resolveWalletIcon(_selectedWallet!.type),
-                                              size: 15,
-                                              color: _parseColor(_selectedWallet!.color),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 6),
-                                          Flexible(
-                                            child: Text(
-                                              _selectedWallet!.name,
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: TextStyle(
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.w700,
-                                                color: isDark ? AppTokens.darkText : AppTokens.lightText,
-                                              ),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 4),
-                                          Icon(
-                                            Icons.arrow_drop_down_rounded,
-                                            size: 18,
-                                            color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  );
+                                  return SizedBox(
+                                      width: MediaQuery.sizeOf(context).width *
+                                          .43,
+                                      child: FlowyPickerTrigger(
+                                          onTap: () => _openWalletPickerModal(
+                                              wallets, isDark, accent),
+                                          child: walletPickerLabel(
+                                              _selectedWallet!)));
                                 },
                                 loading: () => const SizedBox(),
                                 error: (_, __) => const SizedBox(),
@@ -2034,7 +2003,9 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
                         if (_activeTab == CategoryType.debt)
                           Container(
                             padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
-                            color: isDark ? AppTokens.darkCardSubtle : AppTokens.lightCardSubtle,
+                            color: isDark
+                                ? AppTokens.darkCardSubtle
+                                : AppTokens.lightCardSubtle,
                             child: Row(
                               children: [
                                 Text(
@@ -2042,7 +2013,9 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
                                   style: TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.w700,
-                                    color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                                    color: isDark
+                                        ? AppTokens.darkMuted
+                                        : AppTokens.lightMuted,
                                   ),
                                 ),
                                 const SizedBox(width: 8),
@@ -2052,7 +2025,9 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
                                     physics: const BouncingScrollPhysics(),
                                     child: Row(
                                       children: [
-                                        _buildDueDateChip('Không hẹn', _debtDueDate == null, () {
+                                        _buildDueDateChip(
+                                            'Không hẹn', _debtDueDate == null,
+                                            () {
                                           HapticFeedback.selectionClick();
                                           setState(() => _debtDueDate = null);
                                           _syncDraft();
@@ -2060,10 +2035,15 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
                                         const SizedBox(width: 6),
                                         _buildDueDateChip(
                                           '7 ngày',
-                                          _debtDueDate != null && _debtDueDate!.difference(now).inDays == 7,
-                                              () {
+                                          _debtDueDate != null &&
+                                              _debtDueDate!
+                                                      .difference(now)
+                                                      .inDays ==
+                                                  7,
+                                          () {
                                             HapticFeedback.selectionClick();
-                                            setState(() => _debtDueDate = now.add(const Duration(days: 7)));
+                                            setState(() => _debtDueDate = now
+                                                .add(const Duration(days: 7)));
                                             _syncDraft();
                                           },
                                           isDark,
@@ -2073,11 +2053,18 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
                                         _buildDueDateChip(
                                           '1 tháng',
                                           _debtDueDate != null &&
-                                              _debtDueDate!.difference(now).inDays >= 28 &&
-                                              _debtDueDate!.difference(now).inDays <= 31,
-                                              () {
+                                              _debtDueDate!
+                                                      .difference(now)
+                                                      .inDays >=
+                                                  28 &&
+                                              _debtDueDate!
+                                                      .difference(now)
+                                                      .inDays <=
+                                                  31,
+                                          () {
                                             HapticFeedback.selectionClick();
-                                            setState(() => _debtDueDate = now.add(const Duration(days: 30)));
+                                            setState(() => _debtDueDate = now
+                                                .add(const Duration(days: 30)));
                                             _syncDraft();
                                           },
                                           isDark,
@@ -2085,7 +2072,10 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
                                         ),
                                         const SizedBox(width: 6),
                                         _buildDueDateChip(
-                                          _debtDueDate != null ? DateFormat('dd/MM').format(_debtDueDate!) : '📅 Chọn ngày',
+                                          _debtDueDate != null
+                                              ? DateFormat('dd/MM')
+                                                  .format(_debtDueDate!)
+                                              : '📅 Chọn ngày',
                                           _debtDueDate != null,
                                           _pickDueDate,
                                           isDark,
@@ -2101,12 +2091,17 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
 
                         // Hàng Chip Ngày
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 6),
                           decoration: BoxDecoration(
-                            color: isDark ? AppTokens.darkCardSubtle : AppTokens.lightCardSubtle,
+                            color: isDark
+                                ? AppTokens.darkCardSubtle
+                                : AppTokens.lightCardSubtle,
                             border: Border(
                               top: BorderSide(
-                                color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder,
+                                color: isDark
+                                    ? AppTokens.darkBorder
+                                    : AppTokens.lightBorder,
                               ),
                             ),
                           ),
@@ -2114,16 +2109,20 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               InkWell(
-                                onTap: () => _openMiniCalendarModal(isDark, accent),
+                                onTap: () =>
+                                    _openMiniCalendarModal(isDark, accent),
                                 borderRadius: BorderRadius.circular(10),
                                 child: Container(
                                   height: 32,
-                                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10),
                                   decoration: BoxDecoration(
-                                    color: currentSemanticColor.withValues(alpha: 0.12),
+                                    color: currentSemanticColor.withValues(
+                                        alpha: 0.12),
                                     borderRadius: BorderRadius.circular(10),
                                     border: Border.all(
-                                      color: currentSemanticColor.withValues(alpha: 0.4),
+                                      color: currentSemanticColor.withValues(
+                                          alpha: 0.4),
                                       width: 1.0,
                                     ),
                                   ),
@@ -2139,7 +2138,9 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
                                         ),
                                       ),
                                       const SizedBox(width: 4),
-                                      Icon(Icons.keyboard_arrow_down_rounded, size: 14, color: currentSemanticColor),
+                                      Icon(Icons.keyboard_arrow_down_rounded,
+                                          size: 14,
+                                          color: currentSemanticColor),
                                     ],
                                   ),
                                 ),
@@ -2150,25 +2151,37 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
                                     onTap: () {
                                       HapticFeedback.selectionClick();
                                       setState(() {
-                                        final y = now.subtract(const Duration(days: 1));
-                                        _selectedDate = DateTime(y.year, y.month, y.day, now.hour, now.minute);
+                                        final y = now
+                                            .subtract(const Duration(days: 1));
+                                        _selectedDate = DateTime(
+                                            y.year,
+                                            y.month,
+                                            y.day,
+                                            now.hour,
+                                            now.minute);
                                       });
                                       _syncDraft();
                                     },
                                     borderRadius: BorderRadius.circular(10),
                                     child: Container(
                                       height: 32,
-                                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 10),
                                       alignment: Alignment.center,
                                       decoration: BoxDecoration(
                                         color: isSelectedYesterday
-                                            ? currentSemanticColor.withValues(alpha: 0.14)
-                                            : (isDark ? AppTokens.darkCard : Colors.white),
+                                            ? currentSemanticColor.withValues(
+                                                alpha: 0.14)
+                                            : (isDark
+                                                ? AppTokens.darkCard
+                                                : Colors.white),
                                         borderRadius: BorderRadius.circular(10),
                                         border: Border.all(
                                           color: isSelectedYesterday
                                               ? currentSemanticColor
-                                              : (isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
+                                              : (isDark
+                                                  ? AppTokens.darkBorder
+                                                  : AppTokens.lightBorder),
                                           width: 1.0,
                                         ),
                                       ),
@@ -2176,10 +2189,14 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
                                         'Hôm qua',
                                         style: TextStyle(
                                           fontSize: 11,
-                                          fontWeight: isSelectedYesterday ? FontWeight.w800 : FontWeight.w600,
+                                          fontWeight: isSelectedYesterday
+                                              ? FontWeight.w800
+                                              : FontWeight.w600,
                                           color: isSelectedYesterday
                                               ? currentSemanticColor
-                                              : (isDark ? AppTokens.darkText : AppTokens.lightText),
+                                              : (isDark
+                                                  ? AppTokens.darkText
+                                                  : AppTokens.lightText),
                                         ),
                                       ),
                                     ),
@@ -2189,25 +2206,37 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
                                     onTap: () {
                                       HapticFeedback.selectionClick();
                                       setState(() {
-                                        final d = now.subtract(const Duration(days: 2));
-                                        _selectedDate = DateTime(d.year, d.month, d.day, now.hour, now.minute);
+                                        final d = now
+                                            .subtract(const Duration(days: 2));
+                                        _selectedDate = DateTime(
+                                            d.year,
+                                            d.month,
+                                            d.day,
+                                            now.hour,
+                                            now.minute);
                                       });
                                       _syncDraft();
                                     },
                                     borderRadius: BorderRadius.circular(10),
                                     child: Container(
                                       height: 32,
-                                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 10),
                                       alignment: Alignment.center,
                                       decoration: BoxDecoration(
                                         color: isSelectedDayBefore
-                                            ? currentSemanticColor.withValues(alpha: 0.14)
-                                            : (isDark ? AppTokens.darkCard : Colors.white),
+                                            ? currentSemanticColor.withValues(
+                                                alpha: 0.14)
+                                            : (isDark
+                                                ? AppTokens.darkCard
+                                                : Colors.white),
                                         borderRadius: BorderRadius.circular(10),
                                         border: Border.all(
                                           color: isSelectedDayBefore
                                               ? currentSemanticColor
-                                              : (isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
+                                              : (isDark
+                                                  ? AppTokens.darkBorder
+                                                  : AppTokens.lightBorder),
                                           width: 1.0,
                                         ),
                                       ),
@@ -2215,10 +2244,14 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
                                         'Hôm kia',
                                         style: TextStyle(
                                           fontSize: 11,
-                                          fontWeight: isSelectedDayBefore ? FontWeight.w800 : FontWeight.w600,
+                                          fontWeight: isSelectedDayBefore
+                                              ? FontWeight.w800
+                                              : FontWeight.w600,
                                           color: isSelectedDayBefore
                                               ? currentSemanticColor
-                                              : (isDark ? AppTokens.darkText : AppTokens.lightText),
+                                              : (isDark
+                                                  ? AppTokens.darkText
+                                                  : AppTokens.lightText),
                                         ),
                                       ),
                                     ),
@@ -2244,7 +2277,9 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
                     color: isDark ? AppTokens.darkCard : AppTokens.lightCard,
                     border: Border(
                       top: BorderSide(
-                        color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder,
+                        color: isDark
+                            ? AppTokens.darkBorder
+                            : AppTokens.lightBorder,
                       ),
                     ),
                   ),
@@ -2255,14 +2290,16 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
                       children: [
                         _buildChromaticNumpad(isDark, currentSemanticColor),
                         const SizedBox(height: 8),
-
                         Center(
                           child: AnimatedBuilder(
                             animation: _morphWidthAnimation,
                             builder: (context, child) {
-                              final double fullWidth = MediaQuery.of(context).size.width - 24;
+                              final double fullWidth =
+                                  MediaQuery.of(context).size.width - 24;
                               final double currentWidth = _isSuccessMorphed
-                                  ? fullWidth - (fullWidth - 50.0) * _morphWidthAnimation.value
+                                  ? fullWidth -
+                                      (fullWidth - 50.0) *
+                                          _morphWidthAnimation.value
                                   : fullWidth;
 
                               return SizedBox(
@@ -2282,45 +2319,61 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
                                       shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(
                                           _isSuccessMorphed
-                                              ? 16.0 + (9.0 * _morphWidthAnimation.value)
+                                              ? 16.0 +
+                                                  (9.0 *
+                                                      _morphWidthAnimation
+                                                          .value)
                                               : 16.0,
                                         ),
                                       ),
                                     ),
-                                    onPressed: canSubmit ? _submitTransaction : null,
+                                    onPressed:
+                                        canSubmit ? _submitTransaction : null,
                                     child: _isSuccessMorphed
                                         ? ScaleTransition(
-                                      scale: _checkScaleAnimation,
-                                      child: const Icon(Icons.check_rounded, color: Colors.white, size: 26),
-                                    )
+                                            scale: _checkScaleAnimation,
+                                            child: const Icon(
+                                                Icons.check_rounded,
+                                                color: Colors.white,
+                                                size: 26),
+                                          )
                                         : (_isSubmitting
-                                        ? const SizedBox(
-                                      width: 22,
-                                      height: 22,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2.2,
-                                        valueColor: AlwaysStoppedAnimation(Colors.white),
-                                      ),
-                                    )
-                                        : FittedBox(
-                                      fit: BoxFit.scaleDown,
-                                      child: Padding(
-                                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                                        child: Text(
-                                          _activeTab == CategoryType.debt
-                                              ? '✓ XÁC NHẬN GIAO DỊCH VAY NỢ'
-                                              : (_isAmortized
-                                              ? '✓ LƯU & DÀN ĐỀU CẢ KỲ'
-                                              : (_isEditMode ? '✓ CẬP NHẬT GIAO DỊCH' : 'LƯU GIAO DỊCH')),
-                                          maxLines: 1,
-                                          style: const TextStyle(
-                                            fontSize: 15,
-                                            fontWeight: FontWeight.w900,
-                                            letterSpacing: 0.5,
-                                          ),
-                                        ),
-                                      ),
-                                    )),
+                                            ? const SizedBox(
+                                                width: 22,
+                                                height: 22,
+                                                child:
+                                                    CircularProgressIndicator(
+                                                  strokeWidth: 2.2,
+                                                  valueColor:
+                                                      AlwaysStoppedAnimation(
+                                                          Colors.white),
+                                                ),
+                                              )
+                                            : FittedBox(
+                                                fit: BoxFit.scaleDown,
+                                                child: Padding(
+                                                  padding: const EdgeInsets
+                                                      .symmetric(
+                                                      horizontal: 16.0),
+                                                  child: Text(
+                                                    _activeTab ==
+                                                            CategoryType.debt
+                                                        ? '✓ XÁC NHẬN GIAO DỊCH VAY NỢ'
+                                                        : (_isAmortized
+                                                            ? '✓ LƯU & DÀN ĐỀU CẢ KỲ'
+                                                            : (_isEditMode
+                                                                ? '✓ CẬP NHẬT GIAO DỊCH'
+                                                                : 'LƯU GIAO DỊCH')),
+                                                    maxLines: 1,
+                                                    style: const TextStyle(
+                                                      fontSize: 15,
+                                                      fontWeight:
+                                                          FontWeight.w900,
+                                                      letterSpacing: 0.5,
+                                                    ),
+                                                  ),
+                                                ),
+                                              )),
                                   ),
                                 ),
                               );
@@ -2340,7 +2393,8 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
     );
   }
 
-  Widget _buildDueDateChip(String label, bool isSelected, VoidCallback onTap, bool isDark, Color debtColor) {
+  Widget _buildDueDateChip(String label, bool isSelected, VoidCallback onTap,
+      bool isDark, Color debtColor) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(10),
@@ -2382,9 +2436,12 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
       ['C', '0', '000', '⌫'],
     ];
 
-    final Color normalKeyBg = isDark ? AppTokens.darkCardSubtle : AppTokens.lightCardSubtle;
-    final Color shortcutKeyBg = isDark ? Colors.white.withValues(alpha: 0.06) : const Color(0xFFF1F5F9);
-    final Color normalKeyText = isDark ? AppTokens.darkText : AppTokens.lightText;
+    final Color normalKeyBg =
+        isDark ? AppTokens.darkCardSubtle : AppTokens.lightCardSubtle;
+    final Color shortcutKeyBg =
+        isDark ? Colors.white.withValues(alpha: 0.06) : const Color(0xFFF1F5F9);
+    final Color normalKeyText =
+        isDark ? AppTokens.darkText : AppTokens.lightText;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -2400,8 +2457,12 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet> with TickerPr
                 keyText = currentSemanticColor;
               } else if (key == 'C') {
                 final bool hasInput = _expression != '0';
-                keyBg = hasInput ? AppTokens.expense.withValues(alpha: 0.12) : normalKeyBg;
-                keyText = hasInput ? AppTokens.expense : (isDark ? Colors.white30 : Colors.black26);
+                keyBg = hasInput
+                    ? AppTokens.expense.withValues(alpha: 0.12)
+                    : normalKeyBg;
+                keyText = hasInput
+                    ? AppTokens.expense
+                    : (isDark ? Colors.white30 : Colors.black26);
               } else if (key == '⌫') {
                 keyBg = normalKeyBg;
                 keyText = isDark ? Colors.white70 : Colors.black87;
@@ -2457,13 +2518,15 @@ class _MiniCalendarSheetState extends State<_MiniCalendarSheet> {
   void initState() {
     super.initState();
     _currentPickedDate = widget.initialDate;
-    _displayedMonth = DateTime(widget.initialDate.year, widget.initialDate.month, 1);
+    _displayedMonth =
+        DateTime(widget.initialDate.year, widget.initialDate.month, 1);
   }
 
   void _shiftMonth(int delta) {
     HapticFeedback.selectionClick();
     setState(() {
-      _displayedMonth = DateTime(_displayedMonth.year, _displayedMonth.month + delta, 1);
+      _displayedMonth =
+          DateTime(_displayedMonth.year, _displayedMonth.month + delta, 1);
     });
   }
 
@@ -2472,8 +2535,10 @@ class _MiniCalendarSheetState extends State<_MiniCalendarSheet> {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
 
-    final daysInMonth = DateTime(_displayedMonth.year, _displayedMonth.month + 1, 0).day;
-    final firstWeekday = DateTime(_displayedMonth.year, _displayedMonth.month, 1).weekday;
+    final daysInMonth =
+        DateTime(_displayedMonth.year, _displayedMonth.month + 1, 0).day;
+    final firstWeekday =
+        DateTime(_displayedMonth.year, _displayedMonth.month, 1).weekday;
     final leadingEmptyCount = (firstWeekday - 1) % 7;
 
     return ClipRRect(
@@ -2501,7 +2566,6 @@ class _MiniCalendarSheetState extends State<_MiniCalendarSheet> {
                 ),
               ),
               const SizedBox(height: 14),
-
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -2514,7 +2578,9 @@ class _MiniCalendarSheetState extends State<_MiniCalendarSheet> {
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w800,
-                      color: widget.isDark ? AppTokens.darkText : AppTokens.lightText,
+                      color: widget.isDark
+                          ? AppTokens.darkText
+                          : AppTokens.lightText,
                     ),
                   ),
                   IconButton(
@@ -2524,7 +2590,6 @@ class _MiniCalendarSheetState extends State<_MiniCalendarSheet> {
                 ],
               ),
               const SizedBox(height: 10),
-
               Row(
                 children: ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'].map((w) {
                   final isWeekend = w == 'T7' || w == 'CN';
@@ -2536,8 +2601,12 @@ class _MiniCalendarSheetState extends State<_MiniCalendarSheet> {
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
                           color: isWeekend
-                              ? (widget.isDark ? Colors.amber.shade300 : Colors.amber.shade800)
-                              : (widget.isDark ? AppTokens.darkMuted : AppTokens.lightMuted),
+                              ? (widget.isDark
+                                  ? Colors.amber.shade300
+                                  : Colors.amber.shade800)
+                              : (widget.isDark
+                                  ? AppTokens.darkMuted
+                                  : AppTokens.lightMuted),
                         ),
                       ),
                     ),
@@ -2545,7 +2614,6 @@ class _MiniCalendarSheetState extends State<_MiniCalendarSheet> {
                 }).toList(),
               ),
               const SizedBox(height: 8),
-
               GridView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
@@ -2562,7 +2630,8 @@ class _MiniCalendarSheetState extends State<_MiniCalendarSheet> {
                   }
 
                   final dayNumber = index - leadingEmptyCount + 1;
-                  final cellDate = DateTime(_displayedMonth.year, _displayedMonth.month, dayNumber);
+                  final cellDate = DateTime(
+                      _displayedMonth.year, _displayedMonth.month, dayNumber);
 
                   final isFutureDate = cellDate.isAfter(today);
                   final isDisabled = widget.isExpense && isFutureDate;
@@ -2579,22 +2648,23 @@ class _MiniCalendarSheetState extends State<_MiniCalendarSheet> {
                     onTap: isDisabled
                         ? null
                         : () {
-                      HapticFeedback.selectionClick();
-                      setState(() => _currentPickedDate = cellDate);
-                      widget.onDateSelected(cellDate);
-                      Navigator.of(context).pop();
-                    },
+                            HapticFeedback.selectionClick();
+                            setState(() => _currentPickedDate = cellDate);
+                            widget.onDateSelected(cellDate);
+                            Navigator.of(context).pop();
+                          },
                     borderRadius: BorderRadius.circular(12),
                     child: Container(
                       decoration: BoxDecoration(
                         color: isSelected
                             ? widget.accent.primary
                             : (isToday
-                            ? widget.accent.primary.withValues(alpha: 0.15)
-                            : Colors.transparent),
+                                ? widget.accent.primary.withValues(alpha: 0.15)
+                                : Colors.transparent),
                         borderRadius: BorderRadius.circular(12),
                         border: isToday && !isSelected
-                            ? Border.all(color: widget.accent.primary, width: 1.5)
+                            ? Border.all(
+                                color: widget.accent.primary, width: 1.5)
                             : null,
                       ),
                       child: Center(
@@ -2604,10 +2674,14 @@ class _MiniCalendarSheetState extends State<_MiniCalendarSheet> {
                             fontSize: 13,
                             fontWeight: FontWeight.w800,
                             color: isDisabled
-                                ? (widget.isDark ? Colors.white24 : Colors.black26)
+                                ? (widget.isDark
+                                    ? Colors.white24
+                                    : Colors.black26)
                                 : (isSelected
-                                ? Colors.white
-                                : (widget.isDark ? AppTokens.darkText : AppTokens.lightText)),
+                                    ? Colors.white
+                                    : (widget.isDark
+                                        ? AppTokens.darkText
+                                        : AppTokens.lightText)),
                           ),
                         ),
                       ),
@@ -2615,9 +2689,7 @@ class _MiniCalendarSheetState extends State<_MiniCalendarSheet> {
                   );
                 },
               ),
-
               const SizedBox(height: 16),
-
               SizedBox(
                 width: double.infinity,
                 height: 44,
@@ -2634,8 +2706,10 @@ class _MiniCalendarSheetState extends State<_MiniCalendarSheet> {
                   ),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: widget.accent.primary,
-                    side: BorderSide(color: widget.accent.primary.withValues(alpha: 0.5)),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    side: BorderSide(
+                        color: widget.accent.primary.withValues(alpha: 0.5)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14)),
                   ),
                 ),
               ),

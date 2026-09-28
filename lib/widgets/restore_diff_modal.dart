@@ -32,7 +32,9 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../core/animation/app_animation_policy.dart';
 import '../core/feedback/app_feedback.dart';
-import '../data/database.dart';
+import '../main.dart' show resetAppRootSession, hasCompletedOnboardingProvider;
+import '../services/backup_capsule.dart';
+import 'flowy_selection_picker.dart';
 import '../services/cloud_backup_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/currency_text.dart';
@@ -60,40 +62,80 @@ class DatabaseInspectionMetrics {
 class RestoreDiffModal extends ConsumerStatefulWidget {
   final CloudBackupItem? backupItem;
   final BackupDiffReport? signoutReport;
+  final File? localRecovery;
+  final bool finishOnboarding;
+  final ScrollController? scrollController;
 
   const RestoreDiffModal({
     super.key,
     this.backupItem,
     this.signoutReport,
+    this.localRecovery,
+    this.finishOnboarding = false,
+    this.scrollController,
   });
 
   /// Static helper mở modal đối soát trực tiếp từ danh sách backup
   static Future<void> show(
-      BuildContext context, {
-        required CloudBackupItem backupItem,
-      }) {
+    BuildContext context, {
+    required CloudBackupItem backupItem,
+    bool finishOnboarding = false,
+  }) {
     HapticFeedback.selectionClick();
     return AppAnimationPolicy.showFluidSheet<void>(
       context: context,
       mode: FluidSheetMode.nestedScrollable,
+      enableBlur: false,
       backgroundColor: Colors.transparent,
-      builder: (_, __) => RestoreDiffModal(backupItem: backupItem),
+      builder: (_, scroll) => RestoreDiffModal(
+          backupItem: backupItem,
+          finishOnboarding: finishOnboarding,
+          scrollController: scroll),
     );
   }
 
   /// 🌟 Static helper mở Cổng an toàn trước khi Đăng xuất (Sign-Out Backup Interception Sheet)
   static Future<bool> showPreSignoutGate(
-      BuildContext context, {
-        required BackupDiffReport report,
-      }) async {
+    BuildContext context, {
+    required BackupDiffReport report,
+  }) async {
     HapticFeedback.mediumImpact();
     final result = await AppAnimationPolicy.showFluidSheet<bool>(
       context: context,
       mode: FluidSheetMode.nestedScrollable,
       backgroundColor: Colors.transparent,
-      builder: (_, __) => RestoreDiffModal(signoutReport: report),
+      builder: (_, scroll) =>
+          RestoreDiffModal(signoutReport: report, scrollController: scroll),
     );
     return result ?? false;
+  }
+
+  static Future<void> showLocalRecovery(BuildContext context) async {
+    final documents = await getApplicationDocumentsDirectory();
+    final source = File(
+        p.join(documents.path, 'restore_recovery', 'pfm_local_vault.sqlite'));
+    if (!await source.exists()) {
+      if (context.mounted) {
+        AppFeedback.showInfo(context, 'Chưa có bản dự phòng trước khôi phục.');
+      }
+      return;
+    }
+    final modified = await source.lastModified();
+    final length = await source.length();
+    if (!context.mounted) return;
+    await AppAnimationPolicy.showFluidSheet<void>(
+        context: context,
+        mode: FluidSheetMode.nestedScrollable,
+        enableBlur: false,
+        builder: (_, scroll) => RestoreDiffModal(
+            scrollController: scroll,
+            localRecovery: source,
+            backupItem: CloudBackupItem(
+                fileId: 'local',
+                fileName: 'Bản dự phòng trên máy',
+                sizeBytes: length,
+                createdTime: modified,
+                properties: const {})));
   }
 
   @override
@@ -104,6 +146,12 @@ class _RestoreDiffModalState extends ConsumerState<RestoreDiffModal> {
   bool _isLoading = true;
   String? _loadingMessage;
   File? _decryptedTempFile;
+  BackupReconciliation? _reconciliation;
+  Map<String, dynamic>? _savedPreferences;
+  bool _keepLocal = true;
+  final Set<String> _selected = {};
+  final Map<String, String> _walletMapping = {};
+  int _reviewIndex = 0;
 
   DatabaseInspectionMetrics? _localMetrics;
   DatabaseInspectionMetrics? _backupMetrics;
@@ -135,7 +183,8 @@ class _RestoreDiffModalState extends ConsumerState<RestoreDiffModal> {
   }
 
   String _formatCurrency(double amount) {
-    return NumberFormat.currency(locale: 'vi_VN', symbol: '₫', decimalDigits: 0).format(amount);
+    return NumberFormat.currency(locale: 'vi_VN', symbol: '₫', decimalDigits: 0)
+        .format(amount);
   }
 
   /// Định dạng thời gian trực quan thân thiện (vd: "Hôm nay 10:30", "Hôm qua 15:45", "3 ngày trước")
@@ -144,9 +193,12 @@ class _RestoreDiffModalState extends ConsumerState<RestoreDiffModal> {
     final now = DateTime.now();
     final diff = now.difference(date.toLocal());
 
-    final isSameDay = now.year == date.year && now.month == date.month && now.day == date.day;
+    final isSameDay =
+        now.year == date.year && now.month == date.month && now.day == date.day;
     final yesterday = now.subtract(const Duration(days: 1));
-    final isYesterday = yesterday.year == date.year && yesterday.month == date.month && yesterday.day == date.day;
+    final isYesterday = yesterday.year == date.year &&
+        yesterday.month == date.month &&
+        yesterday.day == date.day;
 
     if (isSameDay) {
       return 'Hôm nay ${DateFormat('HH:mm').format(date.toLocal())}';
@@ -163,7 +215,8 @@ class _RestoreDiffModalState extends ConsumerState<RestoreDiffModal> {
   DatabaseInspectionMetrics _inspectSqliteFile(File dbFile) {
     final rawDb = sqlite.sqlite3.open(dbFile.path);
     try {
-      final txResult = rawDb.select('SELECT COUNT(*) AS count, MAX(date) AS max_date FROM transactions;');
+      final txResult = rawDb.select(
+          'SELECT COUNT(*) AS count, MAX(date) AS max_date FROM (SELECT date FROM transactions UNION ALL SELECT date FROM debt_transactions);');
       int txCount = 0;
       DateTime? maxDate;
       if (txResult.isNotEmpty) {
@@ -178,12 +231,14 @@ class _RestoreDiffModalState extends ConsumerState<RestoreDiffModal> {
         }
       }
 
-      final walletResult = rawDb.select('SELECT COUNT(*) AS count, SUM(balance) AS total_balance FROM wallets WHERE is_archived = 0;');
+      final walletResult = rawDb.select(
+          'SELECT COUNT(*) AS count, SUM(balance) AS total_balance FROM wallets WHERE is_archived = 0;');
       int walletCount = 0;
       double totalBalance = 0.0;
       if (walletResult.isNotEmpty) {
         walletCount = walletResult.first['count'] as int? ?? 0;
-        totalBalance = (walletResult.first['total_balance'] as num?)?.toDouble() ?? 0.0;
+        totalBalance =
+            (walletResult.first['total_balance'] as num?)?.toDouble() ?? 0.0;
       }
 
       return DatabaseInspectionMetrics(
@@ -193,7 +248,7 @@ class _RestoreDiffModalState extends ConsumerState<RestoreDiffModal> {
         totalBalance: totalBalance,
       );
     } finally {
-      rawDb.dispose();
+      rawDb.close();
     }
   }
 
@@ -218,9 +273,51 @@ class _RestoreDiffModalState extends ConsumerState<RestoreDiffModal> {
       }
 
       final backupService = ref.read(cloudBackupServiceProvider);
-      _decryptedTempFile = await backupService.downloadAndDecryptBackup(widget.backupItem!.fileId);
+      if (widget.localRecovery != null) {
+        final temp = await getTemporaryDirectory();
+        final folder =
+            await Directory(p.join(temp.path, 'flowy_recovery_')).createTemp();
+        for (final name in [
+          'pfm_local_vault.sqlite',
+          'preferences_manifest.json',
+          'security_manifest.json'
+        ]) {
+          final source = File(p.join(widget.localRecovery!.parent.path, name));
+          if (await source.exists()) {
+            await source.copy(p.join(folder.path, name));
+          }
+        }
+        _decryptedTempFile =
+            File(p.join(folder.path, 'pfm_local_vault.sqlite'));
+      } else {
+        _decryptedTempFile = await backupService
+            .downloadAndDecryptBackup(widget.backupItem!.fileId);
+      }
+      if (!mounted) {
+        _cleanTempFile();
+        return;
+      }
 
+      _savedPreferences = readManifest(
+          _decryptedTempFile!.parent.path, 'preferences_manifest.json');
       _backupMetrics = _inspectSqliteFile(_decryptedTempFile!);
+      final snapshot = await backupService.snapshotForInspection();
+      try {
+        _reconciliation =
+            inspectReconciliation(snapshot.path, _decryptedTempFile!.path);
+        _localMetrics = _inspectSqliteFile(snapshot);
+      } finally {
+        await snapshot.parent.delete(recursive: true);
+      }
+      for (final wallet in _reconciliation!.wallets) {
+        final id = wallet['id'] as String;
+        if (_reconciliation!.localWalletNames.containsKey(id)) {
+          _walletMapping[id] = id;
+        }
+      }
+      _selected.addAll(_reconciliation!.entries
+          .where((e) => e.blockedReason == null)
+          .map((e) => e.key));
 
       if (mounted) {
         setState(() => _isLoading = false);
@@ -238,107 +335,44 @@ class _RestoreDiffModalState extends ConsumerState<RestoreDiffModal> {
   }
 
   Future<void> _executeRestore({required bool createLocalBackupFirst}) async {
-    if (_decryptedTempFile == null || !_decryptedTempFile!.existsSync()) {
-      return;
-    }
-
-    setState(() {
-      _isLoading = true;
-      _loadingMessage = 'Đang tiến hành khôi phục dữ liệu an toàn...';
-    });
-
+    final file = _decryptedTempFile;
+    if (file == null || _isLoading) return;
+    setState(() => _isLoading = true);
     try {
-      final db = ref.read(databaseProvider);
-      final backupService = ref.read(cloudBackupServiceProvider);
-
-      if (createLocalBackupFirst) {
-        setState(() => _loadingMessage = 'Đang tạo bản sao lưu máy lên Google Drive...');
-        await backupService.createBackup();
+      await ref.read(cloudBackupServiceProvider).restorePreparedBackup(file,
+          reconciliation: _reconciliation,
+          selected: _keepLocal ? _selected : <String>{},
+          walletMapping: _walletMapping);
+      if (!mounted) return;
+      if (widget.finishOnboarding) {
+        await ref
+            .read(sharedPreferencesProvider)
+            .setBool('has_completed_onboarding', true);
+        if (!mounted) return;
+        ref.read(hasCompletedOnboardingProvider.notifier).state = true;
       }
-
-      await db.customStatement('PRAGMA wal_checkpoint(FULL);');
-
-      final dbFolder = await getApplicationDocumentsDirectory();
-      final mainDbFile = File(p.join(dbFolder.path, 'pfm_local_vault.sqlite'));
-      final walFile = File(p.join(dbFolder.path, 'pfm_local_vault.sqlite-wal'));
-      final shmFile = File(p.join(dbFolder.path, 'pfm_local_vault.sqlite-shm'));
-      final backupBakFile = File(p.join(dbFolder.path, 'pfm_local_vault.sqlite.bak'));
-
-      if (await mainDbFile.exists()) {
-        await mainDbFile.copy(backupBakFile.path);
-      }
-
-      if (await walFile.exists()) await walFile.delete();
-      if (await shmFile.exists()) await shmFile.delete();
-
-      await _decryptedTempFile!.copy(mainDbFile.path);
-
-      ref.invalidate(databaseProvider);
-
-      if (mounted) {
-        final messenger = ScaffoldMessenger.of(context);
-        final providerContainer = ProviderScope.containerOf(
-          context,
-          listen: false,
-        );
-
-        // Safety-critical exception: restoring a database replaces local data.
-        // Preserve the existing rollback affordance through the unified Undo Dock
-        // instead of leaving an 8-second legacy SnackBar behind the modal layer.
-        AppFeedback.showUndo(
-          context,
-          message: '✓ Khôi phục CSDL từ Cloud thành công!',
-          actionColor: Colors.yellowAccent,
-          onUndo: () async {
-            if (await backupBakFile.exists()) {
-              if (await walFile.exists()) await walFile.delete();
-              if (await shmFile.exists()) await shmFile.delete();
-
-              await backupBakFile.copy(mainDbFile.path);
-              providerContainer.invalidate(databaseProvider);
-
-              AppFeedback.showSuccessWithMessenger(
-                messenger,
-                '✓ Đã hoàn tác trở lại trạng thái cũ trên máy.',
-                emitHaptic: false,
-              );
-            }
-          },
-        );
-
-        Navigator.of(context).pop();
-      }
+      AppFeedback.showSuccess(
+          context, 'Đã khôi phục. Bản dữ liệu trước đó vẫn được giữ trên máy.');
+      resetAppRootSession(ref);
     } catch (e) {
-      debugPrint('RestoreDiffModal: Error during restore: $e');
-      if (mounted) {
-        setState(() => _isLoading = false);
-        AppFeedback.showError(
-          context,
-          'Lỗi trong quá trình khôi phục: $e',
-        );
-      }
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      AppFeedback.showError(context, 'Chưa khôi phục được: $e');
     }
   }
 
-  Future<void> _showDangerousOverrideConfirmation() async {
-    final confirmed = await showDialog<bool>(
+  Future<void> _confirmRestore() async {
+    final confirmed = await AppAnimationPolicy.showPreservedDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.warning_amber_rounded, color: AppTokens.expense, size: 24),
-            SizedBox(width: 8),
-            Text('Xác nhận ghi đè?'),
-          ],
-        ),
+        title: const Text('Xác nhận khôi phục'),
         content: const Text(
-          'Dữ liệu mới trên thiết bị này sẽ bị thay thế bằng bản sao lưu Cloud cũ hơn. '
-              'Hệ thống sẽ tạo bản sao dự phòng .bak để hoàn tác nếu cần. Bạn có chắc chắn muốn tiếp tục?',
+          'Dữ liệu Cloud sẽ thay thế dữ liệu đang dùng. Các mục không chọn nhập lại vẫn nằm trong bản dự phòng trên máy.',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('HỦY'),
+            child: const Text('Hủy'),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -346,7 +380,7 @@ class _RestoreDiffModalState extends ConsumerState<RestoreDiffModal> {
               foregroundColor: Colors.white,
             ),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('VẪN GHI ĐÈ'),
+            child: const Text('Khôi phục'),
           ),
         ],
       ),
@@ -373,7 +407,8 @@ class _RestoreDiffModalState extends ConsumerState<RestoreDiffModal> {
               color: isDark
                   ? const Color(0xFF151C28).withValues(alpha: 0.98)
                   : Colors.white.withValues(alpha: 0.98),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(28)),
               border: Border.all(
                 color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder,
               ),
@@ -382,31 +417,34 @@ class _RestoreDiffModalState extends ConsumerState<RestoreDiffModal> {
               top: false,
               child: _isLoading
                   ? SizedBox(
-                height: 300,
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      CircularProgressIndicator(
-                        strokeWidth: 2.5,
-                        valueColor: AlwaysStoppedAnimation<Color>(accent.primary),
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        _loadingMessage ?? 'Đang đối soát dữ liệu...',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: isDark ? AppTokens.darkText : AppTokens.lightText,
+                      height: 300,
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            CircularProgressIndicator(
+                              strokeWidth: 2.5,
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(accent.primary),
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              _loadingMessage ?? 'Đang đối soát dữ liệu...',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: isDark
+                                    ? AppTokens.darkText
+                                    : AppTokens.lightText,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ],
-                  ),
-                ),
-              )
+                    )
                   : (_isSignoutMode
-                  ? _buildSignOutBackupSheet(isDark, accent)
-                  : _buildDiffContent(isDark, accent)),
+                      ? _buildSignOutBackupSheet(isDark, accent)
+                      : _buildDiffContent(isDark, accent)),
             ),
           ),
         ),
@@ -421,6 +459,7 @@ class _RestoreDiffModalState extends ConsumerState<RestoreDiffModal> {
     final report = widget.signoutReport!;
 
     return SingleChildScrollView(
+      controller: widget.scrollController,
       physics: const ClampingScrollPhysics(),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -475,12 +514,13 @@ class _RestoreDiffModalState extends ConsumerState<RestoreDiffModal> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'BẢO VỆ DỮ LIỆU TRƯỚC KHI ĐĂNG XUẤT',
+                      'Sao lưu trước khi đăng xuất',
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w900,
                         letterSpacing: 0.3,
-                        color: isDark ? AppTokens.darkText : AppTokens.lightText,
+                        color:
+                            isDark ? AppTokens.darkText : AppTokens.lightText,
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -531,7 +571,8 @@ class _RestoreDiffModalState extends ConsumerState<RestoreDiffModal> {
                   children: [
                     const Padding(
                       padding: EdgeInsets.only(top: 2),
-                      child: Icon(Icons.phone_android_rounded, size: 16, color: Color(0xFF0EA5E9)),
+                      child: Icon(Icons.phone_android_rounded,
+                          size: 16, color: Color(0xFF0EA5E9)),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
@@ -543,7 +584,9 @@ class _RestoreDiffModalState extends ConsumerState<RestoreDiffModal> {
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w800,
-                              color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                              color: isDark
+                                  ? AppTokens.darkMuted
+                                  : AppTokens.lightMuted,
                             ),
                           ),
                           const SizedBox(height: 2),
@@ -552,14 +595,18 @@ class _RestoreDiffModalState extends ConsumerState<RestoreDiffModal> {
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w800,
-                              color: isDark ? AppTokens.darkText : AppTokens.lightText,
+                              color: isDark
+                                  ? AppTokens.darkText
+                                  : AppTokens.lightText,
                             ),
                           ),
                           Text(
                             'Giao dịch mới nhất: ${_formatFriendlyRelativeTime(report.localLatestTxDate)}',
                             style: TextStyle(
                               fontSize: 11,
-                              color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                              color: isDark
+                                  ? AppTokens.darkMuted
+                                  : AppTokens.lightMuted,
                             ),
                           ),
                         ],
@@ -576,7 +623,8 @@ class _RestoreDiffModalState extends ConsumerState<RestoreDiffModal> {
                   children: [
                     Padding(
                       padding: const EdgeInsets.only(top: 2),
-                      child: Icon(Icons.cloud_done_rounded, size: 16, color: accent.primary),
+                      child: Icon(Icons.cloud_done_rounded,
+                          size: 16, color: accent.primary),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
@@ -588,14 +636,17 @@ class _RestoreDiffModalState extends ConsumerState<RestoreDiffModal> {
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w800,
-                              color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                              color: isDark
+                                  ? AppTokens.darkMuted
+                                  : AppTokens.lightMuted,
                             ),
                           ),
                           const SizedBox(height: 2),
                           Row(
                             children: [
                               Text(
-                                _formatFriendlyRelativeTime(report.cloudBackupDate),
+                                _formatFriendlyRelativeTime(
+                                    report.cloudBackupDate),
                                 style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w800,
@@ -605,9 +656,11 @@ class _RestoreDiffModalState extends ConsumerState<RestoreDiffModal> {
                               if (report.unsavedTxDifference > 0) ...[
                                 const SizedBox(width: 6),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 6, vertical: 1.5),
                                   decoration: BoxDecoration(
-                                    color: AppTokens.expense.withValues(alpha: 0.16),
+                                    color: AppTokens.expense
+                                        .withValues(alpha: 0.16),
                                     borderRadius: BorderRadius.circular(6),
                                   ),
                                   child: Text(
@@ -626,7 +679,9 @@ class _RestoreDiffModalState extends ConsumerState<RestoreDiffModal> {
                             '${report.cloudTxCount} giao dịch • ${report.cloudWalletCount} nguồn ví',
                             style: TextStyle(
                               fontSize: 11,
-                              color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                              color: isDark
+                                  ? AppTokens.darkMuted
+                                  : AppTokens.lightMuted,
                             ),
                           ),
                         ],
@@ -650,12 +705,13 @@ class _RestoreDiffModalState extends ConsumerState<RestoreDiffModal> {
                 foregroundColor: Colors.white,
                 elevation: 2,
                 shadowColor: accent.primary.withValues(alpha: 0.4),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16)),
               ),
               onPressed: () async {
                 setState(() {
                   _isLoading = true;
-                  _loadingMessage = 'Đang sao lưu CSDL lên Google Drive...';
+                  _loadingMessage = 'Đang sao lưu lên Google Drive…';
                 });
                 final backupService = ref.read(cloudBackupServiceProvider);
                 try {
@@ -663,7 +719,7 @@ class _RestoreDiffModalState extends ConsumerState<RestoreDiffModal> {
                   await backupService.createEmergencyLocalSnapshot();
                   await backupService.signOutAndClearSession();
 
-                  if (context.mounted) {
+                  if (mounted) {
                     AppFeedback.showSuccess(
                       context,
                       '✓ Đã sao lưu an toàn và đăng xuất thành công.',
@@ -671,7 +727,7 @@ class _RestoreDiffModalState extends ConsumerState<RestoreDiffModal> {
                     Navigator.of(context).pop(true);
                   }
                 } catch (e) {
-                  if (context.mounted) {
+                  if (mounted) {
                     setState(() => _isLoading = false);
                     AppFeedback.showError(
                       context,
@@ -683,7 +739,10 @@ class _RestoreDiffModalState extends ConsumerState<RestoreDiffModal> {
               icon: const Icon(Icons.cloud_upload_rounded, size: 18),
               label: const Text(
                 'SAO LƯU VÀ ĐĂNG XUẤT (Khuyên dùng)',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, letterSpacing: 0.2),
+                style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.2),
               ),
             ),
           ),
@@ -695,12 +754,15 @@ class _RestoreDiffModalState extends ConsumerState<RestoreDiffModal> {
             height: 46,
             child: OutlinedButton.icon(
               style: OutlinedButton.styleFrom(
-                backgroundColor: isDark ? AppTokens.darkCard.withValues(alpha: 0.5) : Colors.white,
+                backgroundColor: isDark
+                    ? AppTokens.darkCard.withValues(alpha: 0.5)
+                    : Colors.white,
                 foregroundColor: const Color(0xFFF43F5E),
                 side: BorderSide(
                   color: const Color(0xFFF43F5E).withValues(alpha: 0.45),
                 ),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16)),
               ),
               onPressed: () async {
                 HapticFeedback.mediumImpact();
@@ -709,10 +771,10 @@ class _RestoreDiffModalState extends ConsumerState<RestoreDiffModal> {
                 await backupService.createEmergencyLocalSnapshot();
                 await backupService.signOutAndClearSession();
 
-                if (context.mounted) {
+                if (mounted) {
                   AppFeedback.showSuccess(
                     context,
-                    'Đã đăng xuất tài khoản (Đã tạo snapshot dự phòng trên máy).',
+                    'Đã đăng xuất. Bản dự phòng vẫn được giữ trên máy.',
                     emitHaptic: false,
                   );
                   Navigator.of(context).pop(true);
@@ -750,360 +812,177 @@ class _RestoreDiffModalState extends ConsumerState<RestoreDiffModal> {
   // GIAO DIỆN ĐỐI SOÁT KHÔI PHỤC (RESTORE DIFF)
   // ===========================================================================
   Widget _buildDiffContent(bool isDark, AppAccentPreset accent) {
-    final local = _localMetrics!;
-    final backup = _backupMetrics!;
-
-    final int diffTx = local.transactionCount - backup.transactionCount;
-    final bool isLocalNewer = diffTx > 0 ||
-        (local.latestTransactionDate != null &&
-            backup.latestTransactionDate != null &&
-            local.latestTransactionDate!.isAfter(backup.latestTransactionDate!));
-
+    final diff = _reconciliation!;
+    final available =
+        diff.entries.where((e) => e.blockedReason == null).toList();
+    final blocked = diff.entries.where((e) => e.blockedReason != null).toList();
+    final grouped = available.length > 3;
+    final groups = <String>{
+      for (final e in available) e.walletId,
+      for (final e in available)
+        if (e.row['to_wallet_id'] is String) e.row['to_wallet_id'] as String
+    };
     return SingleChildScrollView(
+      controller: widget.scrollController,
       physics: const ClampingScrollPhysics(),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Center(
-            child: Container(
-              width: 44,
-              height: 4,
-              decoration: BoxDecoration(
-                color: isDark ? Colors.white24 : Colors.black26,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-          const SizedBox(height: 14),
-
-          // Header
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: (isLocalNewer ? AppTokens.expense : const Color(0xFF10B981))
-                          .withValues(alpha: 0.16),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      isLocalNewer ? Icons.warning_amber_rounded : Icons.verified_rounded,
-                      color: isLocalNewer ? AppTokens.expense : const Color(0xFF10B981),
-                      size: 20,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'ĐỐI SOÁT TRƯỚC KHI KHÔI PHỤC',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 0.4,
-                          color: isDark ? AppTokens.darkText : AppTokens.lightText,
-                        ),
-                      ),
-                      Text(
-                        'Kiểm tra kỹ để tránh ghi đè làm mất giao dịch mới',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              IconButton(
-                visualDensity: VisualDensity.compact,
-                icon: const Icon(Icons.close_rounded, size: 20),
-                onPressed: () => Navigator.of(context).pop(),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-
-          // BẢNG SO SÁNH 2 CỘT
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: isDark ? AppTokens.darkCard : AppTokens.lightCardSubtle,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder,
-              ),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.phone_android_rounded, size: 14, color: Color(0xFF0EA5E9)),
-                          const SizedBox(width: 4),
-                          Text(
-                            '📱 DỮ LIỆU TRÊN MÁY',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w800,
-                              color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        '${NumberFormat('#,###').format(local.transactionCount)} GD',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w900,
-                          color: isDark ? AppTokens.darkText : AppTokens.lightText,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${local.walletCount} nguồn ví',
-                        style: TextStyle(fontSize: 11, color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted),
-                      ),
-                      const SizedBox(height: 2),
-                      CurrencyText(
-                        'Số dư: ${_formatCurrency(local.totalBalance)}',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: isDark ? AppTokens.darkText : AppTokens.lightText,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Giao dịch gần nhất:',
-                        style: TextStyle(fontSize: 10, color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted),
-                      ),
-                      Text(
-                        local.formattedLatestDate,
-                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-                      ),
-                    ],
-                  ),
-                ),
-
-                Container(
-                  width: 1,
-                  height: 130,
-                  margin: const EdgeInsets.symmetric(horizontal: 10),
-                  color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder,
-                ),
-
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.cloud_done_rounded, size: 14, color: Color(0xFF10B981)),
-                          const SizedBox(width: 4),
-                          Text(
-                            '☁️ BẢN CLOUD CHỌN',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w800,
-                              color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        '${NumberFormat('#,###').format(backup.transactionCount)} GD',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w900,
-                          color: accent.primary,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${backup.walletCount} nguồn ví',
-                        style: TextStyle(fontSize: 11, color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted),
-                      ),
-                      const SizedBox(height: 2),
-                      CurrencyText(
-                        'Số dư: ${_formatCurrency(backup.totalBalance)}',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: isDark ? AppTokens.darkText : AppTokens.lightText,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Bản tạo lúc:',
-                        style: TextStyle(fontSize: 10, color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted),
-                      ),
-                      Text(
-                        widget.backupItem!.formattedDate,
-                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-
-          if (isLocalNewer)
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppTokens.expense.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppTokens.expense.withValues(alpha: 0.4)),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(Icons.error_outline_rounded, color: AppTokens.expense, size: 20),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          '🚨 CẢNH BÁO NGUY CƠ MẤT DỮ LIỆU',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w900,
-                            color: AppTokens.expense,
-                            letterSpacing: 0.2,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          diffTx > 0
-                              ? 'Dữ liệu trên máy đang MỚI HƠN bản sao lưu Cloud. Nếu khôi phục trực tiếp, bạn sẽ MẤT $diffTx GIAO DỊCH được ghi chép gần đây!'
-                              : 'Thời điểm ghi chép trên máy mới hơn bản sao lưu Cloud này. Hãy cẩn trọng trước khi ghi đè.',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: isDark ? const Color(0xFFFCA5A5) : const Color(0xFFB91C1C),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            )
-          else
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFF10B981).withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.4)),
-              ),
-              child: const Row(
-                children: [
-                  Icon(Icons.check_circle_outline_rounded, color: Color(0xFF10B981), size: 20),
-                  SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'Bản sao lưu Cloud mới hơn dữ liệu hiện tại trên thiết bị. An toàn để khôi phục và đồng bộ.',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF10B981),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          const SizedBox(height: 20),
-
-          // Nút hành động
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF10B981),
-                foregroundColor: Colors.white,
-                elevation: 1,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              ),
-              onPressed: () => _executeRestore(createLocalBackupFirst: true),
-              icon: const Icon(Icons.shield_outlined, size: 18),
-              label: const Text(
-                '🛡️ SAO LƯU MÁY NÀY TRƯỚC RỒI KHÔI PHỤC',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, letterSpacing: 0.3),
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-
-          SizedBox(
-            width: double.infinity,
-            height: 44,
-            child: OutlinedButton.icon(
-              style: OutlinedButton.styleFrom(
-                foregroundColor: isLocalNewer ? AppTokens.expense : (isDark ? AppTokens.darkText : AppTokens.lightText),
-                side: BorderSide(
-                  color: isLocalNewer
-                      ? AppTokens.expense.withValues(alpha: 0.6)
-                      : (isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
-                ),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              ),
-              onPressed: () {
-                HapticFeedback.selectionClick();
-                if (isLocalNewer) {
-                  _showDangerousOverrideConfirmation();
-                } else {
-                  _executeRestore(createLocalBackupFirst: false);
-                }
-              },
-              icon: Icon(
-                isLocalNewer ? Icons.warning_rounded : Icons.restore_rounded,
-                size: 16,
-                color: isLocalNewer ? AppTokens.expense : null,
-              ),
-              label: Text(
-                isLocalNewer ? '⚠️ Vẫn ghi đè (Chấp nhận thay thế)' : 'Tiến hành khôi phục ngay',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
-                  color: isLocalNewer ? AppTokens.expense : null,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-
-          Center(
-            child: TextButton(
-              onPressed: () => Navigator.of(context).pop(),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          const Expanded(
+              child: Text('Chi tiết bản sao lưu',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800))),
+          IconButton(
+              onPressed: () => Navigator.pop(context),
+              icon: const Icon(Icons.close_rounded)),
+        ]),
+        Text(
+            '${widget.backupItem!.formattedDate}${widget.backupItem!.sizeBytes > 0 ? ' • ${widget.backupItem!.formattedSize}' : ''}'),
+        const SizedBox(height: 16),
+        Text(
+            '${_backupMetrics!.transactionCount} giao dịch • ${_backupMetrics!.walletCount} ví',
+            style: const TextStyle(fontWeight: FontWeight.w700)),
+        const SizedBox(height: 8),
+        if (_savedPreferences != null)
+          Text(
+              'Giao diện: ${AppAccentPreset.values.firstWhere((a) => a.name == _savedPreferences![kPrefKeyAccentPreset], orElse: () => AppAccentPreset.grass).label} • Phông tiền: ${_savedPreferences![kPrefKeyCurrencyFont] ?? 'Theo giao diện'}\nBao gồm thiết lập nhắc nhở và mã PIN két')
+        else
+          const Text(
+              'Bản cũ chỉ có dữ liệu tài chính; giữ thiết lập hiện tại.'),
+        const Divider(height: 28),
+        Text(
+            'Trên máy: ${_localMetrics!.transactionCount} giao dịch • ${_localMetrics!.walletCount} ví'),
+        const SizedBox(height: 8),
+        Text(
+            '${diff.entries.length} giao dịch chỉ có trên máy. ${diff.conflicts} giao dịch cùng ID nhưng khác nội dung.'),
+        if (diff.conflicts > 0)
+          const Padding(
+              padding: EdgeInsets.only(top: 8),
               child: Text(
-                'Hủy bỏ',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
-                ),
-              ),
-            ),
-          ),
+                  'Các giao dịch xung đột giữ theo bản Cloud. Bản trên máy được giữ nguyên trong bản dự phòng.')),
+        const SizedBox(height: 12),
+        _restoreChoice(true, 'Giữ lại các giao dịch được chọn',
+            'Chọn ví nhận. Danh mục và đối tác mới đi kèm sẽ được giữ lại.'),
+        _restoreChoice(false, 'Chỉ dùng bản Cloud',
+            'Dữ liệu cũ được giữ trong bản dự phòng trên máy.'),
+        if (_keepLocal && available.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          Text(grouped ? 'Ghép ví cho từng nhóm' : 'Duyệt từng giao dịch',
+              style: const TextStyle(fontWeight: FontWeight.w700)),
+          if (grouped) ...[
+            for (final id in groups)
+              Padding(
+                  padding: const EdgeInsets.only(top: 10),
+                  child: Column(children: [
+                    CheckboxListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(
+                            '${diff.localWalletNames[id] ?? 'Ví cũ'} • ${available.where((e) => e.walletId == id).length} giao dịch'),
+                        value: available
+                            .where((e) => e.walletId == id)
+                            .every((e) => _selected.contains(e.key)),
+                        onChanged: (value) => setState(() {
+                              for (final e
+                                  in available.where((e) => e.walletId == id)) {
+                                if (value == true) {
+                                  _selected.add(e.key);
+                                } else {
+                                  _selected.remove(e.key);
+                                }
+                              }
+                            })),
+                    _walletChoice(id),
+                  ])),
+          ] else ...[
+            const SizedBox(height: 8),
+            Builder(builder: (context) {
+              final entry =
+                  available[_reviewIndex.clamp(0, available.length - 1)];
+              return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Giao dịch ${_reviewIndex + 1}/${available.length}'),
+                    CheckboxListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: CurrencyText(_formatCurrency(
+                            (entry.row['amount'] as num).toDouble())),
+                        subtitle: Text(entry.row['note'] as String? ??
+                            diff.localWalletNames[entry.walletId] ??
+                            'Giao dịch'),
+                        value: _selected.contains(entry.key),
+                        onChanged: (v) => setState(() {
+                              if (v == true) {
+                                _selected.add(entry.key);
+                              } else {
+                                _selected.remove(entry.key);
+                              }
+                            })),
+                    _walletChoice(entry.walletId),
+                    if (entry.row['to_wallet_id'] is String)
+                      Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: _walletChoice(
+                              entry.row['to_wallet_id'] as String)),
+                    Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          TextButton(
+                              onPressed: _reviewIndex > 0
+                                  ? () => setState(() => _reviewIndex--)
+                                  : null,
+                              child: const Text('Trước')),
+                          TextButton(
+                              onPressed: _reviewIndex + 1 < available.length
+                                  ? () => setState(() => _reviewIndex++)
+                                  : null,
+                              child: const Text('Tiếp')),
+                        ]),
+                  ]);
+            }),
+          ],
         ],
-      ),
+        if (blocked.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Text(
+              '${blocked.length} giao dịch cần đối soát riêng, được giữ trong bản dự phòng:',
+              style: const TextStyle(fontWeight: FontWeight.w700)),
+          for (final reason in blocked.map((e) => e.blockedReason!).toSet())
+            Text('• $reason'),
+        ],
+        const SizedBox(height: 20),
+        const Text(
+            'Bản dự phòng luôn được tạo trước khi thay dữ liệu. Theme, phông chữ và lịch nhắc sẽ áp dụng theo bản sao lưu.'),
+        const SizedBox(height: 12),
+        SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+                onPressed: _confirmRestore,
+                child: Text(_keepLocal
+                    ? 'Khôi phục và nhập ${_selected.length} giao dịch'
+                    : 'Khôi phục bản Cloud'))),
+      ]),
     );
   }
+
+  Widget _restoreChoice(bool value, String title, String subtitle) => ListTile(
+        contentPadding: EdgeInsets.zero,
+        leading: Icon(_keepLocal == value
+            ? Icons.radio_button_checked
+            : Icons.radio_button_off),
+        title: Text(title),
+        subtitle: Text(subtitle),
+        onTap: () => setState(() => _keepLocal = value),
+      );
+
+  Widget _walletChoice(String localId) => FlowyDropdown<String>(
+        title: 'Ví nhận trong bản Cloud',
+        value: _walletMapping[localId],
+        hint: const Text('Chọn ví nhận'),
+        items: [
+          for (final w in _reconciliation!.wallets)
+            DropdownMenuItem(
+                value: w['id'] as String, child: Text(w['name'] as String))
+        ],
+        onChanged: (value) => setState(() {
+          if (value != null) _walletMapping[localId] = value;
+        }),
+      );
 }

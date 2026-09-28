@@ -1,3 +1,6 @@
+import 'restore_diff_modal.dart';
+import '../services/backup_schedule.dart';
+import 'flowy_selection_picker.dart';
 // ==============================================================================
 // File: lib/widgets/cloud_cadence_modal.dart
 // Architecture: Cloud Backup Cadence & Google Drive Synchronization Modal (Phase 4)
@@ -36,14 +39,15 @@ import '../theme/app_theme.dart';
 /// Enum phân loại các chế độ chu kỳ sao lưu
 enum BackupCadenceMode {
   afterEachEntry, // ⚡ Sau mỗi lần ghi (debounce 3 phút)
-  daily,          // 🌙 Mỗi ngày (02:00 sáng) - Mặc định
-  weekly,         // 📅 Mỗi tuần (Tối Chủ Nhật)
-  manualOnly,     // ✋ Tắt tự động (Chỉ thủ công)
-  custom,         // ⏱️ Tùy biến (Số lượng + Đơn vị: Giờ/Ngày/Tuần)
+  daily, // 🌙 Mỗi ngày (02:00 sáng) - Mặc định
+  weekly, // 📅 Mỗi tuần (Tối Chủ Nhật)
+  manualOnly, // ✋ Tắt tự động (Chỉ thủ công)
+  custom, // ⏱️ Tùy biến (Số lượng + Đơn vị: Giờ/Ngày/Tuần)
 }
 
 class CloudCadenceModal extends ConsumerStatefulWidget {
-  const CloudCadenceModal({super.key});
+  final ScrollController? scrollController;
+  const CloudCadenceModal({super.key, this.scrollController});
 
   /// Static launcher tiện lợi để mở Modal từ bất kỳ màn hình nào
   static Future<void> show(BuildContext context) {
@@ -52,7 +56,7 @@ class CloudCadenceModal extends ConsumerStatefulWidget {
       context: context,
       mode: FluidSheetMode.nestedScrollable,
       backgroundColor: Colors.transparent,
-      builder: (_, __) => const CloudCadenceModal(),
+      builder: (_, scroll) => CloudCadenceModal(scrollController: scroll),
     );
   }
 
@@ -73,7 +77,8 @@ class _CloudCadenceModalState extends ConsumerState<CloudCadenceModal> {
 
   // Custom Cadence state
   String _customUnit = 'hours'; // 'hours', 'days', 'weeks'
-  final TextEditingController _customValueController = TextEditingController(text: '6');
+  final TextEditingController _customValueController =
+      TextEditingController(text: '6');
 
   // Điều kiện an toàn
   bool _wifiOnly = true;
@@ -96,7 +101,8 @@ class _CloudCadenceModalState extends ConsumerState<CloudCadenceModal> {
   Future<void> _loadStoredPreferences() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final modeIndex = prefs.getInt(_prefKeyCadenceMode) ?? BackupCadenceMode.daily.index;
+      final modeIndex =
+          prefs.getInt(_prefKeyCadenceMode) ?? BackupCadenceMode.daily.index;
       final customUnit = prefs.getString(_prefKeyCustomUnit) ?? 'hours';
       final customVal = prefs.getInt(_prefKeyCustomValue) ?? 6;
       final wifiOnly = prefs.getBool(_prefKeyWifiOnly) ?? true;
@@ -104,7 +110,8 @@ class _CloudCadenceModalState extends ConsumerState<CloudCadenceModal> {
 
       if (mounted) {
         setState(() {
-          _selectedCadence = BackupCadenceMode.values[modeIndex.clamp(0, BackupCadenceMode.values.length - 1)];
+          _selectedCadence = BackupCadenceMode
+              .values[modeIndex.clamp(0, BackupCadenceMode.values.length - 1)];
           _customUnit = customUnit;
           _customValueController.text = customVal.toString();
           _wifiOnly = wifiOnly;
@@ -127,14 +134,15 @@ class _CloudCadenceModalState extends ConsumerState<CloudCadenceModal> {
     await prefs.setInt(_prefKeyCustomValue, val);
     await prefs.setBool(_prefKeyWifiOnly, _wifiOnly);
     await prefs.setBool(_prefKeyBatterySafe, _batterySafe);
+    await configureBackupSchedule(prefs);
   }
 
   String _getCadenceDescription() {
     switch (_selectedCadence) {
       case BackupCadenceMode.afterEachEntry:
-        return 'Sau mỗi lần ghi chép (Debounce 3 phút)';
+        return 'Sau lần ghi cuối khoảng 3 phút';
       case BackupCadenceMode.daily:
-        return 'Mỗi ngày (02:00 sáng) ⭐';
+        return 'Mỗi ngày lúc 02:00';
       case BackupCadenceMode.weekly:
         return 'Mỗi tuần (23:00 Chủ Nhật)';
       case BackupCadenceMode.manualOnly:
@@ -214,7 +222,8 @@ class _CloudCadenceModalState extends ConsumerState<CloudCadenceModal> {
       );
     }
 
-    final latestBackup = backupState.backups.isNotEmpty ? backupState.backups.first : null;
+    final latestBackup =
+        backupState.backups.isNotEmpty ? backupState.backups.first : null;
 
     return AppFeedbackDismissRegion(
       child: ClipRRect(
@@ -227,7 +236,8 @@ class _CloudCadenceModalState extends ConsumerState<CloudCadenceModal> {
               color: isDark
                   ? const Color(0xFF151C28).withValues(alpha: 0.98)
                   : Colors.white.withValues(alpha: 0.98),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(28)),
               border: Border.all(
                 color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder,
               ),
@@ -235,24 +245,12 @@ class _CloudCadenceModalState extends ConsumerState<CloudCadenceModal> {
             child: SafeArea(
               top: false,
               child: SingleChildScrollView(
+                controller: widget.scrollController,
                 physics: const ClampingScrollPhysics(),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Drag indicator
-                    Center(
-                      child: Container(
-                        width: 44,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: isDark ? Colors.white24 : Colors.black26,
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
                     // Header Modal
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -262,7 +260,8 @@ class _CloudCadenceModalState extends ConsumerState<CloudCadenceModal> {
                             Container(
                               padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF0EA5E9).withValues(alpha: 0.16),
+                                color: const Color(0xFF0EA5E9)
+                                    .withValues(alpha: 0.16),
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: const Icon(
@@ -276,19 +275,23 @@ class _CloudCadenceModalState extends ConsumerState<CloudCadenceModal> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'CÀI ĐẶT SAO LƯU CLOUD',
+                                  'Cài đặt sao lưu',
                                   style: TextStyle(
                                     fontSize: 14,
                                     fontWeight: FontWeight.w900,
                                     letterSpacing: 0.4,
-                                    color: isDark ? AppTokens.darkText : AppTokens.lightText,
+                                    color: isDark
+                                        ? AppTokens.darkText
+                                        : AppTokens.lightText,
                                   ),
                                 ),
                                 Text(
-                                  'Thư mục Google Drive AppData bí mật',
+                                  'Bản sao riêng tư trên Google Drive',
                                   style: TextStyle(
                                     fontSize: 11,
-                                    color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                                    color: isDark
+                                        ? AppTokens.darkMuted
+                                        : AppTokens.lightMuted,
                                   ),
                                 ),
                               ],
@@ -310,10 +313,14 @@ class _CloudCadenceModalState extends ConsumerState<CloudCadenceModal> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: isDark ? AppTokens.darkCard : AppTokens.lightCardSubtle,
+                        color: isDark
+                            ? AppTokens.darkCard
+                            : AppTokens.lightCardSubtle,
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
-                          color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder,
+                          color: isDark
+                              ? AppTokens.darkBorder
+                              : AppTokens.lightBorder,
                         ),
                       ),
                       child: Row(
@@ -325,7 +332,9 @@ class _CloudCadenceModalState extends ConsumerState<CloudCadenceModal> {
                               shape: BoxShape.circle,
                               color: isDark ? Colors.white10 : Colors.white,
                               border: Border.all(
-                                color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder,
+                                color: isDark
+                                    ? AppTokens.darkBorder
+                                    : AppTokens.lightBorder,
                               ),
                             ),
                             child: const Center(
@@ -345,20 +354,27 @@ class _CloudCadenceModalState extends ConsumerState<CloudCadenceModal> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  userProfile.isSignedIn ? userProfile.displayName : 'Chưa liên kết',
+                                  userProfile.isSignedIn
+                                      ? userProfile.displayName
+                                      : 'Chưa liên kết',
                                   style: TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w800,
-                                    color: isDark ? AppTokens.darkText : AppTokens.lightText,
+                                    color: isDark
+                                        ? AppTokens.darkText
+                                        : AppTokens.lightText,
                                   ),
                                 ),
                                 Text(
-                                  userProfile.email ?? 'Nhấn để kết nối Google Drive',
+                                  userProfile.email ??
+                                      'Nhấn để kết nối Google Drive',
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
                                     fontSize: 11,
-                                    color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                                    color: isDark
+                                        ? AppTokens.darkMuted
+                                        : AppTokens.lightMuted,
                                   ),
                                 ),
                               ],
@@ -368,7 +384,8 @@ class _CloudCadenceModalState extends ConsumerState<CloudCadenceModal> {
                             TextButton(
                               style: TextButton.styleFrom(
                                 foregroundColor: AppTokens.expense,
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 4),
                                 visualDensity: VisualDensity.compact,
                               ),
                               onPressed: () async {
@@ -381,7 +398,8 @@ class _CloudCadenceModalState extends ConsumerState<CloudCadenceModal> {
                                     ),
                                     actions: [
                                       TextButton(
-                                        onPressed: () => Navigator.of(ctx).pop(false),
+                                        onPressed: () =>
+                                            Navigator.of(ctx).pop(false),
                                         child: const Text('HỦY'),
                                       ),
                                       ElevatedButton(
@@ -389,7 +407,8 @@ class _CloudCadenceModalState extends ConsumerState<CloudCadenceModal> {
                                           backgroundColor: AppTokens.expense,
                                           foregroundColor: Colors.white,
                                         ),
-                                        onPressed: () => Navigator.of(ctx).pop(true),
+                                        onPressed: () =>
+                                            Navigator.of(ctx).pop(true),
                                         child: const Text('ĐĂNG XUẤT'),
                                       ),
                                     ],
@@ -397,24 +416,38 @@ class _CloudCadenceModalState extends ConsumerState<CloudCadenceModal> {
                                 );
 
                                 if (confirm == true && mounted) {
-                                  await ref.read(userProfileNotifierProvider.notifier).signOut();
+                                  await ref
+                                      .read(
+                                          userProfileNotifierProvider.notifier)
+                                      .signOut();
                                 }
                               },
-                              child: const Text('Đăng xuất', style: TextStyle(fontWeight: FontWeight.bold)),
+                              child: const Text('Đăng xuất',
+                                  style:
+                                      TextStyle(fontWeight: FontWeight.bold)),
                             )
                           else
                             ElevatedButton(
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: accent.primary,
                                 foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 6),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10)),
                               ),
                               onPressed: () async {
-                                await ref.read(userProfileNotifierProvider.notifier).signInWithGoogle();
-                                ref.read(cloudBackupNotifierProvider.notifier).loadBackups();
+                                await ref
+                                    .read(userProfileNotifierProvider.notifier)
+                                    .signInWithGoogle();
+                                ref
+                                    .read(cloudBackupNotifierProvider.notifier)
+                                    .loadBackups();
                               },
-                              child: const Text('Đăng nhập', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                              child: const Text('Đăng nhập',
+                                  style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold)),
                             ),
                         ],
                       ),
@@ -430,7 +463,9 @@ class _CloudCadenceModalState extends ConsumerState<CloudCadenceModal> {
                         color: isDark ? AppTokens.darkCard : Colors.white,
                         borderRadius: BorderRadius.circular(18),
                         border: Border.all(
-                          color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder,
+                          color: isDark
+                              ? AppTokens.darkBorder
+                              : AppTokens.lightBorder,
                         ),
                       ),
                       child: Column(
@@ -438,7 +473,8 @@ class _CloudCadenceModalState extends ConsumerState<CloudCadenceModal> {
                         children: [
                           Row(
                             children: [
-                              const Icon(Icons.timer_outlined, size: 18, color: Color(0xFF10B981)),
+                              const Icon(Icons.timer_outlined,
+                                  size: 18, color: Color(0xFF10B981)),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
@@ -446,20 +482,25 @@ class _CloudCadenceModalState extends ConsumerState<CloudCadenceModal> {
                                   style: TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w800,
-                                    color: isDark ? AppTokens.darkText : AppTokens.lightText,
+                                    color: isDark
+                                        ? AppTokens.darkText
+                                        : AppTokens.lightText,
                                   ),
                                 ),
                               ),
                               InkWell(
                                 onTap: () {
                                   HapticFeedback.selectionClick();
-                                  setState(() => _isCadenceExpanded = !_isCadenceExpanded);
+                                  setState(() =>
+                                      _isCadenceExpanded = !_isCadenceExpanded);
                                 },
                                 borderRadius: BorderRadius.circular(8),
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 4),
                                   decoration: BoxDecoration(
-                                    color: accent.primary.withValues(alpha: 0.12),
+                                    color:
+                                        accent.primary.withValues(alpha: 0.12),
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: Text(
@@ -481,14 +522,21 @@ class _CloudCadenceModalState extends ConsumerState<CloudCadenceModal> {
                           // Dòng phụ: Dự kiến kế tiếp & Bản gần nhất
                           Row(
                             children: [
-                              Text('• Lần sao lưu kế tiếp: ', style: TextStyle(fontSize: 11, color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted)),
+                              Text('• Lần sao lưu kế tiếp: ',
+                                  style: TextStyle(
+                                      fontSize: 11,
+                                      color: isDark
+                                          ? AppTokens.darkMuted
+                                          : AppTokens.lightMuted)),
                               Expanded(
                                 child: Text(
                                   _getNextEstimatedBackupTime(),
                                   style: TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.w700,
-                                    color: isDark ? AppTokens.darkText : AppTokens.lightText,
+                                    color: isDark
+                                        ? AppTokens.darkText
+                                        : AppTokens.lightText,
                                   ),
                                 ),
                               ),
@@ -497,7 +545,12 @@ class _CloudCadenceModalState extends ConsumerState<CloudCadenceModal> {
                           const SizedBox(height: 4),
                           Row(
                             children: [
-                              Text('• Bản sao lưu gần nhất: ', style: TextStyle(fontSize: 11, color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted)),
+                              Text('• Bản sao lưu gần nhất: ',
+                                  style: TextStyle(
+                                      fontSize: 11,
+                                      color: isDark
+                                          ? AppTokens.darkMuted
+                                          : AppTokens.lightMuted)),
                               Expanded(
                                 child: Text(
                                   latestBackup != null
@@ -506,7 +559,11 @@ class _CloudCadenceModalState extends ConsumerState<CloudCadenceModal> {
                                   style: TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.w700,
-                                    color: latestBackup != null ? const Color(0xFF10B981) : (isDark ? AppTokens.darkMuted : AppTokens.lightMuted),
+                                    color: latestBackup != null
+                                        ? const Color(0xFF10B981)
+                                        : (isDark
+                                            ? AppTokens.darkMuted
+                                            : AppTokens.lightMuted),
                                   ),
                                 ),
                               ),
@@ -521,7 +578,9 @@ class _CloudCadenceModalState extends ConsumerState<CloudCadenceModal> {
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w700,
-                                color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                                color: isDark
+                                    ? AppTokens.darkMuted
+                                    : AppTokens.lightMuted,
                               ),
                             ),
                             const SizedBox(height: 8),
@@ -562,7 +621,9 @@ class _CloudCadenceModalState extends ConsumerState<CloudCadenceModal> {
                             Container(
                               padding: const EdgeInsets.all(10),
                               decoration: BoxDecoration(
-                                color: isDark ? AppTokens.darkCardSubtle : AppTokens.lightCardSubtle,
+                                color: isDark
+                                    ? AppTokens.darkCardSubtle
+                                    : AppTokens.lightCardSubtle,
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Column(
@@ -573,7 +634,9 @@ class _CloudCadenceModalState extends ConsumerState<CloudCadenceModal> {
                                     style: TextStyle(
                                       fontSize: 11,
                                       fontWeight: FontWeight.w700,
-                                      color: isDark ? AppTokens.darkText : AppTokens.lightText,
+                                      color: isDark
+                                          ? AppTokens.darkText
+                                          : AppTokens.lightText,
                                     ),
                                   ),
                                   const SizedBox(height: 6),
@@ -589,41 +652,53 @@ class _CloudCadenceModalState extends ConsumerState<CloudCadenceModal> {
                                           style: TextStyle(
                                             fontSize: 14,
                                             fontWeight: FontWeight.w800,
-                                            color: isDark ? AppTokens.darkText : AppTokens.lightText,
+                                            color: isDark
+                                                ? AppTokens.darkText
+                                                : AppTokens.lightText,
                                           ),
                                           decoration: InputDecoration(
                                             contentPadding: EdgeInsets.zero,
-                                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                            border: OutlineInputBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(8)),
                                           ),
                                         ),
                                       ),
                                       const SizedBox(width: 8),
-                                      Container(
-                                        height: 38,
-                                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                                        decoration: BoxDecoration(
-                                          border: Border.all(
-                                            color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder,
-                                          ),
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                        child: DropdownButtonHideUnderline(
-                                          child: DropdownButton<String>(
+                                      Expanded(
+                                        child: Padding(
+                                          padding: EdgeInsets.zero,
+                                          child: FlowyDropdown<String>(
+                                            title: 'Chu kỳ sao lưu',
                                             value: _customUnit,
                                             style: TextStyle(
                                               fontSize: 12,
                                               fontWeight: FontWeight.w700,
-                                              color: isDark ? AppTokens.darkText : AppTokens.lightText,
+                                              color: isDark
+                                                  ? AppTokens.darkText
+                                                  : AppTokens.lightText,
                                             ),
-                                            dropdownColor: isDark ? AppTokens.darkCard : Colors.white,
+                                            dropdownColor: isDark
+                                                ? AppTokens.darkCard
+                                                : Colors.white,
                                             items: const [
-                                              DropdownMenuItem(value: 'hours', child: Text('Giờ (4h - 24h)')),
-                                              DropdownMenuItem(value: 'days', child: Text('Ngày (1d - 7d)')),
-                                              DropdownMenuItem(value: 'weeks', child: Text('Tuần (1w - 2w)')),
+                                              DropdownMenuItem(
+                                                  value: 'hours',
+                                                  child:
+                                                      Text('Giờ (4h - 24h)')),
+                                              DropdownMenuItem(
+                                                  value: 'days',
+                                                  child:
+                                                      Text('Ngày (1d - 7d)')),
+                                              DropdownMenuItem(
+                                                  value: 'weeks',
+                                                  child:
+                                                      Text('Tuần (1w - 2w)')),
                                             ],
                                             onChanged: (val) {
                                               if (val != null) {
-                                                setState(() => _customUnit = val);
+                                                setState(
+                                                    () => _customUnit = val);
                                               }
                                             },
                                           ),
@@ -635,10 +710,16 @@ class _CloudCadenceModalState extends ConsumerState<CloudCadenceModal> {
                                           backgroundColor: accent.primary,
                                           foregroundColor: Colors.white,
                                           visualDensity: VisualDensity.compact,
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                          shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(8)),
                                         ),
-                                        onPressed: _validateAndApplyCustomCadence,
-                                        child: const Text('Áp dụng', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                        onPressed:
+                                            _validateAndApplyCustomCadence,
+                                        child: const Text('Áp dụng',
+                                            style: TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.bold)),
                                       ),
                                     ],
                                   ),
@@ -647,7 +728,9 @@ class _CloudCadenceModalState extends ConsumerState<CloudCadenceModal> {
                                     '💡 Giới hạn tối thiểu 4 giờ để tối ưu tuổi thọ pin thiết bị.',
                                     style: TextStyle(
                                       fontSize: 10,
-                                      color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                                      color: isDark
+                                          ? AppTokens.darkMuted
+                                          : AppTokens.lightMuted,
                                     ),
                                   ),
                                 ],
@@ -667,7 +750,8 @@ class _CloudCadenceModalState extends ConsumerState<CloudCadenceModal> {
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
-                        color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                        color:
+                            isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -676,25 +760,34 @@ class _CloudCadenceModalState extends ConsumerState<CloudCadenceModal> {
                         color: isDark ? AppTokens.darkCard : Colors.white,
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
-                          color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder,
+                          color: isDark
+                              ? AppTokens.darkBorder
+                              : AppTokens.lightBorder,
                         ),
                       ),
                       child: Column(
                         children: [
                           SwitchListTile(
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 0),
                             dense: true,
                             title: Text(
-                              'Chỉ sao lưu khi kết nối Wi-Fi',
+                              'Chỉ tự động qua mạng không tính phí',
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w700,
-                                color: isDark ? AppTokens.darkText : AppTokens.lightText,
+                                color: isDark
+                                    ? AppTokens.darkText
+                                    : AppTokens.lightText,
                               ),
                             ),
                             subtitle: Text(
-                              'Bảo toàn dữ liệu mạng 4G/5G di động của bạn',
-                              style: TextStyle(fontSize: 10, color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted),
+                              'Tiết kiệm dữ liệu di động',
+                              style: TextStyle(
+                                  fontSize: 10,
+                                  color: isDark
+                                      ? AppTokens.darkMuted
+                                      : AppTokens.lightMuted),
                             ),
                             value: _wifiOnly,
                             activeThumbColor: accent.primary,
@@ -706,19 +799,26 @@ class _CloudCadenceModalState extends ConsumerState<CloudCadenceModal> {
                           ),
                           const Divider(height: 1),
                           SwitchListTile(
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 0),
                             dense: true,
                             title: Text(
-                              'Chỉ sao lưu khi pin trên 20% hoặc đang sạc',
+                              'Hoãn tự động khi thiết bị báo pin yếu',
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w700,
-                                color: isDark ? AppTokens.darkText : AppTokens.lightText,
+                                color: isDark
+                                    ? AppTokens.darkText
+                                    : AppTokens.lightText,
                               ),
                             ),
                             subtitle: Text(
-                              'Tránh sập nguồn đột ngột khi nén tệp CSDL',
-                              style: TextStyle(fontSize: 10, color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted),
+                              'Tạm hoãn sao lưu tự động khi pin yếu',
+                              style: TextStyle(
+                                  fontSize: 10,
+                                  color: isDark
+                                      ? AppTokens.darkMuted
+                                      : AppTokens.lightMuted),
                             ),
                             value: _batterySafe,
                             activeThumbColor: accent.primary,
@@ -733,6 +833,38 @@ class _CloudCadenceModalState extends ConsumerState<CloudCadenceModal> {
                     ),
                     const SizedBox(height: 20),
 
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                          color: accent.primary.withValues(alpha: .06),
+                          borderRadius: BorderRadius.circular(16)),
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Dữ liệu được sao lưu',
+                                style: TextStyle(fontWeight: FontWeight.w700)),
+                            const SizedBox(height: 8),
+                            const Text(
+                                'Giao dịch, ví, sổ nợ, hũ tiết kiệm và thùng rác'),
+                            Text(
+                                'Giao diện ${accent.label} • Phông tiền ${ref.watch(currencyFontProvider)}'),
+                            const Text(
+                                'Chu kỳ, lịch nhắc và mã PIN két đã băm'),
+                            const SizedBox(height: 6),
+                            const Text(
+                                'Không sao lưu trạng thái hiện số dư hoặc phiên đăng nhập Google.'),
+                            const SizedBox(height: 6),
+                            const Text(
+                                'Lịch tự động trên Android có thể trễ theo chế độ tiết kiệm pin. Sao lưu ngay không chịu các điều kiện tự động.'),
+                          ]),
+                    ),
+                    const SizedBox(height: 16),
+                    TextButton(
+                        onPressed: () =>
+                            RestoreDiffModal.showLocalRecovery(context),
+                        child: const Text(
+                            'Bản dự phòng trước khôi phục trên máy')),
                     // =========================================================
                     // THANH TIẾN ĐỘ SAO LƯU NẾU ĐANG CHẠY
                     // =========================================================
@@ -744,7 +876,8 @@ class _CloudCadenceModalState extends ConsumerState<CloudCadenceModal> {
                         decoration: BoxDecoration(
                           color: accent.primary.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: accent.primary.withValues(alpha: 0.3)),
+                          border: Border.all(
+                              color: accent.primary.withValues(alpha: 0.3)),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -756,13 +889,15 @@ class _CloudCadenceModalState extends ConsumerState<CloudCadenceModal> {
                                   height: 14,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(accent.primary),
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                        accent.primary),
                                   ),
                                 ),
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
-                                    backupState.message ?? 'Đang thực hiện sao lưu...',
+                                    backupState.message ??
+                                        'Đang thực hiện sao lưu...',
                                     style: TextStyle(
                                       fontSize: 11,
                                       fontWeight: FontWeight.bold,
@@ -776,8 +911,10 @@ class _CloudCadenceModalState extends ConsumerState<CloudCadenceModal> {
                             LinearProgressIndicator(
                               value: backupState.progress,
                               minHeight: 4,
-                              backgroundColor: isDark ? Colors.white12 : Colors.black12,
-                              valueColor: AlwaysStoppedAnimation<Color>(accent.primary),
+                              backgroundColor:
+                                  isDark ? Colors.white12 : Colors.black12,
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(accent.primary),
                             ),
                           ],
                         ),
@@ -796,36 +933,46 @@ class _CloudCadenceModalState extends ConsumerState<CloudCadenceModal> {
                           backgroundColor: accent.primary,
                           foregroundColor: Colors.white,
                           elevation: 1,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16)),
                         ),
                         onPressed: (!userProfile.isSignedIn ||
-                            backupState.status == CloudBackupStatus.checkpointing ||
-                            backupState.status == CloudBackupStatus.encrypting ||
-                            backupState.status == CloudBackupStatus.uploading)
+                                backupState.status ==
+                                    CloudBackupStatus.checkpointing ||
+                                backupState.status ==
+                                    CloudBackupStatus.encrypting ||
+                                backupState.status ==
+                                    CloudBackupStatus.uploading)
                             ? null
                             : () async {
-                          HapticFeedback.mediumImpact();
-                          try {
-                            await ref.read(cloudBackupNotifierProvider.notifier).performBackup();
-                            if (context.mounted) {
-                              AppFeedback.showSuccess(
-                                context,
-                                '✓ Đã tạo bản sao lưu mã hóa AES-GCM thành công trên Google Drive!',
-                              );
-                            }
-                          } catch (e) {
-                            if (context.mounted) {
-                              AppFeedback.showError(
-                                context,
-                                'Lỗi sao lưu Google Drive: $e',
-                              );
-                            }
-                          }
-                        },
+                                HapticFeedback.mediumImpact();
+                                try {
+                                  await ref
+                                      .read(
+                                          cloudBackupNotifierProvider.notifier)
+                                      .performBackup();
+                                  if (context.mounted) {
+                                    AppFeedback.showSuccess(
+                                      context,
+                                      'Đã sao lưu lên Google Drive.',
+                                    );
+                                  }
+                                } catch (e) {
+                                  if (context.mounted) {
+                                    AppFeedback.showError(
+                                      context,
+                                      'Lỗi sao lưu Google Drive: $e',
+                                    );
+                                  }
+                                }
+                              },
                         icon: const Icon(Icons.cloud_upload_rounded, size: 18),
                         label: const Text(
-                          '☁️ SAO LƯU NGAY BÂY GIỜ',
-                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, letterSpacing: 0.3),
+                          'Sao lưu ngay',
+                          style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.3),
                         ),
                       ),
                     ),
@@ -838,22 +985,20 @@ class _CloudCadenceModalState extends ConsumerState<CloudCadenceModal> {
                       child: OutlinedButton.icon(
                         style: OutlinedButton.styleFrom(
                           foregroundColor: accent.primary,
-                          side: BorderSide(color: accent.primary.withValues(alpha: 0.5)),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          side: BorderSide(
+                              color: accent.primary.withValues(alpha: 0.5)),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16)),
                         ),
                         onPressed: () {
                           HapticFeedback.selectionClick();
-                          AppFeedback.showInfo(
-                            context,
-                            'Đang chuẩn bị màn hình đối soát bản sao lưu (Phase 5)...',
-                            emitHaptic: false,
-                          );
-                          Navigator.of(context).pop();
+                          _showHistory();
                         },
                         icon: const Icon(Icons.history_rounded, size: 18),
                         label: const Text(
-                          '📥 Khôi phục dữ liệu từ Cloud (Xem lịch sử)',
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                          'Lịch sử và khôi phục',
+                          style: TextStyle(
+                              fontSize: 12, fontWeight: FontWeight.w700),
                         ),
                       ),
                     ),
@@ -867,13 +1012,41 @@ class _CloudCadenceModalState extends ConsumerState<CloudCadenceModal> {
     );
   }
 
+  Future<void> _showHistory() async {
+    try {
+      final backups = await ref.read(cloudBackupServiceProvider).listBackups();
+      if (!mounted) return;
+      if (backups.isEmpty) {
+        AppFeedback.showInfo(context, 'Chưa có bản sao lưu trên Google Drive.');
+        return;
+      }
+      final selected = await showFlowyPicker<String>(
+          context: context,
+          title: 'Lịch sử sao lưu',
+          items: [
+            for (final backup in backups)
+              DropdownMenuItem(
+                  value: backup.fileId,
+                  child:
+                      Text('${backup.formattedDate} • ${backup.formattedSize}'))
+          ]);
+      if (!mounted || selected == null || selected.isEmpty) return;
+      await RestoreDiffModal.show(context,
+          backupItem: backups.firstWhere((b) => b.fileId == selected.first));
+    } catch (error) {
+      if (mounted) {
+        AppFeedback.showError(context, 'Chưa tải được lịch sử: $error');
+      }
+    }
+  }
+
   Widget _buildPresetOption(
-      BackupCadenceMode mode,
-      String title,
-      String subtitle,
-      bool isDark,
-      AppAccentPreset accent,
-      ) {
+    BackupCadenceMode mode,
+    String title,
+    String subtitle,
+    bool isDark,
+    AppAccentPreset accent,
+  ) {
     final isSelected = _selectedCadence == mode;
 
     return InkWell(
@@ -901,9 +1074,13 @@ class _CloudCadenceModalState extends ConsumerState<CloudCadenceModal> {
         child: Row(
           children: [
             Icon(
-              isSelected ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded,
+              isSelected
+                  ? Icons.radio_button_checked_rounded
+                  : Icons.radio_button_off_rounded,
               size: 16,
-              color: isSelected ? accent.primary : (isDark ? AppTokens.darkMuted : AppTokens.lightMuted),
+              color: isSelected
+                  ? accent.primary
+                  : (isDark ? AppTokens.darkMuted : AppTokens.lightMuted),
             ),
             const SizedBox(width: 8),
             Expanded(
@@ -914,15 +1091,19 @@ class _CloudCadenceModalState extends ConsumerState<CloudCadenceModal> {
                     title,
                     style: TextStyle(
                       fontSize: 12,
-                      fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                      color: isSelected ? accent.primary : (isDark ? AppTokens.darkText : AppTokens.lightText),
+                      fontWeight:
+                          isSelected ? FontWeight.w800 : FontWeight.w600,
+                      color: isSelected
+                          ? accent.primary
+                          : (isDark ? AppTokens.darkText : AppTokens.lightText),
                     ),
                   ),
                   Text(
                     subtitle,
                     style: TextStyle(
                       fontSize: 10,
-                      color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                      color:
+                          isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
                     ),
                   ),
                 ],

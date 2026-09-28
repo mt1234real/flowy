@@ -1,5 +1,11 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../services/backup_schedule.dart';
+import '../../services/cloud_backup_service.dart';
+import '../../theme/app_theme.dart';
 import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workmanager/workmanager.dart';
@@ -21,8 +27,35 @@ void notificationBackgroundDispatcher() {
       }
       return true;
     }
+    final documents = await getApplicationDocumentsDirectory();
+    final guard = await File(p.join(documents.path, 'restore_access.lock'))
+        .open(mode: FileMode.append);
+    await guard.lock(FileLock.blockingExclusive);
+    if (await File(p.join(documents.path, 'restore_recovery', 'pending'))
+        .exists()) {
+      await guard.unlock();
+      await guard.close();
+      return false;
+    }
     final db = AppDatabase();
     try {
+      if (task == cloudBackupTask || task == cloudEntryBackupTask) {
+        if (!isBackupDue(prefs, entryTask: task == cloudEntryBackupTask)) {
+          return true;
+        }
+        final container = ProviderContainer(overrides: [
+          sharedPreferencesProvider.overrideWithValue(prefs),
+          databaseProvider.overrideWithValue(db)
+        ]);
+        try {
+          await container
+              .read(cloudBackupServiceProvider)
+              .performBackup(silent: true);
+          return true;
+        } finally {
+          container.dispose();
+        }
+      }
       final settings = NotificationPreferences(Map<String, dynamic>.from(
           jsonDecode(prefs.getString('notification_preferences_v1') ?? '{}')
               as Map));
@@ -36,6 +69,8 @@ void notificationBackgroundDispatcher() {
       return false;
     } finally {
       await db.close();
+      await guard.unlock();
+      await guard.close();
     }
   });
 }
@@ -43,6 +78,7 @@ void notificationBackgroundDispatcher() {
 Future<void> startNotificationBackgroundRefresh() async {
   if (!Platform.isAndroid && !Platform.isIOS) return;
   await Workmanager().initialize(notificationBackgroundDispatcher);
+  await configureBackupSchedule(await SharedPreferences.getInstance());
   await Workmanager().registerPeriodicTask(
       notificationRefreshTask, notificationRefreshTask,
       frequency: const Duration(hours: 6),

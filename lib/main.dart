@@ -18,16 +18,21 @@
 //      mượt mà trên mọi máy Android/HyperOS kể cả khi bật Tiết kiệm pin hoặc tắt Animator duration.
 // ==============================================================================
 
+import 'dart:io';
+import 'package:path/path.dart' as p;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:path_provider/path_provider.dart';
+import 'services/backup_capsule.dart';
 import 'data/database.dart';
 import 'data/database_seeder.dart';
 import 'features/onboarding/screens/welcome_onboarding_screen.dart';
 import 'screens/main_scaffold.dart';
 import 'theme/app_theme.dart';
+import 'widgets/backup_progress_curtain.dart';
 
 /// 🌟 ROOT SESSION KEY PROVIDER (ROOT PURGE ARCHITECTURE)
 /// Gán UniqueKey mới để dọn sạch toàn bộ state trong bộ nhớ và ép dựng lại cây Widget.
@@ -35,6 +40,7 @@ final appSessionKeyProvider = StateProvider<UniqueKey>((ref) => UniqueKey());
 
 /// Helper reset toàn bộ ứng dụng từ bất kỳ đâu
 void resetAppRootSession(WidgetRef ref) {
+  backupNavigatorKey = GlobalKey<NavigatorState>();
   ref.read(appSessionKeyProvider.notifier).state = UniqueKey();
 }
 
@@ -66,6 +72,21 @@ Future<void> main() async {
   // Khởi tạo SharedPreferences trước khi render frame đầu tiên (Chống chớp giật giao diện)
   final prefs = await SharedPreferences.getInstance();
 
+  final documents = await getApplicationDocumentsDirectory();
+  if (await File(p.join(documents.path, 'restore_recovery', 'pending'))
+      .exists()) {
+    final recoveryGuard =
+        await File(p.join(documents.path, 'restore_access.lock'))
+            .open(mode: FileMode.append);
+    await recoveryGuard.lock(FileLock.blockingExclusive);
+    try {
+      await recoverInterruptedRestore(documents.path, prefs);
+    } finally {
+      await recoveryGuard.unlock();
+      await recoveryGuard.close();
+    }
+  }
+
   // Khởi tạo Drift SQLite Database cục bộ
   final appDb = AppDatabase();
 
@@ -80,11 +101,12 @@ Future<void> main() async {
     }
   }
 
+  await appDb.close();
+
   runApp(
     ProviderScope(
       overrides: [
         sharedPreferencesProvider.overrideWithValue(prefs),
-        databaseProvider.overrideWithValue(appDb),
       ],
       child: const FlowyApp(),
     ),
@@ -110,6 +132,7 @@ class FlowyApp extends ConsumerWidget {
       key: sessionKey,
       child: MaterialApp(
         title: 'Flowy',
+        navigatorKey: backupNavigatorKey,
         debugShowCheckedModeBanner: false,
 
         // 🌟 GHI ĐÈ THIẾT LẬP TRỢ NĂNG TOÀN CỤC: BẢO VỆ MỌI ANIMATION TRÊN HYPEROS / ANDROID
@@ -119,7 +142,7 @@ class FlowyApp extends ConsumerWidget {
             data: mediaQueryData.copyWith(
               disableAnimations: false,
             ),
-            child: child!,
+            child: BackupProgressHost(child: child!),
           );
         },
 
