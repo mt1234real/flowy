@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../services/fiscal_day.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'package:drift/drift.dart';
@@ -186,13 +187,14 @@ class NotificationCoordinator {
   bool? _lastPrivate;
   final _scheduledSignatures = <int, String>{};
   Future<void> refresh(
-      NotificationPreferences prefs, Map<String, int> cycles) async {
+      NotificationPreferences prefs, Map<String, int> cycles,
+      {FiscalDayBoundary boundary = const FiscalDayBoundary()}) async {
     if (_running != null) {
       _rerun = true;
       await _running;
       return;
     }
-    _running = _refresh(prefs, cycles);
+    _running = _refresh(prefs, cycles, boundary);
     try {
       await _running;
     } finally {
@@ -210,7 +212,8 @@ class NotificationCoordinator {
       NumberFormat.currency(locale: 'vi_VN', symbol: '₫', decimalDigits: 0)
           .format(n);
   Future<void> _refresh(
-      NotificationPreferences prefs, Map<String, int> cycles) async {
+      NotificationPreferences prefs, Map<String, int> cycles,
+      FiscalDayBoundary boundary) async {
     await platform.initialize();
     if (platform.ready) await platform.updateTimezone();
     if (platform.ready && prefs.flag('private') && _lastPrivate != true) {
@@ -221,6 +224,7 @@ class NotificationCoordinator {
     _lastPrivate = prefs.flag('private');
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
+    final fiscalToday = boundary.date(now);
     final txs = await (db.select(db.transactions)
           ..where((t) => t.deletedAt.isNull()))
         .get();
@@ -232,13 +236,13 @@ class NotificationCoordinator {
     final plan = <_Notice>[];
     String day(DateTime d) => DateFormat('yyyy-MM-dd').format(d);
     for (var offset = 0; offset < 14; offset++) {
-      final date = DateTime(today.year, today.month, today.day + offset);
+      final date = DateTime(fiscalToday.year, fiscalToday.month, fiscalToday.day + offset);
       final end = DateTime(date.year, date.month, date.day + 1);
       final count = txs
-              .where((t) => !t.date.isBefore(date) && t.date.isBefore(end))
+              .where((t) => boundary.contains(t.date, date))
               .length +
           debts
-              .where((t) => !t.date.isBefore(date) && t.date.isBefore(end))
+              .where((t) => boundary.contains(t.date, date))
               .length;
       void reminder(String slot, int fallback) {
         if (!prefs.flag(slot, slot == 'evening') ||
@@ -249,8 +253,7 @@ class NotificationCoordinator {
           return;
         }
         final minute = prefs.number('${slot}Minute', fallback).clamp(0, 1439);
-        final at = DateTime(
-            date.year, date.month, date.day, minute ~/ 60, minute % 60);
+        final at = boundary.reminderAt(date, minute);
         final body = count == 0
             ? 'Hôm nay bạn chưa có ghi chép. Dành một chút thời gian điểm lại các khoản thu chi nhé.'
             : 'Hôm nay bạn đã ghi $count giao dịch. Bạn có muốn kiểm tra lại các khoản vừa ghi?';
@@ -268,7 +271,7 @@ class NotificationCoordinator {
       if (date.weekday == DateTime.sunday && prefs.flag('digest')) {
         final start = date.subtract(const Duration(days: 6));
         final week =
-            txs.where((t) => !t.date.isBefore(start) && t.date.isBefore(end));
+            txs.where((t) => !t.date.isBefore(boundary.start(start)) && t.date.isBefore(boundary.start(end)));
         final expense = week
             .where((t) => t.type == CategoryType.expense)
             .fold(0.0, (s, t) => s + t.amount);
@@ -324,7 +327,7 @@ class NotificationCoordinator {
       for (final budget in await db.select(db.budgets).get()) {
         if (budget.amount <= 0) continue;
         final window = resolveBudgetWindow(budget, cycles);
-        if (now.isBefore(window.startDate) || now.isAfter(window.endDate)) {
+        if (now.isBefore(boundary.start(window.startDate)) || !now.isBefore(boundary.end(window.endDate))) {
           continue;
         }
         final ids = <String>{budget.categoryId};
@@ -340,8 +343,8 @@ class NotificationCoordinator {
             .where((t) =>
                 t.type == CategoryType.expense &&
                 ids.contains(t.categoryId) &&
-                !t.date.isBefore(window.startDate) &&
-                !t.date.isAfter(window.endDate))
+                !t.date.isBefore(boundary.start(window.startDate)) &&
+                t.date.isBefore(boundary.end(window.endDate)))
             .fold(0.0, (s, t) => s + t.amount);
         final threshold = spent >= budget.amount
             ? 100
@@ -354,7 +357,8 @@ class NotificationCoordinator {
                 .firstOrNull
                 ?.name ??
             'Danh mục';
-        final remaining = window.endDate.difference(now).inDays + 1;
+        final remaining = DateTime.utc(window.endDate.year, window.endDate.month, window.endDate.day)
+            .difference(DateTime.utc(fiscalToday.year, fiscalToday.month, fiscalToday.day)).inDays + 1;
         plan.add(_Notice(
             'budget:${budget.id}:${day(window.startDate)}:$threshold',
             threshold == 100
@@ -461,10 +465,11 @@ class NotificationCoordinator {
   Future<void> dailyLimit(
       {required double safe,
       required double spent,
-      required NotificationPreferences prefs}) async {
+      required NotificationPreferences prefs,
+      FiscalDayBoundary boundary = const FiscalDayBoundary()}) async {
     if (!prefs.flag('dailyLimit') || safe > 0 || spent <= 0) return;
     await platform.initialize();
-    final now = DateTime.now();
+    final now = boundary.date(DateTime.now());
     final item = await db.createNotificationIfNotExists(
         dedupKey: 'safe:${DateFormat('yyyy-MM-dd').format(now)}',
         title: 'Hạn mức hôm nay đã dùng hết',

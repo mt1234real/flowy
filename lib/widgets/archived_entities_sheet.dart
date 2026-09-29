@@ -5,7 +5,7 @@ import 'package:intl/intl.dart';
 import '../data/database.dart';
 import '../core/animation/app_animation_policy.dart';
 import '../core/feedback/app_feedback.dart';
-import '../screens/category_manager_screen.dart' show resolveAppIcon;
+import '../theme/app_icons.dart';
 
 class _ArchivedItem {
   final String id, name;
@@ -38,14 +38,14 @@ Future<void> showArchivedEntities(
           .watch()
           .map((rows) => rows
               .map((w) => _ArchivedItem(
-                  w.id, w.name, resolveAppIcon(w.icon), _archiveColor(w.color)))
+                  w.id, w.name, AppIcons.resolve(w.icon), _archiveColor(w.color)))
               .toList());
     } else {
       final details = <String, _ArchivedItem>{};
       if (type == 'category') {
         for (final c in await db.select(db.categories).get()) {
           details[c.id] = _ArchivedItem(
-              c.id, c.name, resolveAppIcon(c.icon), _archiveColor(c.color));
+              c.id, c.name, AppIcons.resolve(c.icon), _archiveColor(c.color));
         }
       } else {
         for (final c in await db.select(db.debtContacts).get()) {
@@ -53,7 +53,11 @@ Future<void> showArchivedEntities(
           final color =
               parts.where((p) => p.startsWith('#')).firstOrNull ?? '#10B981';
           details[c.id] = _ArchivedItem(
-              c.id, c.name, Icons.person_outline_rounded, _archiveColor(color));
+              c.id, c.name,
+              (c.avatarUrl ?? '').startsWith('icon:')
+                  ? AppIcons.resolve(parts.first.substring(5))
+                  : Icons.person_rounded,
+              _archiveColor(color));
         }
       }
       items = db.watchEntityArchives(type).map((rows) {

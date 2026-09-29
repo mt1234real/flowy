@@ -24,6 +24,7 @@ import '../core/animation/app_animation_policy.dart';
 import '../core/feedback/app_feedback.dart';
 import '../data/database.dart';
 import '../theme/app_theme.dart';
+import '../theme/app_icons.dart';
 import '../widgets/currency_text.dart';
 import '../widgets/internal_transfer_sheet.dart';
 
@@ -54,22 +55,6 @@ class _WalletManagerScreenState extends ConsumerState<WalletManagerScreen> {
       return Color(int.parse('FF$hex', radix: 16));
     } catch (_) {
       return const Color(0xFF10B981);
-    }
-  }
-
-  IconData _getWalletIconData(String type) {
-    switch (type.toLowerCase()) {
-      case 'bank':
-        return Icons.account_balance_rounded;
-      case 'ewallet':
-        return Icons.account_balance_wallet_rounded;
-      case 'credit':
-        return Icons.credit_card_rounded;
-      case 'savings':
-        return Icons.savings_rounded;
-      case 'cash':
-      default:
-        return Icons.payments_rounded;
     }
   }
 
@@ -1135,7 +1120,7 @@ class _WalletManagerScreenState extends ConsumerState<WalletManagerScreen> {
                   ),
                   child: Center(
                     child: Icon(
-                      _getWalletIconData(wallet.type),
+                      AppIcons.resolve(wallet.icon),
                       size: 22,
                       color: _parseColor(wallet.color),
                     ),

@@ -16,6 +16,7 @@
 // ==============================================================================
 
 import 'dart:async';
+import 'fiscal_day.dart';
 import 'dart:convert';
 import 'dart:io';
 
@@ -452,8 +453,8 @@ class CloudBackupService {
 
       final cacheDir = await getTemporaryDirectory();
       final timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
-      tempDir = await Directory(p.join(cacheDir.path, 'backup_${timestamp}_'))
-          .createTemp();
+      await cacheDir.create(recursive: true);
+      tempDir = await cacheDir.createTemp('backup_${timestamp}_');
 
       final tempDbCopy = File(p.join(tempDir.path, 'pfm_local_vault.sqlite'));
       await _db.customStatement('VACUUM INTO ?', [tempDbCopy.path]);
@@ -649,8 +650,8 @@ class CloudBackupService {
 
   Future<File> snapshotForInspection() async {
     final folder = await getTemporaryDirectory();
-    final dir =
-        await Directory(p.join(folder.path, 'flowy_inspection_')).createTemp();
+    await folder.create(recursive: true);
+    final dir = await folder.createTemp('flowy_inspection_');
     final file = File(p.join(dir.path, 'local.sqlite'));
     await _db.customStatement('VACUUM INTO ?', [file.path]);
     return file;
@@ -779,6 +780,7 @@ class CloudBackupService {
         _ref.invalidate(fontFamilyProvider);
         _ref.invalidate(currencyFontProvider);
         _ref.invalidate(notificationPreferencesProvider);
+        _ref.invalidate(dayCutoffProvider);
         _ref.invalidate(classificationSchemesProvider);
         _ref.invalidate(userProfileNotifierProvider);
         _ref.invalidate(vaultSecurityServiceProvider);

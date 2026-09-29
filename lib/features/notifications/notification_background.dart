@@ -1,4 +1,5 @@
 import 'dart:convert';
+import '../../services/fiscal_day.dart';
 import 'dart:io';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -62,7 +63,8 @@ void notificationBackgroundDispatcher() {
       final cycles = Map<String, int>.from(jsonDecode(
           prefs.getString('notification_cycle_snapshot') ??
               '{"default":10}') as Map);
-      await NotificationCoordinator(db).refresh(settings, cycles);
+      await NotificationCoordinator(db).refresh(settings, cycles,
+          boundary: FiscalDayBoundary.fromPreferences(prefs));
       return true;
     } catch (e) {
       debugPrint('Notification background refresh failed: $e');

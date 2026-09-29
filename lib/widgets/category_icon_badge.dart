@@ -8,7 +8,7 @@
 
 import 'package:flutter/material.dart';
 import '../data/database.dart';
-import '../screens/category_manager_screen.dart' show resolveAppIcon;
+import '../theme/app_icons.dart';
 
 class CategoryIconBadge extends StatelessWidget {
   final Category? category;
@@ -31,7 +31,7 @@ class CategoryIconBadge extends StatelessWidget {
 
     // 1. Nếu có thuộc tính hex color (String)
     final hexStr = category!.color;
-    if (hexStr != null && hexStr.isNotEmpty) {
+    if (hexStr.isNotEmpty) {
       try {
         final clean = hexStr.replaceAll('#', '');
         return Color(int.parse('FF$clean', radix: 16));
@@ -46,9 +46,9 @@ class CategoryIconBadge extends StatelessWidget {
       return isExpense ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded;
     }
 
-    // 1. Phân giải qua resolveAppIcon nếu category.icon có dữ liệu
-    if (category!.icon != null && category!.icon!.isNotEmpty) {
-      return resolveAppIcon(category!.icon);
+    // Resolve persisted keys through the shared catalogue.
+    if (category!.icon.isNotEmpty) {
+      return AppIcons.resolve(category!.icon);
     }
 
     return isExpense ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded;

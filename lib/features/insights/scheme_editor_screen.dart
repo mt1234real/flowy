@@ -1,4 +1,4 @@
-import '../../screens/category_manager_screen.dart' show resolveAppIcon;
+import '../../theme/app_icons.dart';
 import '../../widgets/flowy_selection_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -194,7 +194,7 @@ class _SchemeEditorScreenState extends ConsumerState<SchemeEditorScreen> {
                   isExpanded: true,
                   decoration: InputDecoration(
                       labelText: category.name,
-                      prefixIcon: Icon(resolveAppIcon(category.icon))),
+                      prefixIcon: Icon(AppIcons.resolve(category.icon))),
                   items: [
                     const DropdownMenuItem(
                         value: '', child: Text('Chưa phân loại')),

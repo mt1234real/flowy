@@ -1,3 +1,4 @@
+import '../theme/app_icons.dart';
 import '../widgets/flowy_selection_picker.dart';
 // ==============================================================================
 // File: lib/screens/category_manager_screen.dart
@@ -32,148 +33,7 @@ final allCategoriesStreamProvider =
 // ==============================================================================
 // 🌟 UNIFIED TOP-LEVEL ICON RESOLVER (Supports 40+ Curated Icons)
 // ==============================================================================
-IconData resolveAppIcon(String? iconName) {
-  if (iconName == null || iconName.isEmpty) return Icons.folder_open_rounded;
 
-  switch (iconName.toLowerCase()) {
-    // Ăn uống
-    case 'restaurant':
-    case 'food':
-      return Icons.restaurant_rounded;
-    case 'local_cafe':
-    case 'cafe':
-    case 'coffee':
-      return Icons.local_cafe_rounded;
-    case 'local_bar':
-    case 'bar':
-    case 'beer':
-      return Icons.local_bar_rounded;
-    case 'bakery_dining':
-    case 'bakery':
-    case 'cake':
-      return Icons.bakery_dining_rounded;
-    case 'fastfood':
-      return Icons.fastfood_rounded;
-
-    // Xe cộ / Di chuyển
-    case 'directions_car':
-    case 'car':
-    case 'transport':
-    case 'taxi':
-      return Icons.directions_car_rounded;
-    case 'two_wheeler':
-    case 'bike':
-    case 'motorcycle':
-      return Icons.two_wheeler_rounded;
-    case 'local_gas_station':
-    case 'gas':
-    case 'fuel':
-      return Icons.local_gas_station_rounded;
-    case 'flight':
-    case 'travel':
-      return Icons.flight_rounded;
-    case 'commute':
-    case 'bus':
-    case 'train':
-      return Icons.commute_rounded;
-
-    // Nhà cửa / Hóa đơn
-    case 'home':
-    case 'house':
-    case 'rent':
-      return Icons.home_rounded;
-    case 'bolt':
-    case 'electric':
-    case 'power':
-      return Icons.bolt_rounded;
-    case 'water_drop':
-    case 'water':
-      return Icons.water_drop_rounded;
-    case 'wifi':
-    case 'internet':
-      return Icons.wifi_rounded;
-    case 'cleaning_services':
-    case 'clean':
-      return Icons.cleaning_services_rounded;
-
-    // Mua sắm
-    case 'shopping_bag':
-    case 'shopping':
-    case 'shop':
-      return Icons.shopping_bag_rounded;
-    case 'shopping_cart':
-    case 'market':
-    case 'grocery':
-      return Icons.shopping_cart_rounded;
-    case 'checkroom':
-    case 'clothes':
-    case 'fashion':
-      return Icons.checkroom_rounded;
-    case 'devices':
-    case 'phone':
-    case 'laptop':
-      return Icons.devices_rounded;
-
-    // Sức khỏe & Học tập
-    case 'medical_services':
-    case 'health':
-    case 'medicine':
-    case 'doctor':
-      return Icons.medical_services_rounded;
-    case 'fitness_center':
-    case 'gym':
-    case 'fitness':
-    case 'sport':
-      return Icons.fitness_center_rounded;
-    case 'school':
-    case 'education':
-    case 'course':
-    case 'book':
-      return Icons.school_rounded;
-
-    // Giải trí
-    case 'sports_esports':
-    case 'game':
-    case 'entertainment':
-      return Icons.sports_esports_rounded;
-    case 'movie':
-    case 'cinema':
-    case 'film':
-      return Icons.movie_rounded;
-    case 'headphones':
-    case 'music':
-    case 'audio':
-      return Icons.headphones_rounded;
-    case 'card_giftcard':
-    case 'gift':
-      return Icons.card_giftcard_rounded;
-
-    // Tài chính / Thu nhập
-    case 'payments':
-    case 'salary':
-    case 'income':
-      return Icons.payments_rounded;
-    case 'trending_up':
-    case 'investment':
-    case 'stock':
-      return Icons.trending_up_rounded;
-    case 'savings':
-    case 'saving':
-    case 'bank':
-      return Icons.savings_rounded;
-    case 'handshake':
-    case 'debt':
-    case 'loan':
-      return Icons.handshake_rounded;
-    case 'receipt_long':
-    case 'bill':
-    case 'receipt':
-      return Icons.receipt_long_rounded;
-
-    default:
-      return Icons.folder_open_rounded;
-  }
-}
 
 class CategoryManagerScreen extends ConsumerStatefulWidget {
   const CategoryManagerScreen({super.key});
@@ -501,7 +361,7 @@ class _CategoryManagerScreenState extends ConsumerState<CategoryManagerScreen> {
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Icon(
-                  resolveAppIcon(parent.icon),
+                  AppIcons.resolve(parent.icon),
                   color: parentColor,
                   size: 22,
                 ),
@@ -593,7 +453,7 @@ class _CategoryManagerScreenState extends ConsumerState<CategoryManagerScreen> {
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(
-                    resolveAppIcon(child.icon),
+                    AppIcons.resolve(child.icon),
                     size: 16,
                     color: childColor,
                   ),
@@ -694,6 +554,8 @@ class _CategoryFormModalState extends ConsumerState<_CategoryFormModal> {
       context,
       initialIconName: _selectedIconName,
       initialHexColor: _selectedHexColor,
+      title: 'Biểu tượng danh mục',
+      confirmLabel: 'Áp dụng cho danh mục',
     );
 
     if (result != null && mounted) {
@@ -926,7 +788,7 @@ class _CategoryFormModalState extends ConsumerState<_CategoryFormModal> {
                             .map((p) => DropdownMenuItem<String>(
                                 value: p.id,
                                 child: Row(children: [
-                                  Icon(resolveAppIcon(p.icon),
+                                  Icon(AppIcons.resolve(p.icon),
                                       size: 20, color: accent.primary),
                                   const SizedBox(width: 10),
                                   Expanded(
@@ -973,7 +835,7 @@ class _CategoryFormModalState extends ConsumerState<_CategoryFormModal> {
                               alignment: Alignment.center,
                               children: [
                                 Icon(
-                                  resolveAppIcon(_selectedIconName),
+                                  AppIcons.resolve(_selectedIconName),
                                   color: activeColor.computeLuminance() > 0.5
                                       ? Colors.black87
                                       : Colors.white,

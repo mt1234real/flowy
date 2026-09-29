@@ -14,6 +14,8 @@ import 'package:flutter/services.dart';
 import '../core/feedback/app_feedback.dart';
 
 import 'emoji_picker_bottom_sheet.dart';
+import 'icon_color_picker_sheet.dart';
+import '../theme/app_icons.dart';
 
 typedef OnAvatarChanged = void Function({
 required String avatarType, // 'INITIALS' | 'EMOJI'
@@ -129,7 +131,9 @@ class DebtContactAvatarPicker extends StatelessWidget {
                   ],
                 ),
                 child: Center(
-                  child: isInitials
+                  child: avatarType == 'ICON'
+                      ? Icon(AppIcons.resolve(avatarValue), size: 30, color: primaryColor)
+                      : isInitials
                       ? Text(
                     _extractInitials(contactName),
                     style: TextStyle(
@@ -265,6 +269,20 @@ class DebtContactAvatarPicker extends StatelessWidget {
                 ),
 
                 const SizedBox(width: 8),
+
+                TextButton.icon(
+                  onPressed: () async {
+                    final result = await IconColorPickerSheet.show(context,
+                      initialIconName: avatarType == 'ICON' ? avatarValue : 'person',
+                      initialHexColor: colorHex,
+                      title: 'Biểu tượng đối tác',
+                      confirmLabel: 'Áp dụng cho đối tác');
+                    if (!context.mounted || result == null) return;
+                    onChanged(avatarType: 'ICON', avatarValue: result.iconName, colorHex: result.hexColor);
+                  },
+                  icon: const Icon(Icons.category_rounded, size: 18),
+                  label: const Text('Biểu tượng'),
+                ),
 
                 // 8 Emoji Ngữ Cảnh Nhanh
                 ...curatedEmojis.map((em) {

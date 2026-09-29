@@ -1,3 +1,5 @@
+import '../widgets/ambient_canvas.dart';
+import '../services/fiscal_day.dart';
 import 'dart:convert';
 import '../widgets/currency_text.dart';
 // ==============================================================================
@@ -76,7 +78,7 @@ enum CycleMode { calendar, customCycle }
 final cycleModeProvider = StateProvider<CycleMode>((ref) => CycleMode.customCycle);
 
 final currentAnchorMonthProvider = StateProvider<DateTime>((ref) {
-  final now = DateTime.now();
+  final now = ref.read(dayCutoffProvider).date(DateTime.now());
   return DateTime(now.year, now.month, 1);
 });
 
@@ -250,6 +252,7 @@ final unifiedLedgerStreamProvider = StreamProvider.autoDispose<List<UnifiedLedge
   final anchor = ref.watch(currentAnchorMonthProvider);
   final criteria = ref.watch(ledgerFilterCriteriaProvider);
   final searchQuery = ref.watch(ledgerSearchQueryProvider).trim();
+  final boundary = ref.watch(dayCutoffProvider);
 
   DateTime queryStart;
   DateTime queryEnd;
@@ -281,18 +284,20 @@ final unifiedLedgerStreamProvider = StreamProvider.autoDispose<List<UnifiedLedge
     queryEnd = range.endDate;
   }
 
+  queryStart = boundary.start(queryStart);
+  queryEnd = boundary.end(queryEnd);
   final standardTxStream = (db.select(db.transactions)
     ..where((t) =>
     t.deletedAt.isNull() &
     t.date.isBiggerOrEqualValue(queryStart) &
-    t.date.isSmallerOrEqualValue(queryEnd)))
+    t.date.isSmallerThanValue(queryEnd)))
       .watch();
 
   final debtTxStream = (db.select(db.debtTransactions)
     ..where((d) =>
     d.deletedAt.isNull() &
     d.date.isBiggerOrEqualValue(queryStart) &
-    d.date.isSmallerOrEqualValue(queryEnd)))
+    d.date.isSmallerThanValue(queryEnd)))
       .watch();
 
   final walletsStream = db.select(db.wallets).watch();
@@ -713,7 +718,7 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> with TickerProvider
   Map<String, List<UnifiedLedgerItem>> _groupItemsByDate(List<UnifiedLedgerItem> items) {
     final Map<String, List<UnifiedLedgerItem>> grouped = {};
     for (final item in items) {
-      final dateStr = DateFormat('dd/MM/yyyy').format(item.date);
+      final dateStr = DateFormat('dd/MM/yyyy').format(ref.read(dayCutoffProvider).date(item.date));
       grouped.putIfAbsent(dateStr, () => []).add(item);
     }
     return grouped;
@@ -937,8 +942,8 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> with TickerProvider
     final bool hasActiveFilters = criteria.isActive || searchQuery.isNotEmpty;
 
     return AppFeedbackDismissRegion(
-      child: Scaffold(
-        backgroundColor: isDark ? AppTokens.darkBg : AppTokens.lightBg,
+      child: AmbientCanvas(child: Scaffold(
+        backgroundColor: Colors.transparent,
         body: SafeArea(
           child: TwoStageOverscrollHeader(
             onRefresh: _handleLedgerRefresh,
@@ -1295,7 +1300,7 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> with TickerProvider
             ),
           ),
         ),
-      ),
+      )),
     );
   }
 
@@ -1396,6 +1401,8 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> with TickerProvider
       AppAccentPreset accent,
       ) {
     final groupedMap = _groupItemsByDate(items);
+    final today = ref.watch(fiscalTodayProvider);
+    final yesterday = DateTime(today.year, today.month, today.day - 1);
     final dateKeys = groupedMap.keys.toList();
 
     return Padding(
@@ -1420,16 +1427,21 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> with TickerProvider
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
+                    Expanded(child: Row(
                       children: [
-                        Text(
-                          dateStr,
+                        Flexible(child: Text(
+                          dateStr == DateFormat('dd/MM/yyyy').format(today)
+                              ? 'Hôm nay ($dateStr)'
+                              : dateStr == DateFormat('dd/MM/yyyy').format(yesterday)
+                                  ? 'Hôm qua ($dateStr)' : dateStr,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w800,
                             color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
                           ),
-                        ),
+                        )),
                         const SizedBox(width: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
@@ -1447,15 +1459,16 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> with TickerProvider
                           ),
                         ),
                       ],
-                    ),
-                    CurrencyText(
+                    )),
+                    const SizedBox(width: 8),
+                    Flexible(child: FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerRight, child: CurrencyText(
                       '${netDaily >= 0 ? '+' : ''}${_formatCurrency(netDaily)}',
                       style: currencyTextStyle(context, TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
                         color: netDaily >= 0 ? AppTokens.income : AppTokens.expense,
                       )),
-                    ),
+                    ))),
                   ],
                 ),
               ),
@@ -3449,7 +3462,7 @@ class _MonthYearPickerModalState extends ConsumerState<_MonthYearPickerModal> {
                     ),
                     onPressed: () {
                       HapticFeedback.mediumImpact();
-                      final now = DateTime.now();
+                      final now = ref.read(dayCutoffProvider).date(DateTime.now());
                       ref.read(currentAnchorMonthProvider.notifier).state = DateTime(now.year, now.month, 1);
                       Navigator.of(context).pop();
                     },

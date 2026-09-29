@@ -21,7 +21,6 @@
 // ==============================================================================
 
 import 'dart:io';
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -84,7 +83,7 @@ class RestoreDiffModal extends ConsumerStatefulWidget {
     HapticFeedback.selectionClick();
     return AppAnimationPolicy.showFluidSheet<void>(
       context: context,
-      mode: FluidSheetMode.nestedScrollable,
+      mode: FluidSheetMode.scrollable,
       enableBlur: false,
       backgroundColor: Colors.transparent,
       builder: (_, scroll) => RestoreDiffModal(
@@ -102,7 +101,7 @@ class RestoreDiffModal extends ConsumerStatefulWidget {
     HapticFeedback.mediumImpact();
     final result = await AppAnimationPolicy.showFluidSheet<bool>(
       context: context,
-      mode: FluidSheetMode.nestedScrollable,
+      mode: FluidSheetMode.scrollable,
       backgroundColor: Colors.transparent,
       builder: (_, scroll) =>
           RestoreDiffModal(signoutReport: report, scrollController: scroll),
@@ -125,7 +124,7 @@ class RestoreDiffModal extends ConsumerStatefulWidget {
     if (!context.mounted) return;
     await AppAnimationPolicy.showFluidSheet<void>(
         context: context,
-        mode: FluidSheetMode.nestedScrollable,
+        mode: FluidSheetMode.scrollable,
         enableBlur: false,
         builder: (_, scroll) => RestoreDiffModal(
             scrollController: scroll,
@@ -151,7 +150,6 @@ class _RestoreDiffModalState extends ConsumerState<RestoreDiffModal> {
   bool _keepLocal = true;
   final Set<String> _selected = {};
   final Map<String, String> _walletMapping = {};
-  int _reviewIndex = 0;
 
   DatabaseInspectionMetrics? _localMetrics;
   DatabaseInspectionMetrics? _backupMetrics;
@@ -275,8 +273,8 @@ class _RestoreDiffModalState extends ConsumerState<RestoreDiffModal> {
       final backupService = ref.read(cloudBackupServiceProvider);
       if (widget.localRecovery != null) {
         final temp = await getTemporaryDirectory();
-        final folder =
-            await Directory(p.join(temp.path, 'flowy_recovery_')).createTemp();
+        await temp.create(recursive: true);
+        final folder = await temp.createTemp('flowy_recovery_');
         for (final name in [
           'pfm_local_vault.sqlite',
           'preferences_manifest.json',
@@ -306,6 +304,53 @@ class _RestoreDiffModalState extends ConsumerState<RestoreDiffModal> {
         _reconciliation =
             inspectReconciliation(snapshot.path, _decryptedTempFile!.path);
         _localMetrics = _inspectSqliteFile(snapshot);
+        final local = sqlite.sqlite3.open(snapshot.path);
+        try {
+          final rows =
+              local.select('SELECT id,name,type,currency FROM wallets');
+          final cloud = _reconciliation!.wallets;
+          // Stable identity takes precedence; ambiguous matches require a choice.
+          for (final row in rows) {
+            final id = row['id'] as String;
+            if (cloud.any((w) => w['id'] == id)) _walletMapping[id] = id;
+          }
+          String normalize(Object? name) => (name as String? ?? '')
+              .trim()
+              .toLowerCase()
+              .replaceAll(RegExp(r'\s+'), ' ');
+          for (final row in rows) {
+            final id = row['id'] as String;
+            if (_walletMapping.containsKey(id)) continue;
+            final compatible = cloud
+                .where((w) =>
+                    w['type'] == row['type'] &&
+                    w['currency'] == row['currency'])
+                .toList();
+            final named = compatible
+                .where((w) => normalize(w['name']) == normalize(row['name']))
+                .toList();
+            final localNamed = rows
+                .where((w) =>
+                    normalize(w['name']) == normalize(row['name']) &&
+                    w['type'] == row['type'])
+                .length;
+            final localType = rows
+                .where((w) =>
+                    w['type'] == row['type'] &&
+                    w['currency'] == row['currency'])
+                .length;
+            final match = named.length == 1 && localNamed == 1
+                ? named.single
+                : named.isEmpty && compatible.length == 1 && localType == 1
+                    ? compatible.single
+                    : null;
+            if (match != null && !_walletMapping.containsValue(match['id'])) {
+              _walletMapping[id] = match['id'] as String;
+            }
+          }
+        } finally {
+          local.close();
+        }
       } finally {
         await snapshot.parent.delete(recursive: true);
       }
@@ -315,6 +360,7 @@ class _RestoreDiffModalState extends ConsumerState<RestoreDiffModal> {
           _walletMapping[id] = id;
         }
       }
+      _keepLocal = _reconciliation!.entries.any((e) => e.blockedReason == null);
       _selected.addAll(_reconciliation!.entries
           .where((e) => e.blockedReason == null)
           .map((e) => e.key));
@@ -362,6 +408,24 @@ class _RestoreDiffModalState extends ConsumerState<RestoreDiffModal> {
   }
 
   Future<void> _confirmRestore() async {
+    if (_keepLocal) {
+      for (final entry
+          in _reconciliation!.entries.where((e) => _selected.contains(e.key))) {
+        final source = _walletMapping[entry.walletId];
+        final targetId = entry.row['to_wallet_id'] as String?;
+        if (source == null ||
+            (targetId != null && _walletMapping[targetId] == null)) {
+          AppFeedback.showInfo(context,
+              'Chọn ví tương ứng cho các giao dịch mới trước khi khôi phục.');
+          return;
+        }
+        if (targetId != null && source == _walletMapping[targetId]) {
+          AppFeedback.showInfo(context,
+              'Ví gửi và ví nhận của giao dịch chuyển tiền phải khác nhau.');
+          return;
+        }
+      }
+    }
     final confirmed = await AppAnimationPolicy.showPreservedDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -396,60 +460,93 @@ class _RestoreDiffModalState extends ConsumerState<RestoreDiffModal> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final accent = ref.watch(accentPresetProvider);
 
+    final media = MediaQuery.of(context);
+    final topInset =
+        View.of(context).padding.top / View.of(context).devicePixelRatio;
     return AppFeedbackDismissRegion(
-      child: ClipRRect(
+        child: SizedBox(
+      height: (media.size.height - topInset - 12).clamp(0.0, media.size.height),
+      child: Material(
+        color: Theme.of(context).colorScheme.surface.withValues(alpha: .98),
         borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-          child: Container(
-            padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
-            decoration: BoxDecoration(
-              color: isDark
-                  ? const Color(0xFF151C28).withValues(alpha: 0.98)
-                  : Colors.white.withValues(alpha: 0.98),
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(28)),
-              border: Border.all(
-                color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder,
-              ),
-            ),
-            child: SafeArea(
-              top: false,
-              child: _isLoading
-                  ? SizedBox(
-                      height: 300,
-                      child: Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            CircularProgressIndicator(
-                              strokeWidth: 2.5,
-                              valueColor:
-                                  AlwaysStoppedAnimation<Color>(accent.primary),
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              _loadingMessage ?? 'Đang đối soát dữ liệu...',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                                color: isDark
-                                    ? AppTokens.darkText
-                                    : AppTokens.lightText,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    )
-                  : (_isSignoutMode
-                      ? _buildSignOutBackupSheet(isDark, accent)
-                      : _buildDiffContent(isDark, accent)),
-            ),
-          ),
-        ),
+        clipBehavior: Clip.antiAlias,
+        child: SafeArea(
+            top: false,
+            child: Column(children: [
+              Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 12, 8),
+                  child: ConstrainedBox(
+                      constraints: const BoxConstraints(minHeight: 54),
+                      child: Row(children: [
+                        Expanded(
+                            child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                              Text(
+                                  _isSignoutMode
+                                      ? 'Sao lưu trước khi đăng xuất'
+                                      : 'Chi tiết bản sao lưu',
+                                  style: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w800)),
+                              const SizedBox(height: 4),
+                              Text(
+                                  widget.localRecovery != null
+                                      ? 'Bản dự phòng được giữ trên thiết bị'
+                                      : 'Đồng bộ dữ liệu an toàn cùng Google Drive',
+                                  style: TextStyle(
+                                      fontSize: 11.5,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurfaceVariant)),
+                            ])),
+                        IconButton(
+                            tooltip: 'Đóng',
+                            onPressed: _isLoading
+                                ? null
+                                : () => Navigator.pop(context),
+                            style: IconButton.styleFrom(
+                                backgroundColor:
+                                    accent.primary.withValues(alpha: .08)),
+                            icon: const Icon(Icons.close_rounded, size: 18)),
+                      ]))),
+              Expanded(
+                  child: _isLoading
+                      ? Center(
+                          child:
+                              Column(mainAxisSize: MainAxisSize.min, children: [
+                          CircularProgressIndicator(
+                              strokeWidth: 2.5, color: accent.primary),
+                          const SizedBox(height: 16),
+                          Text(_loadingMessage ?? 'Đang đối soát dữ liệu…',
+                              textAlign: TextAlign.center),
+                        ]))
+                      : Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          child: _isSignoutMode
+                              ? _buildSignOutBackupSheet(isDark, accent)
+                              : _buildDiffContent(isDark, accent))),
+              if (!_isLoading && !_isSignoutMode)
+                Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 10, 20, 16),
+                    child: SizedBox(
+                        width: double.infinity,
+                        child: FilledButton(
+                            style: FilledButton.styleFrom(
+                                minimumSize: const Size(0, 50),
+                                backgroundColor: accent.primary,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16))),
+                            onPressed: _confirmRestore,
+                            child: Text(
+                                _keepLocal && _selected.isNotEmpty
+                                    ? 'Khôi phục và nhập ${_selected.length} giao dịch'
+                                    : 'Khôi phục bản sao lưu',
+                                textAlign: TextAlign.center)))),
+            ])),
       ),
-    );
+    ));
   }
 
   // ===========================================================================
@@ -465,19 +562,6 @@ class _RestoreDiffModalState extends ConsumerState<RestoreDiffModal> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Drag handle bar
-          Center(
-            child: Container(
-              width: 44,
-              height: 4,
-              decoration: BoxDecoration(
-                color: isDark ? Colors.white24 : Colors.black26,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-
           // 1. Header: Icon 🔒 viền phát quang Emerald + Tiêu đề
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -811,178 +895,218 @@ class _RestoreDiffModalState extends ConsumerState<RestoreDiffModal> {
   // ===========================================================================
   // GIAO DIỆN ĐỐI SOÁT KHÔI PHỤC (RESTORE DIFF)
   // ===========================================================================
+  String get _sourceLabel =>
+      widget.localRecovery == null ? 'Cloud' : 'dự phòng';
+
+  Widget _glassCard(Widget child, {bool selected = false}) {
+    final theme = Theme.of(context);
+    final accent = ref.watch(accentPresetProvider).primary;
+    return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+            color: selected
+                ? accent.withValues(alpha: .08)
+                : theme.colorScheme.surfaceContainer.withValues(alpha: .6),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+                color: selected
+                    ? accent
+                    : theme.colorScheme.outlineVariant.withValues(alpha: .5),
+                width: .8)),
+        child: child);
+  }
+
   Widget _buildDiffContent(bool isDark, AppAccentPreset accent) {
     final diff = _reconciliation!;
     final available =
         diff.entries.where((e) => e.blockedReason == null).toList();
     final blocked = diff.entries.where((e) => e.blockedReason != null).toList();
-    final grouped = available.length > 3;
     final groups = <String>{
       for (final e in available) e.walletId,
       for (final e in available)
         if (e.row['to_wallet_id'] is String) e.row['to_wallet_id'] as String
     };
+    final muted = Theme.of(context).colorScheme.onSurfaceVariant;
     return SingleChildScrollView(
-      controller: widget.scrollController,
-      physics: const ClampingScrollPhysics(),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          const Expanded(
-              child: Text('Chi tiết bản sao lưu',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800))),
-          IconButton(
-              onPressed: () => Navigator.pop(context),
-              icon: const Icon(Icons.close_rounded)),
-        ]),
-        Text(
-            '${widget.backupItem!.formattedDate}${widget.backupItem!.sizeBytes > 0 ? ' • ${widget.backupItem!.formattedSize}' : ''}'),
-        const SizedBox(height: 16),
-        Text(
-            '${_backupMetrics!.transactionCount} giao dịch • ${_backupMetrics!.walletCount} ví',
-            style: const TextStyle(fontWeight: FontWeight.w700)),
-        const SizedBox(height: 8),
-        if (_savedPreferences != null)
-          Text(
-              'Giao diện: ${AppAccentPreset.values.firstWhere((a) => a.name == _savedPreferences![kPrefKeyAccentPreset], orElse: () => AppAccentPreset.grass).label} • Phông tiền: ${_savedPreferences![kPrefKeyCurrencyFont] ?? 'Theo giao diện'}\nBao gồm thiết lập nhắc nhở và mã PIN két')
-        else
-          const Text(
-              'Bản cũ chỉ có dữ liệu tài chính; giữ thiết lập hiện tại.'),
-        const Divider(height: 28),
-        Text(
-            'Trên máy: ${_localMetrics!.transactionCount} giao dịch • ${_localMetrics!.walletCount} ví'),
-        const SizedBox(height: 8),
-        Text(
-            '${diff.entries.length} giao dịch chỉ có trên máy. ${diff.conflicts} giao dịch cùng ID nhưng khác nội dung.'),
-        if (diff.conflicts > 0)
-          const Padding(
-              padding: EdgeInsets.only(top: 8),
-              child: Text(
-                  'Các giao dịch xung đột giữ theo bản Cloud. Bản trên máy được giữ nguyên trong bản dự phòng.')),
-        const SizedBox(height: 12),
-        _restoreChoice(true, 'Giữ lại các giao dịch được chọn',
-            'Chọn ví nhận. Danh mục và đối tác mới đi kèm sẽ được giữ lại.'),
-        _restoreChoice(false, 'Chỉ dùng bản Cloud',
-            'Dữ liệu cũ được giữ trong bản dự phòng trên máy.'),
-        if (_keepLocal && available.isNotEmpty) ...[
-          const SizedBox(height: 16),
-          Text(grouped ? 'Ghép ví cho từng nhóm' : 'Duyệt từng giao dịch',
-              style: const TextStyle(fontWeight: FontWeight.w700)),
-          if (grouped) ...[
+        controller: widget.scrollController,
+        physics: const ClampingScrollPhysics(),
+        padding: const EdgeInsets.only(top: 8, bottom: 20),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          _glassCard(
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Bản $_sourceLabel (${widget.backupItem!.formattedDate})',
+                style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: accent.primary)),
+            const SizedBox(height: 12),
+            Wrap(spacing: 8, runSpacing: 8, children: [
+              for (final metric in [
+                '${_backupMetrics!.transactionCount} giao dịch',
+                '${_backupMetrics!.walletCount} ví',
+                if (widget.backupItem!.sizeBytes > 0)
+                  widget.backupItem!.formattedSize
+              ])
+                Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    decoration: BoxDecoration(
+                        color: accent.primary.withValues(alpha: .08),
+                        borderRadius: BorderRadius.circular(10)),
+                    child: Text(metric,
+                        style: const TextStyle(
+                            fontSize: 14, fontWeight: FontWeight.w800))),
+            ]),
+            const Divider(height: 24),
+            Text(
+                'Trên máy: ${_localMetrics!.transactionCount} giao dịch • ${_localMetrics!.walletCount} ví',
+                style: TextStyle(fontSize: 12, color: muted)),
+            const SizedBox(height: 8),
+            Text(
+                'Phát hiện ${diff.entries.length} giao dịch chỉ có trên máy này',
+                style:
+                    const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 6),
+            Text(
+                'Bản $_sourceLabel là dữ liệu gốc để khôi phục. Bạn có thể nhập thêm các giao dịch mới vào ví tương ứng.',
+                style: TextStyle(fontSize: 12, height: 1.4, color: muted)),
+            if (diff.conflicts > 0) ...[
+              const SizedBox(height: 8),
+              Text(
+                  '${diff.conflicts} giao dịch khác nội dung sẽ giữ theo bản $_sourceLabel. Nội dung trên máy vẫn được giữ trong bản dự phòng.',
+                  style: TextStyle(fontSize: 12, color: muted)),
+            ],
+          ])),
+          const SizedBox(height: 12),
+          if (available.isNotEmpty) ...[
+            _restoreChoice(
+                true,
+                'Nạp ${available.length} giao dịch mới vào bản $_sourceLabel',
+                'Chọn ví tương ứng để cập nhật số dư chính xác. Khuyên dùng.'),
+            const SizedBox(height: 10),
+          ],
+          _restoreChoice(false, 'Chỉ khôi phục bản $_sourceLabel',
+              'Dữ liệu trên máy được giữ trong bản dự phòng trước khi khôi phục.'),
+          if (_keepLocal && available.isNotEmpty) ...[
+            const SizedBox(height: 18),
+            const Text('Ghép nguồn tiền',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 6),
+            Text(
+                'Kiểm tra ví được gợi ý trước khi tiếp tục. Với chuyển tiền, chọn riêng ví gửi và ví nhận.',
+                style: TextStyle(fontSize: 12, color: muted)),
             for (final id in groups)
               Padding(
                   padding: const EdgeInsets.only(top: 10),
-                  child: Column(children: [
-                    CheckboxListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: Text(
-                            '${diff.localWalletNames[id] ?? 'Ví cũ'} • ${available.where((e) => e.walletId == id).length} giao dịch'),
-                        value: available
-                            .where((e) => e.walletId == id)
-                            .every((e) => _selected.contains(e.key)),
-                        onChanged: (value) => setState(() {
-                              for (final e
-                                  in available.where((e) => e.walletId == id)) {
-                                if (value == true) {
-                                  _selected.add(e.key);
-                                } else {
-                                  _selected.remove(e.key);
-                                }
-                              }
-                            })),
-                    _walletChoice(id),
-                  ])),
-          ] else ...[
-            const SizedBox(height: 8),
-            Builder(builder: (context) {
-              final entry =
-                  available[_reviewIndex.clamp(0, available.length - 1)];
-              return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Giao dịch ${_reviewIndex + 1}/${available.length}'),
-                    CheckboxListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: CurrencyText(_formatCurrency(
-                            (entry.row['amount'] as num).toDouble())),
-                        subtitle: Text(entry.row['note'] as String? ??
-                            diff.localWalletNames[entry.walletId] ??
-                            'Giao dịch'),
-                        value: _selected.contains(entry.key),
-                        onChanged: (v) => setState(() {
-                              if (v == true) {
-                                _selected.add(entry.key);
-                              } else {
-                                _selected.remove(entry.key);
-                              }
-                            })),
-                    _walletChoice(entry.walletId),
-                    if (entry.row['to_wallet_id'] is String)
-                      Padding(
-                          padding: const EdgeInsets.only(top: 8),
-                          child: _walletChoice(
-                              entry.row['to_wallet_id'] as String)),
-                    Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          TextButton(
-                              onPressed: _reviewIndex > 0
-                                  ? () => setState(() => _reviewIndex--)
-                                  : null,
-                              child: const Text('Trước')),
-                          TextButton(
-                              onPressed: _reviewIndex + 1 < available.length
-                                  ? () => setState(() => _reviewIndex++)
-                                  : null,
-                              child: const Text('Tiếp')),
-                        ]),
-                  ]);
-            }),
+                  child: _glassCard(Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                            '${diff.localWalletNames[id] ?? 'Ví cũ'} (máy này) • ${available.where((e) => e.walletId == id || e.row['to_wallet_id'] == id).length} giao dịch',
+                            style: const TextStyle(
+                                fontSize: 12, fontWeight: FontWeight.w700)),
+                        const SizedBox(height: 8),
+                        _walletChoice(id),
+                      ]))),
           ],
-        ],
-        if (blocked.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          Text(
-              '${blocked.length} giao dịch cần đối soát riêng, được giữ trong bản dự phòng:',
-              style: const TextStyle(fontWeight: FontWeight.w700)),
-          for (final reason in blocked.map((e) => e.blockedReason!).toSet())
-            Text('• $reason'),
-        ],
-        const SizedBox(height: 20),
-        const Text(
-            'Bản dự phòng luôn được tạo trước khi thay dữ liệu. Theme, phông chữ và lịch nhắc sẽ áp dụng theo bản sao lưu.'),
-        const SizedBox(height: 12),
-        SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-                onPressed: _confirmRestore,
-                child: Text(_keepLocal
-                    ? 'Khôi phục và nhập ${_selected.length} giao dịch'
-                    : 'Khôi phục bản Cloud'))),
-      ]),
-    );
+          if (blocked.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            Text(
+                '${blocked.length} giao dịch cần đối soát riêng, được giữ trong bản dự phòng:',
+                style:
+                    const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+            for (final reason in blocked.map((e) => e.blockedReason!).toSet())
+              Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text('• $reason',
+                      style: TextStyle(fontSize: 12, color: muted))),
+          ],
+          const SizedBox(height: 16),
+          _glassCard(Text(
+              _savedPreferences != null
+                  ? 'Bao gồm giao diện, phông chữ, chu kỳ, lịch nhắc và mã PIN két đã băm. Bản dữ liệu hiện tại luôn được giữ lại trước khi khôi phục.'
+                  : 'Bản cũ chỉ có dữ liệu tài chính. Giao diện và thiết lập hiện tại được giữ nguyên. Bản dữ liệu trên máy được lưu dự phòng trước khi khôi phục.',
+              style: TextStyle(fontSize: 12, height: 1.4, color: muted))),
+        ]));
   }
 
-  Widget _restoreChoice(bool value, String title, String subtitle) => ListTile(
-        contentPadding: EdgeInsets.zero,
-        leading: Icon(_keepLocal == value
-            ? Icons.radio_button_checked
-            : Icons.radio_button_off),
-        title: Text(title),
-        subtitle: Text(subtitle),
-        onTap: () => setState(() => _keepLocal = value),
-      );
+  Widget _restoreChoice(bool value, String title, String subtitle) {
+    final selected = _keepLocal == value;
+    return Semantics(
+        selected: selected,
+        button: true,
+        child: InkWell(
+            borderRadius: BorderRadius.circular(20),
+            onTap: () {
+              HapticFeedback.selectionClick();
+              setState(() => _keepLocal = value);
+            },
+            child: _glassCard(
+                Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Icon(
+                      selected
+                          ? Icons.radio_button_checked
+                          : Icons.radio_button_off,
+                      size: 20,
+                      color: selected
+                          ? ref.watch(accentPresetProvider).primary
+                          : Theme.of(context).colorScheme.onSurfaceVariant),
+                  const SizedBox(width: 10),
+                  Expanded(
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                        Text(title,
+                            style: const TextStyle(
+                                fontSize: 13.5, fontWeight: FontWeight.w700)),
+                        const SizedBox(height: 5),
+                        Text(subtitle,
+                            style: TextStyle(
+                                fontSize: 12,
+                                height: 1.4,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant)),
+                      ])),
+                ]),
+                selected: selected)));
+  }
 
-  Widget _walletChoice(String localId) => FlowyDropdown<String>(
-        title: 'Ví nhận trong bản Cloud',
-        value: _walletMapping[localId],
-        hint: const Text('Chọn ví nhận'),
-        items: [
-          for (final w in _reconciliation!.wallets)
-            DropdownMenuItem(
-                value: w['id'] as String, child: Text(w['name'] as String))
-        ],
-        onChanged: (value) => setState(() {
-          if (value != null) _walletMapping[localId] = value;
-        }),
-      );
+  Widget _cloudWalletLabel(Map<String, dynamic> wallet) => Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(wallet['name'] as String,
+                style:
+                    const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+            CurrencyText(
+                _formatCurrency((wallet['balance'] as num?)?.toDouble() ?? 0),
+                style: const TextStyle(fontSize: 11)),
+          ]);
+
+  Widget _walletChoice(String localId) {
+    final wallets = _reconciliation!.wallets;
+    final match =
+        wallets.where((w) => w['id'] == _walletMapping[localId]).firstOrNull;
+    return FlowyPickerTrigger(
+        minHeight: 46,
+        onTap: () async {
+          final result = await showFlowyPicker<String>(
+              context: context,
+              title: 'Ví nhận trong bản $_sourceLabel',
+              selected: match == null ? {} : {match['id'] as String},
+              items: [
+                for (final wallet in wallets)
+                  DropdownMenuItem(
+                      value: wallet['id'] as String,
+                      child: _cloudWalletLabel(wallet))
+              ]);
+          if (!mounted || result == null || result.isEmpty) return;
+          setState(() => _walletMapping[localId] = result.first);
+        },
+        child: match == null
+            ? const Text('Chọn ví tương ứng', style: TextStyle(fontSize: 12))
+            : _cloudWalletLabel(match));
+  }
 }

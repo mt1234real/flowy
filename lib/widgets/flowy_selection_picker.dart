@@ -5,6 +5,7 @@ import '../core/animation/app_animation_policy.dart';
 import '../data/database.dart';
 import '../theme/app_theme.dart';
 import 'currency_text.dart';
+import '../theme/app_icons.dart';
 
 /// A single Fluid surface for value selection. Action menus remain separate.
 Future<Set<T>?> showFlowyPicker<T>({
@@ -193,6 +194,7 @@ class FlowyDropdown<T> extends StatelessWidget {
       required this.items,
       required this.onChanged,
       this.title = 'Chọn mục',
+      this.minHeight = 52,
       this.hint,
       this.icon,
       this.isExpanded = true,
@@ -202,6 +204,7 @@ class FlowyDropdown<T> extends StatelessWidget {
       this.decoration,
       this.itemsStream,
       this.style});
+  final double minHeight;
   final T? value, initialValue;
   final List<DropdownMenuItem<T>>? items;
   final ValueChanged<T?>? onChanged;
@@ -225,10 +228,10 @@ class FlowyDropdown<T> extends StatelessWidget {
             ? theme.colorScheme.surfaceContainer
             : Colors.white,
         shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: borderRadius ?? BorderRadius.circular(16),
             side: BorderSide(color: accent.withValues(alpha: .22), width: .8)),
         child: InkWell(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: borderRadius ?? BorderRadius.circular(16),
             onTap: onChanged == null
                 ? null
                 : () async {
@@ -245,7 +248,7 @@ class FlowyDropdown<T> extends StatelessWidget {
                     }
                   },
             child: ConstrainedBox(
-                constraints: const BoxConstraints(minHeight: 52),
+                constraints: BoxConstraints(minHeight: minHeight),
                 child: Padding(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -316,14 +319,7 @@ class FlowySelectionMenu<T> extends StatelessWidget {
 }
 
 Widget walletPickerLabel(Wallet wallet) {
-  final icon = switch (wallet.type) {
-    'cash' => Icons.payments_outlined,
-    'bank' => Icons.account_balance_outlined,
-    'credit' => Icons.credit_card_rounded,
-    'ewallet' => Icons.account_balance_wallet_outlined,
-    'savings' => Icons.savings_outlined,
-    _ => Icons.wallet_outlined,
-  };
+  final icon = AppIcons.resolve(wallet.icon);
   return LayoutBuilder(builder: (context, constraints) {
     final theme = Theme.of(context);
     final accent = theme.colorScheme.primary;
@@ -399,8 +395,12 @@ Future<String?> showFlowyWalletPicker(
 
 class FlowyPickerTrigger extends StatelessWidget {
   const FlowyPickerTrigger(
-      {super.key, required this.onTap, required this.child});
+      {super.key,
+      required this.onTap,
+      required this.child,
+      this.minHeight = 52});
   final VoidCallback onTap;
+  final double minHeight;
   final Widget child;
   @override
   Widget build(BuildContext context) {
@@ -417,7 +417,7 @@ class FlowyPickerTrigger extends StatelessWidget {
             onTap: onTap,
             borderRadius: BorderRadius.circular(16),
             child: ConstrainedBox(
-                constraints: const BoxConstraints(minHeight: 52),
+                constraints: BoxConstraints(minHeight: minHeight),
                 child: Padding(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 14, vertical: 8),

@@ -1,4 +1,6 @@
 import '../widgets/flowy_selection_picker.dart';
+import '../theme/app_icons.dart';
+import '../widgets/icon_color_picker_sheet.dart';
 // ==============================================================================
 // File: lib/screens/savings_vault_screen.dart
 // Architecture: Digital Swiss Vault Savings Screen & Root-Safe Auto-Lock
@@ -42,20 +44,6 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
 
   static const Duration _privacyShieldFadeDuration =
       Duration(milliseconds: 150);
-
-  static const Map<String, IconData> _vaultGoalIcons = {
-    'general': Icons.savings_outlined,
-    'laptop': Icons.laptop_mac_rounded,
-    'travel': Icons.flight_takeoff_rounded,
-    'motorbike': Icons.two_wheeler_rounded,
-    'emergency': Icons.health_and_safety_outlined,
-    'home': Icons.home_work_outlined,
-    'education': Icons.school_outlined,
-    'gift': Icons.redeem_outlined,
-    'car': Icons.directions_car_rounded,
-    'music': Icons.music_note_rounded,
-    'diamond': Icons.diamond_outlined,
-  };
 
   @override
   void initState() {
@@ -137,39 +125,9 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
     });
   }
 
-  String _normalizeGoalIconKey(String raw) {
-    if (_vaultGoalIcons.containsKey(raw)) return raw;
+  String _normalizeGoalIconKey(String raw) => AppIcons.canonicalKey(raw);
 
-    switch (raw) {
-      case '💻':
-        return 'laptop';
-      case '✈️':
-        return 'travel';
-      case '🚗':
-        return 'car';
-      case '🏠':
-        return 'home';
-      case '🎓':
-        return 'education';
-      case '🎁':
-        return 'gift';
-      case '🎸':
-        return 'music';
-      case '💍':
-        return 'diamond';
-      case '🛡️':
-      case '⚡':
-        return 'emergency';
-      case '🐖':
-      default:
-        return 'general';
-    }
-  }
-
-  IconData _resolveGoalIcon(String raw) {
-    final key = _normalizeGoalIconKey(raw);
-    return _vaultGoalIcons[key] ?? Icons.savings_outlined;
-  }
+  IconData _resolveGoalIcon(String raw) => AppIcons.resolve(raw);
 
   String _formatCurrency(double amount) {
     return NumberFormat.currency(locale: 'vi_VN', symbol: '₫', decimalDigits: 0)
@@ -1569,7 +1527,8 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final inputFill = isDark ? const Color(0xFF1A212D) : Colors.white;
 
-    final icons = _vaultGoalIcons.keys.toList(growable: false);
+    final icons = AppIcons.search('', topic: 'Tài chính')
+        .take(11).map((item) => item.key).toList(growable: false);
     final colors = [
       for (final preset in AppAccentPreset.values)
         '#${preset.primary.toARGB32().toRadixString(16).substring(2).toUpperCase()}',
@@ -1675,7 +1634,20 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
 
                             const SizedBox(height: 14),
 
-                            // CHỌN BIỂU TƯỢNG EMOJI
+                            ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              leading: Icon(AppIcons.resolve(selectedIcon), color: _parseColor(selectedColor)),
+                              title: const Text('Biểu tượng và màu sắc'),
+                              trailing: const Icon(Icons.chevron_right_rounded),
+                              onTap: () async {
+                                final result = await IconColorPickerSheet.show(ctx,
+                                  initialIconName: selectedIcon, initialHexColor: selectedColor,
+                                  title: 'Biểu tượng hũ tích lũy', confirmLabel: 'Áp dụng cho hũ');
+                                if (!ctx.mounted || result == null) return;
+                                setModalState(() { selectedIcon = result.iconName; selectedColor = result.hexColor; });
+                              },
+                            ),
+                            // Biểu tượng gợi ý từ danh mục dùng chung.
                             Text('CHỌN BIỂU TƯỢNG',
                                 style: TextStyle(
                                     fontSize: 11,

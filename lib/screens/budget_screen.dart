@@ -1,3 +1,5 @@
+import '../services/fiscal_day.dart';
+import '../widgets/ambient_canvas.dart';
 // ==============================================================================
 // File: lib/screens/budget_screen.dart
 // Architecture: Isolated Monthly Budgets & Reactive Project/Event Budgets (Phase 1B)
@@ -49,7 +51,10 @@ import 'ledger_screen.dart'
     MonthCycleRange;
 
 /// StateProvider lưu trữ mốc tháng độc lập hoàn toàn cho màn hình Ngân Sách
-final budgetAnchorMonthProvider = StateProvider<DateTime>((ref) => DateTime(DateTime.now().year, DateTime.now().month, 1));
+final budgetAnchorMonthProvider = StateProvider<DateTime>((ref) {
+  final now = ref.read(dayCutoffProvider).date(DateTime.now());
+  return DateTime(now.year, now.month, 1);
+});
 
 // Enum 2 Top Tabs
 enum BudgetTopTab { recurring, event }
@@ -577,6 +582,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen>
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final boundary = ref.watch(dayCutoffProvider);
     final accent = ref.watch(accentPresetProvider);
 
     final currentTopTab = ref.watch(budgetTopTabProvider);
@@ -590,8 +596,8 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen>
     final projectBudgetsAsync = ref.watch(projectBudgetsStreamProvider);
 
     return AppFeedbackDismissRegion(
-      child: Scaffold(
-        backgroundColor: isDark ? AppTokens.darkBg : AppTokens.lightBg,
+      child: AmbientCanvas(child: Scaffold(
+        backgroundColor: Colors.transparent,
         body: SafeArea(
           child: TwoStageOverscrollHeader(
             onRefresh: _handleBudgetRefresh,
@@ -744,7 +750,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen>
                           final isEventTx = activeProjectTags.any((tag) => noteLower.contains(tag) || merchantLower.contains(tag));
                           if (isEventTx) return false;
 
-                          if (t.date.isBefore(cycleRange.startDate) || t.date.isAfter(cycleRange.endDate)) return false;
+                          if (t.date.isBefore(boundary.start(cycleRange.startDate)) || !t.date.isBefore(boundary.end(cycleRange.endDate))) return false;
                           if (isParent) {
                             if (t.categoryId == b.categoryId) return true;
                             final sub = catMap[t.categoryId];
@@ -1009,7 +1015,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen>
                                 final isEventTx = activeProjectTags.any((tag) => noteLower.contains(tag) || merchantLower.contains(tag));
                                 if (isEventTx) return false;
 
-                                if (t.date.isBefore(cycleRange.startDate) || t.date.isAfter(cycleRange.endDate)) return false;
+                                if (t.date.isBefore(boundary.start(cycleRange.startDate)) || !t.date.isBefore(boundary.end(cycleRange.endDate))) return false;
                                 if (isChild) {
                                   return t.categoryId == budget.categoryId;
                                 } else {
@@ -1633,7 +1639,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen>
             ),
           ),
         ),
-      ),
+      )),
     );
   }
 

@@ -1,3 +1,5 @@
+import '../widgets/ambient_canvas.dart';
+import '../services/fiscal_day.dart';
 import '../widgets/currency_text.dart';
 import '../features/notifications/notification_center_screen.dart';
 import '../features/notifications/notification_host.dart';
@@ -93,6 +95,13 @@ final recentTransactionsStreamProvider =
 });
 
 // StreamProvider lấy danh sách ví
+final dashboardPeriodTransactionsProvider = StreamProvider.autoDispose
+    .family<List<Transaction>, DateTimeRange>((ref, range) {
+  final db = ref.watch(databaseProvider);
+  return (db.select(db.transactions)..where((t) => t.deletedAt.isNull() &
+      t.date.isBiggerOrEqualValue(range.start) & t.date.isSmallerThanValue(range.end))).watch();
+});
+
 final dashboardWalletsStreamProvider =
     StreamProvider.autoDispose<List<Wallet>>((ref) {
   final db = ref.watch(databaseProvider);
@@ -347,12 +356,24 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
     final accent = ref.watch(accentPresetProvider);
     final userProfile = ref.watch(currentUserProfileProvider);
 
-    final now = DateTime.now();
-    final currentMonth = DateTime(now.year, now.month, 1);
+    final boundary = ref.watch(dayCutoffProvider);
+    final now = ref.watch(fiscalTodayProvider);
+    var currentMonth = DateTime(now.year, now.month, 1);
 
     final dashboardMode = ref.watch(dashboardCycleModeProvider);
     final cycleStore = ref.watch(cycleStartDaysByMonthProvider);
+    if (dashboardMode == CycleMode.customCycle &&
+        now.isBefore(computeMonthCycleRange(currentMonth, cycleStore).startDate)) {
+      currentMonth = DateTime(now.year, now.month - 1, 1);
+    }
     final cycleRange = computeMonthCycleRange(currentMonth, cycleStore);
+    final periodStart = boundary.start(dashboardMode == CycleMode.customCycle
+        ? cycleRange.startDate : DateTime(currentMonth.year, currentMonth.month, 1));
+    final periodEnd = dashboardMode == CycleMode.customCycle
+        ? boundary.end(cycleRange.endDate)
+        : boundary.start(DateTime(currentMonth.year, currentMonth.month + 1, 1));
+    final periodTxsAsync = ref.watch(dashboardPeriodTransactionsProvider(
+        DateTimeRange(start: periodStart, end: periodEnd)));
 
     final txsAsync = ref.watch(recentTransactionsStreamProvider);
     final walletsAsync = ref.watch(dashboardWalletsStreamProvider);
@@ -373,22 +394,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
       for (final w in walletsAsync.valueOrNull ?? <Wallet>[]) w.id: w,
     };
 
-    final allRecentTxs = txsAsync.valueOrNull ?? <Transaction>[];
 
     final totalWalletBalance = (walletsAsync.valueOrNull ?? <Wallet>[])
         .where((w) => !w.isExcludedFromTotal)
         .fold(0.0, (sum, w) => sum + w.balance);
 
-    final cycleTxs = allRecentTxs.where((t) {
-      if (dashboardMode == CycleMode.calendar) {
-        return t.date.year == currentMonth.year &&
-            t.date.month == currentMonth.month;
-      } else {
-        return t.date.isAfter(
-                cycleRange.startDate.subtract(const Duration(seconds: 1))) &&
-            t.date.isBefore(cycleRange.endDate.add(const Duration(seconds: 1)));
-      }
-    }).toList();
+    final cycleTxs = periodTxsAsync.valueOrNull ?? <Transaction>[];
 
     final totalIncome = cycleTxs
         .where((t) => t.type == CategoryType.income)
@@ -472,9 +483,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
 
     final double todaySpent = cycleTxs.where((t) {
       return t.type == CategoryType.expense &&
-          t.date.year == now.year &&
-          t.date.month == now.month &&
-          t.date.day == now.day;
+          boundary.contains(t.date, now);
     }).fold(0.0, (sum, t) => sum + t.amount);
 
     final double originalBaseLimit = daysRemaining > 0
@@ -484,11 +493,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
     final bool isOverSpentToday = todaySpent > originalBaseLimit;
     final double overAmount = math.max(0.0, todaySpent - originalBaseLimit);
 
-    if (!isOverSpentToday &&
+    if (periodTxsAsync.hasValue && walletsAsync.hasValue && budgetsAsync.hasValue && !isOverSpentToday &&
         (fastRecoveryDaysRemaining > 0 ||
             fastRecoveryTotalDays > 0 ||
             amortizedDeduction > 0)) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
         if (ref.read(fastRecoveryDaysRemainingProvider) > 0 ||
             ref.read(fastRecoveryTotalDaysProvider) > 0) {
           ref.read(fastRecoveryTotalDaysProvider.notifier).state = 0;
@@ -513,7 +523,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
 
     final double safeToSpendToday =
         math.max(0.0, effectiveDailyLimit - todaySpent);
-    if (txsAsync.hasValue &&
+    if (periodTxsAsync.hasValue &&
         walletsAsync.hasValue &&
         budgetsAsync.hasValue &&
         categoriesAsync.hasValue) {
@@ -573,19 +583,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
     return BalancePrivacyScope(
         visible: _balancesVisible,
         child: AppFeedbackDismissRegion(
-          child: Container(
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF7FAF9),
-              gradient: RadialGradient(
-                center: const Alignment(0.0, -0.95),
-                radius: 1.2,
-                colors: [
-                  accent.primary.withValues(alpha: isDark ? 0.12 : 0.06),
-                  isDark ? const Color(0xFF0F172A) : const Color(0xFFF7FAF9),
-                ],
-                stops: const [0.0, 1.0],
-              ),
-            ),
+          child: AmbientCanvas(
+            dashboard: true,
             child: Scaffold(
               backgroundColor: Colors.transparent,
               body: SafeArea(

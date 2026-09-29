@@ -1,3 +1,4 @@
+import '../services/fiscal_day.dart';
 import 'currency_text.dart';
 // ==============================================================================
 // File: lib/widgets/spending_trend_chart.dart
@@ -124,7 +125,8 @@ class _SpendingTrendChartState extends ConsumerState<SpendingTrendChart>
 
   List<_ChartBucket> _buildBuckets(
       List<Transaction> allExpenses, ChartPeriod period) {
-    final now = DateTime.now();
+    final now = ref.watch(fiscalTodayProvider);
+    final boundary = ref.watch(dayCutoffProvider);
     final List<_ChartBucket> buckets = [];
 
     switch (period) {
@@ -139,8 +141,8 @@ class _SpendingTrendChartState extends ConsumerState<SpendingTrendChart>
 
           final daySum = allExpenses
               .where((t) =>
-                  t.date.isAfter(start.subtract(const Duration(seconds: 1))) &&
-                  t.date.isBefore(end.add(const Duration(seconds: 1))))
+                  !t.date.isBefore(boundary.start(start)) &&
+                  t.date.isBefore(boundary.end(end)))
               .fold(0.0, (sum, t) => sum + t.amount);
 
           final weekdayNames = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
@@ -175,8 +177,8 @@ class _SpendingTrendChartState extends ConsumerState<SpendingTrendChart>
 
           final weekSum = allExpenses
               .where((t) =>
-                  t.date.isAfter(start.subtract(const Duration(seconds: 1))) &&
-                  t.date.isBefore(end.add(const Duration(seconds: 1))))
+                  !t.date.isBefore(boundary.start(start)) &&
+                  t.date.isBefore(boundary.end(end)))
               .fold(0.0, (sum, t) => sum + t.amount);
 
           buckets.add(_ChartBucket(
@@ -202,8 +204,8 @@ class _SpendingTrendChartState extends ConsumerState<SpendingTrendChart>
 
           final mSum = allExpenses
               .where((t) =>
-                  t.date.isAfter(start.subtract(const Duration(seconds: 1))) &&
-                  t.date.isBefore(end.add(const Duration(seconds: 1))))
+                  !t.date.isBefore(boundary.start(start)) &&
+                  t.date.isBefore(boundary.end(end)))
               .fold(0.0, (sum, t) => sum + t.amount);
 
           buckets.add(_ChartBucket(
@@ -224,8 +226,8 @@ class _SpendingTrendChartState extends ConsumerState<SpendingTrendChart>
 
           final mSum = allExpenses
               .where((t) =>
-                  t.date.isAfter(start.subtract(const Duration(seconds: 1))) &&
-                  t.date.isBefore(end.add(const Duration(seconds: 1))))
+                  !t.date.isBefore(boundary.start(start)) &&
+                  t.date.isBefore(boundary.end(end)))
               .fold(0.0, (sum, t) => sum + t.amount);
 
           buckets.add(_ChartBucket(

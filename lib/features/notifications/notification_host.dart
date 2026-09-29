@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../services/fiscal_day.dart';
 import 'dart:convert';
 import '../../widgets/backup_progress_curtain.dart';
 import '../../services/cloud_backup_service.dart';
@@ -75,7 +76,8 @@ class _NotificationHostState extends ConsumerState<NotificationHost>
           jsonEncode(ref.read(cycleStartDaysByMonthProvider)));
       if (!mounted) return;
       await coordinator.refresh(ref.read(notificationPreferencesProvider),
-          ref.read(cycleStartDaysByMonthProvider));
+            ref.read(cycleStartDaysByMonthProvider),
+            boundary: ref.read(dayCutoffProvider));
       if (!mounted) return;
       ref.invalidate(unreadNotificationCountProvider);
       ref.invalidate(notificationListProvider);
@@ -133,15 +135,19 @@ class _NotificationHostState extends ConsumerState<NotificationHost>
       if (value == null) _queue();
     });
     ref.listen(notificationPreferencesProvider, (_, __) => _queue());
+    ref.listen(dayCutoffProvider, (_, __) => _queue());
+    ref.listen(fiscalTodayProvider, (_, __) => _queue());
     ref.listen(cycleStartDaysByMonthProvider, (_, __) => _queue());
     ref.listen(notificationDailySnapshotProvider, (_, value) {
-      if (value == null || ref.read(backupOperationProvider) != null) return;
+        if (value == null || ref.read(backupOperationProvider) != null) return;
+        if (value.day != ref.read(fiscalTodayProvider)) return;
       unawaited(ref
           .read(notificationCoordinatorProvider)
           .dailyLimit(
               safe: value.safe,
               spent: value.spent,
-              prefs: ref.read(notificationPreferencesProvider))
+                prefs: ref.read(notificationPreferencesProvider),
+                boundary: ref.read(dayCutoffProvider))
           .catchError(
               (Object e) => debugPrint('Daily notification failed: $e')));
     });

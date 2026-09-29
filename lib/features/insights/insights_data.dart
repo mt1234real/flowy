@@ -1,4 +1,5 @@
 import 'dart:convert';
+import '../../services/fiscal_day.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/database.dart';
@@ -234,6 +235,7 @@ InsightsReport buildInsightsReport(
     required InsightsWindow window,
     required InsightsWindow previousWindow,
     required CategoryType type,
+    FiscalDayBoundary boundary = const FiscalDayBoundary(),
     Set<String> wallets = const {},
     ClassificationScheme? scheme,
     Set<String>? categoryIds,
@@ -258,9 +260,9 @@ InsightsReport buildInsightsReport(
       t.amount > 0 &&
       (wallets.isEmpty || wallets.contains(t.walletId)) &&
       (categoryIds == null || categoryIds.contains(t.categoryId)));
-  final current = eligible.where((t) => window.contains(t.date)).toList();
+  final current = eligible.where((t) => window.contains(boundary.date(t.date))).toList();
   final previous =
-      eligible.where((t) => previousWindow.contains(t.date)).toList();
+      eligible.where((t) => previousWindow.contains(boundary.date(t.date))).toList();
   final groups = {
     for (final g in scheme?.groups ?? <ClassificationGroup>[]) g.id: g
   };

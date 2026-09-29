@@ -1,3 +1,4 @@
+import '../../services/fiscal_day.dart';
 import '../../widgets/flowy_selection_picker.dart';
 import '../../widgets/preserved_balance_tumbler.dart';
 import 'package:flutter/material.dart';
@@ -13,7 +14,7 @@ import '../../screens/budget_screen.dart'
 import '../../theme/app_theme.dart';
 import '../../widgets/currency_text.dart';
 import '../../widgets/sliding_segmented_bar.dart';
-import '../../screens/category_manager_screen.dart' show resolveAppIcon;
+import '../../theme/app_icons.dart';
 import 'insights_surfaces.dart';
 import '../../widgets/quick_entry_sheet.dart';
 import 'insights_data.dart';
@@ -244,7 +245,7 @@ class _SpendingInsightsScreenState
     Navigator.of(context).push(PreservedMaterialPageRoute(
         builder: (_) => SpendingInsightsScreen(
             initialPeriod: _period,
-            anchor: _anchor,
+            anchor: widget.anchor == null ? ref.read(fiscalTodayProvider) : _anchor,
             initialWallets: bucket.id.startsWith('wallet:')
                 ? {bucket.id.substring(7)}
                 : _wallets,
@@ -401,8 +402,10 @@ class _SpendingInsightsScreenState
 
   Widget _content(InsightsData data) {
     final cycles = ref.watch(cycleStartDaysByMonthProvider);
-    final window = insightsWindow(_period, _anchor, cycles, custom: _custom);
-    final previous = insightsWindow(_period, _anchor, cycles,
+    final boundary = ref.watch(dayCutoffProvider);
+    final anchor = widget.anchor == null ? ref.watch(fiscalTodayProvider) : _anchor;
+    final window = insightsWindow(_period, anchor, cycles, custom: _custom);
+    final previous = insightsWindow(_period, anchor, cycles,
         custom: _custom, previous: true);
     final schemes = ref.watch(classificationSchemesProvider);
     final matches = schemes.where((s) => s.id == _schemeId);
@@ -420,6 +423,7 @@ class _SpendingInsightsScreenState
             .where((t) => classification(t) == widget.classification)
             .toList();
     final report = buildInsightsReport(
+        boundary: boundary,
         transactions: scopedTransactions,
         categories: data.categories,
         window: window,
@@ -449,6 +453,7 @@ class _SpendingInsightsScreenState
     final filteredReport = _classification == 'all'
         ? report
         : buildInsightsReport(
+            boundary: boundary,
             transactions: scopedTransactions
                 .where((t) => classification(t) == _classification)
                 .toList(),
@@ -1270,7 +1275,7 @@ class _SpendingInsightsScreenState
                                       child: Icon(
                                           category == null
                                               ? Icons.donut_small
-                                              : resolveAppIcon(category.icon),
+                                              : AppIcons.resolve(category.icon),
                                           color: tone,
                                           size: 23))),
                               const SizedBox(width: 12),

@@ -15,7 +15,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'sliding_segmented_bar.dart';
 import '../core/animation/app_animation_policy.dart';
 import '../data/database.dart';
-import '../screens/category_manager_screen.dart' show resolveAppIcon;
+import '../theme/app_icons.dart';
 import '../theme/app_theme.dart';
 
 // StreamProvider tự động cập nhật danh mục từ Drift SQLite
@@ -393,7 +393,7 @@ class _CategoryTreeModalState extends ConsumerState<CategoryTreeModal> {
                                           borderRadius: BorderRadius.circular(12),
                                         ),
                                         child: Icon(
-                                          resolveAppIcon(parent.icon),
+                                          AppIcons.resolve(parent.icon),
                                           color: parentColor,
                                           size: 20,
                                         ),
@@ -515,7 +515,7 @@ class _CategoryTreeModalState extends ConsumerState<CategoryTreeModal> {
                                                   borderRadius: BorderRadius.circular(10),
                                                 ),
                                                 child: Icon(
-                                                  resolveAppIcon(child.icon),
+                                                  AppIcons.resolve(child.icon),
                                                   size: 16,
                                                   color: childColor,
                                                 ),

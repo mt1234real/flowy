@@ -1,3 +1,7 @@
+import '../widgets/currency_font_gallery.dart';
+import '../widgets/day_cutoff_picker_sheet.dart';
+import '../services/fiscal_day.dart';
+import '../widgets/ambient_canvas.dart';
 import '../features/notifications/notification_settings_sheet.dart';
 // ==============================================================================
 // File: lib/screens/settings_screen.dart
@@ -545,7 +549,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final currentThemeMode = ref.watch(themeModeProvider);
     final currentAccent = ref.watch(accentPresetProvider);
     final currentFont = ref.watch(fontFamilyProvider);
-    final currencyFont = ref.watch(currencyFontProvider);
     final userProfile = ref.watch(currentUserProfileProvider);
     final backupState = ref.watch(cloudBackupNotifierProvider);
     final db = ref.watch(databaseProvider);
@@ -554,8 +557,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final latestBackup = backupState.backups.isNotEmpty ? backupState.backups.first : null;
 
     return AppFeedbackDismissRegion(
-      child: Scaffold(
-        backgroundColor: isDark ? AppTokens.darkBg : AppTokens.lightBg,
+      child: AmbientCanvas(child: Scaffold(
+        backgroundColor: Colors.transparent,
         body: SafeArea(
           child: LuminescentEdgeScaffoldWrapper(
             onRefresh: _handleSettingsRefresh,
@@ -854,6 +857,24 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 // ===============================================================
                 // [KHỐI 3]: GIAO DIỆN & MÀU SẮC (PERSISTENT SHARDEPREFERENCES)
                 // ===============================================================
+                _buildSectionHeader('NHỊP SỐNG & CHU KỲ', isDark),
+                const SizedBox(height: 8),
+                _SettingsTileSurface(isDark: isDark, child: ListTile(
+                  leading: Container(width: 36, height: 36,
+                    decoration: BoxDecoration(color: currentAccent.primary.withValues(alpha: .12), borderRadius: BorderRadius.circular(10)),
+                    child: Icon(Icons.schedule_rounded, color: currentAccent.primary, size: 20)),
+                  title: const Text('Thời gian bắt đầu ngày mới', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700)),
+                  subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    const Text('Chi tiêu trước mốc này vẫn tính vào ngày hôm trước', style: TextStyle(fontSize: 11)),
+                    const SizedBox(height: 6),
+                    Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(borderRadius: BorderRadius.circular(8), border: Border.all(color: currentAccent.primary.withValues(alpha: .25))),
+                      child: Text(ref.watch(dayCutoffProvider).label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700))),
+                  ]),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => DayCutoffPickerSheet.show(context),
+                )),
+                const SizedBox(height: 24),
                 _buildSectionHeader('GIAO DIỆN & MÀU SẮC', isDark),
                 const SizedBox(height: 10),
 
@@ -993,36 +1014,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
                 _buildSectionHeader('FONT TIỀN TỆ', isDark),
                 const SizedBox(height: 8),
-                Text('Chọn kiểu chữ riêng cho số tiền. Các nhãn vẫn dùng font ứng dụng.',
-                  style: TextStyle(fontSize: 12, color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted)),
-                const SizedBox(height: 10),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: isDark ? AppTokens.darkCard : Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    const Text('Xem trước', style: TextStyle(fontSize: 11)),
-                    const SizedBox(height: 6),
-                    FittedBox(fit: BoxFit.scaleDown, child: Text('12.345.678 ₫',
-                      style: currencyTextStyle(context, TextStyle(fontSize: 26, fontWeight: FontWeight.w800,
-                        color: isDark ? AppTokens.darkText : AppTokens.lightText), family: currencyFont))),
-                    const SizedBox(height: 12),
-                    Wrap(spacing: 8, runSpacing: 8, children: [
-                      for (final family in kCurrencyFontChoices)
-                        ChoiceChip(
-                          label: Text(family == kCurrencyFontFollowApp ? 'Theo font ứng dụng' : family == 'monospace' ? 'Monospace' : family),
-                          selected: currencyFont == family,
-                          onSelected: (_) {
-                            HapticFeedback.selectionClick();
-                            ref.read(currencyFontProvider.notifier).setFont(family);
-                          },
-                        ),
-                    ]),
-                  ]),
-                ),
+                Text('Chọn kiểu chữ riêng cho số tiền. Các tiêu đề và nhãn chức năng vẫn dùng font ứng dụng.',
+                  style: TextStyle(fontSize: 12, height: 1.4, color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted)),
+                const SizedBox(height: 12),
+                const CurrencyFontGallery(),
                 const SizedBox(height: 24),
 
                 // ===============================================================
@@ -1231,7 +1226,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
           ),
         ),
-      ),
+      )),
     );
   }
 

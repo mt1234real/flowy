@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import '../../services/fiscal_day.dart';
 import 'dart:io';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -373,6 +374,12 @@ class _NotificationSettingsSheetState
                   const SizedBox(height: 14),
                   _card('GHI CHÉP HẰNG NGÀY', [
                     _rhythm('evening', 'Điểm lại cuối ngày', 1290),
+                    if (_draft.flag('evening') && ref.watch(dayCutoffProvider).eveningWarning(_draft.number('eveningMinute', 1290)) != null)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        child: Text(ref.watch(dayCutoffProvider).eveningWarning(_draft.number('eveningMinute', 1290))!,
+                            style: Theme.of(context).textTheme.bodySmall),
+                      ),
                     _PreservedReveal(
                         visible: _draft.flag('evening'),
                         child: _toggle(

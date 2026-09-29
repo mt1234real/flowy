@@ -23,7 +23,6 @@ import 'flowy_selection_picker.dart';
 //    - Fully compliant switch-case mapping covering all BackupCadenceMode enum values
 // ==============================================================================
 
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -54,7 +53,7 @@ class CloudCadenceModal extends ConsumerStatefulWidget {
     HapticFeedback.selectionClick();
     return AppAnimationPolicy.showFluidSheet<void>(
       context: context,
-      mode: FluidSheetMode.nestedScrollable,
+      mode: FluidSheetMode.scrollable,
       backgroundColor: Colors.transparent,
       builder: (_, scroll) => CloudCadenceModal(scrollController: scroll),
     );
@@ -168,7 +167,7 @@ class _CloudCadenceModalState extends ConsumerState<CloudCadenceModal> {
         if (now.isAfter(target)) {
           target = target.add(const Duration(days: 1));
         }
-        return '02:00 sáng ngày mai (${DateFormat('dd/MM').format(target)})';
+        return '02:00 (${DateFormat('dd/MM').format(target)})';
       case BackupCadenceMode.weekly:
         int daysUntilSunday = DateTime.sunday - now.weekday;
         if (daysUntilSunday < 0 || (daysUntilSunday == 0 && now.hour >= 23)) {
@@ -225,787 +224,838 @@ class _CloudCadenceModalState extends ConsumerState<CloudCadenceModal> {
     final latestBackup =
         backupState.backups.isNotEmpty ? backupState.backups.first : null;
 
+    final media = MediaQuery.of(context);
+    final topInset =
+        View.of(context).padding.top / View.of(context).devicePixelRatio;
     return AppFeedbackDismissRegion(
-      child: ClipRRect(
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-          child: Container(
-            padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
-            decoration: BoxDecoration(
-              color: isDark
-                  ? const Color(0xFF151C28).withValues(alpha: 0.98)
-                  : Colors.white.withValues(alpha: 0.98),
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(28)),
-              border: Border.all(
-                color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder,
-              ),
-            ),
-            child: SafeArea(
-              top: false,
-              child: SingleChildScrollView(
-                controller: widget.scrollController,
-                physics: const ClampingScrollPhysics(),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Header Modal
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF0EA5E9)
-                                    .withValues(alpha: 0.16),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: const Icon(
-                                Icons.cloud_sync_rounded,
-                                color: Color(0xFF0EA5E9),
-                                size: 20,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Cài đặt sao lưu',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: 0.4,
-                                    color: isDark
-                                        ? AppTokens.darkText
-                                        : AppTokens.lightText,
-                                  ),
-                                ),
-                                Text(
-                                  'Bản sao riêng tư trên Google Drive',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: isDark
-                                        ? AppTokens.darkMuted
-                                        : AppTokens.lightMuted,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                        IconButton(
-                          visualDensity: VisualDensity.compact,
-                          icon: const Icon(Icons.close_rounded, size: 20),
-                          onPressed: () => Navigator.of(context).pop(),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-
-                    // =========================================================
-                    // KHỐI TÀI KHOẢN GOOGLE
-                    // =========================================================
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: isDark
-                            ? AppTokens.darkCard
-                            : AppTokens.lightCardSubtle,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: isDark
-                              ? AppTokens.darkBorder
-                              : AppTokens.lightBorder,
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 36,
-                            height: 36,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: isDark ? Colors.white10 : Colors.white,
-                              border: Border.all(
-                                color: isDark
-                                    ? AppTokens.darkBorder
-                                    : AppTokens.lightBorder,
-                              ),
-                            ),
-                            child: const Center(
-                              child: Text(
-                                'G',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w900,
-                                  color: Color(0xFF4285F4),
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
+      child: Padding(
+        padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
+        child: SizedBox(
+          height: (media.size.height - topInset - 12 - media.viewInsets.bottom)
+              .clamp(0.0, media.size.height),
+          child: Material(
+            color: Theme.of(context).colorScheme.surface.withValues(alpha: .98),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+            clipBehavior: Clip.antiAlias,
+            child: Column(children: [
+              Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 12, 8),
+                  child: ConstrainedBox(
+                      constraints: const BoxConstraints(minHeight: 54),
+                      child: Row(children: [
+                        Expanded(
                             child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  userProfile.isSignedIn
-                                      ? userProfile.displayName
-                                      : 'Chưa liên kết',
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                              const Text('Cài đặt sao lưu',
                                   style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w800,
-                                    color: isDark
-                                        ? AppTokens.darkText
-                                        : AppTokens.lightText,
-                                  ),
-                                ),
-                                Text(
-                                  userProfile.email ??
-                                      'Nhấn để kết nối Google Drive',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w800)),
+                              const SizedBox(height: 4),
+                              Text('Đồng bộ dữ liệu an toàn cùng Google Drive',
                                   style: TextStyle(
-                                    fontSize: 11,
-                                    color: isDark
-                                        ? AppTokens.darkMuted
-                                        : AppTokens.lightMuted,
-                                  ),
+                                      fontSize: 11.5,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurfaceVariant)),
+                            ])),
+                        IconButton(
+                            tooltip: 'Đóng',
+                            onPressed: () => Navigator.pop(context),
+                            style: IconButton.styleFrom(
+                                backgroundColor:
+                                    accent.primary.withValues(alpha: .08)),
+                            icon: const Icon(Icons.close_rounded, size: 18)),
+                      ]))),
+              Expanded(
+                  child: SingleChildScrollView(
+                      controller: widget.scrollController,
+                      physics: const ClampingScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // =========================================================
+                            // KHỐI TÀI KHOẢN GOOGLE
+                            // =========================================================
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: isDark
+                                    ? AppTokens.darkCard
+                                    : AppTokens.lightCardSubtle,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: isDark
+                                      ? AppTokens.darkBorder
+                                      : AppTokens.lightBorder,
                                 ),
-                              ],
-                            ),
-                          ),
-                          if (userProfile.isSignedIn)
-                            TextButton(
-                              style: TextButton.styleFrom(
-                                foregroundColor: AppTokens.expense,
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 4),
-                                visualDensity: VisualDensity.compact,
                               ),
-                              onPressed: () async {
-                                final confirm = await showDialog<bool>(
-                                  context: context,
-                                  builder: (ctx) => AlertDialog(
-                                    title: const Text('Đăng xuất Google?'),
-                                    content: const Text(
-                                      'Dữ liệu sổ cái trên máy của bạn sẽ được bảo toàn nguyên vẹn.',
-                                    ),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () =>
-                                            Navigator.of(ctx).pop(false),
-                                        child: const Text('HỦY'),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 36,
+                                    height: 36,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: isDark
+                                          ? Colors.white10
+                                          : Colors.white,
+                                      border: Border.all(
+                                        color: isDark
+                                            ? AppTokens.darkBorder
+                                            : AppTokens.lightBorder,
                                       ),
-                                      ElevatedButton(
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: AppTokens.expense,
-                                          foregroundColor: Colors.white,
+                                    ),
+                                    child: const Center(
+                                      child: Text(
+                                        'G',
+                                        style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.w900,
+                                          color: Color(0xFF4285F4),
                                         ),
-                                        onPressed: () =>
-                                            Navigator.of(ctx).pop(true),
-                                        child: const Text('ĐĂNG XUẤT'),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          userProfile.isSignedIn
+                                              ? userProfile.displayName
+                                              : 'Chưa liên kết',
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w800,
+                                            color: isDark
+                                                ? AppTokens.darkText
+                                                : AppTokens.lightText,
+                                          ),
+                                        ),
+                                        Text(
+                                          userProfile.email ??
+                                              'Nhấn để kết nối Google Drive',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: isDark
+                                                ? AppTokens.darkMuted
+                                                : AppTokens.lightMuted,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  if (userProfile.isSignedIn)
+                                    TextButton(
+                                      style: TextButton.styleFrom(
+                                        foregroundColor: AppTokens.expense,
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 8, vertical: 4),
+                                        visualDensity: VisualDensity.compact,
+                                      ),
+                                      onPressed: () async {
+                                        final confirm = await AppAnimationPolicy
+                                            .showPreservedDialog<bool>(
+                                          context: context,
+                                          builder: (ctx) => AlertDialog(
+                                            title:
+                                                const Text('Đăng xuất Google?'),
+                                            content: const Text(
+                                              'Dữ liệu sổ cái trên máy của bạn sẽ được bảo toàn nguyên vẹn.',
+                                            ),
+                                            actions: [
+                                              TextButton(
+                                                onPressed: () =>
+                                                    Navigator.of(ctx)
+                                                        .pop(false),
+                                                child: const Text('HỦY'),
+                                              ),
+                                              ElevatedButton(
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor:
+                                                      AppTokens.expense,
+                                                  foregroundColor: Colors.white,
+                                                ),
+                                                onPressed: () =>
+                                                    Navigator.of(ctx).pop(true),
+                                                child: const Text('ĐĂNG XUẤT'),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+
+                                        if (confirm == true && mounted) {
+                                          await ref
+                                              .read(userProfileNotifierProvider
+                                                  .notifier)
+                                              .signOut();
+                                        }
+                                      },
+                                      child: const Text('Đăng xuất',
+                                          style: TextStyle(
+                                              fontWeight: FontWeight.bold)),
+                                    )
+                                  else
+                                    ElevatedButton(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: accent.primary,
+                                        foregroundColor: Colors.white,
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 10, vertical: 6),
+                                        shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(10)),
+                                      ),
+                                      onPressed: () async {
+                                        await ref
+                                            .read(userProfileNotifierProvider
+                                                .notifier)
+                                            .signInWithGoogle();
+                                        if (!mounted) return;
+                                        ref
+                                            .read(cloudBackupNotifierProvider
+                                                .notifier)
+                                            .loadBackups();
+                                      },
+                                      child: const Text('Đăng nhập',
+                                          style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold)),
+                                    ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+
+                            // =========================================================
+                            // KHỐI TẦN SUẤT SAO LƯU TỰ ĐỘNG
+                            // =========================================================
+                            Container(
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color:
+                                    isDark ? AppTokens.darkCard : Colors.white,
+                                borderRadius: BorderRadius.circular(18),
+                                border: Border.all(
+                                  color: isDark
+                                      ? AppTokens.darkBorder
+                                      : AppTokens.lightBorder,
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(Icons.timer_outlined,
+                                          size: 18, color: accent.primary),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          _getCadenceDescription(),
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w800,
+                                            color: isDark
+                                                ? AppTokens.darkText
+                                                : AppTokens.lightText,
+                                          ),
+                                        ),
+                                      ),
+                                      InkWell(
+                                        onTap: () {
+                                          HapticFeedback.selectionClick();
+                                          setState(() => _isCadenceExpanded =
+                                              !_isCadenceExpanded);
+                                        },
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 8, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: accent.primary
+                                                .withValues(alpha: 0.12),
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                          ),
+                                          child: Text(
+                                            _isCadenceExpanded
+                                                ? 'Thu gọn'
+                                                : 'Đổi ▾',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w800,
+                                              color: accent.primary,
+                                            ),
+                                          ),
+                                        ),
                                       ),
                                     ],
                                   ),
-                                );
+                                  const SizedBox(height: 10),
+                                  const Divider(height: 1),
+                                  const SizedBox(height: 8),
 
-                                if (confirm == true && mounted) {
-                                  await ref
-                                      .read(
-                                          userProfileNotifierProvider.notifier)
-                                      .signOut();
-                                }
-                              },
-                              child: const Text('Đăng xuất',
-                                  style:
-                                      TextStyle(fontWeight: FontWeight.bold)),
-                            )
-                          else
-                            ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: accent.primary,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 10, vertical: 6),
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10)),
-                              ),
-                              onPressed: () async {
-                                await ref
-                                    .read(userProfileNotifierProvider.notifier)
-                                    .signInWithGoogle();
-                                ref
-                                    .read(cloudBackupNotifierProvider.notifier)
-                                    .loadBackups();
-                              },
-                              child: const Text('Đăng nhập',
-                                  style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.bold)),
-                            ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 14),
+                                  // Dòng phụ: Dự kiến kế tiếp & Bản gần nhất
+                                  Row(
+                                    children: [
+                                      Text('• Lần sao lưu kế tiếp: ',
+                                          style: TextStyle(
+                                              fontSize: 11,
+                                              color: isDark
+                                                  ? AppTokens.darkMuted
+                                                  : AppTokens.lightMuted)),
+                                      Expanded(
+                                        child: Text(
+                                          _getNextEstimatedBackupTime(),
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w700,
+                                            color: isDark
+                                                ? AppTokens.darkText
+                                                : AppTokens.lightText,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      Text('• Bản sao lưu gần nhất: ',
+                                          style: TextStyle(
+                                              fontSize: 11,
+                                              color: isDark
+                                                  ? AppTokens.darkMuted
+                                                  : AppTokens.lightMuted)),
+                                      Expanded(
+                                        child: Text(
+                                          latestBackup != null
+                                              ? '${latestBackup.formattedDate} (${latestBackup.formattedSize})'
+                                              : 'Chưa có bản sao lưu nào',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w700,
+                                            color: latestBackup != null
+                                                ? accent.primary
+                                                : (isDark
+                                                    ? AppTokens.darkMuted
+                                                    : AppTokens.lightMuted),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
 
-                    // =========================================================
-                    // KHỐI TẦN SUẤT SAO LƯU TỰ ĐỘNG
-                    // =========================================================
-                    Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: isDark ? AppTokens.darkCard : Colors.white,
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(
-                          color: isDark
-                              ? AppTokens.darkBorder
-                              : AppTokens.lightBorder,
-                        ),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(Icons.timer_outlined,
-                                  size: 18, color: Color(0xFF10B981)),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  _getCadenceDescription(),
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w800,
-                                    color: isDark
-                                        ? AppTokens.darkText
-                                        : AppTokens.lightText,
-                                  ),
-                                ),
-                              ),
-                              InkWell(
-                                onTap: () {
-                                  HapticFeedback.selectionClick();
-                                  setState(() =>
-                                      _isCadenceExpanded = !_isCadenceExpanded);
-                                },
-                                borderRadius: BorderRadius.circular(8),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color:
-                                        accent.primary.withValues(alpha: 0.12),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(
-                                    _isCadenceExpanded ? 'Thu gọn' : 'Đổi ▾',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w800,
-                                      color: accent.primary,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 10),
-                          const Divider(height: 1),
-                          const SizedBox(height: 8),
-
-                          // Dòng phụ: Dự kiến kế tiếp & Bản gần nhất
-                          Row(
-                            children: [
-                              Text('• Lần sao lưu kế tiếp: ',
-                                  style: TextStyle(
-                                      fontSize: 11,
-                                      color: isDark
-                                          ? AppTokens.darkMuted
-                                          : AppTokens.lightMuted)),
-                              Expanded(
-                                child: Text(
-                                  _getNextEstimatedBackupTime(),
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700,
-                                    color: isDark
-                                        ? AppTokens.darkText
-                                        : AppTokens.lightText,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Row(
-                            children: [
-                              Text('• Bản sao lưu gần nhất: ',
-                                  style: TextStyle(
-                                      fontSize: 11,
-                                      color: isDark
-                                          ? AppTokens.darkMuted
-                                          : AppTokens.lightMuted)),
-                              Expanded(
-                                child: Text(
-                                  latestBackup != null
-                                      ? '${latestBackup.formattedDate} (${latestBackup.formattedSize})'
-                                      : 'Chưa có bản sao lưu nào',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700,
-                                    color: latestBackup != null
-                                        ? const Color(0xFF10B981)
-                                        : (isDark
+                                  // KHỐI MỞ RỘNG ĐỔI TẦN SUẤT
+                                  if (_isCadenceExpanded) ...[
+                                    const SizedBox(height: 14),
+                                    Text(
+                                      'Chọn nhịp độ tự động:',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: isDark
                                             ? AppTokens.darkMuted
-                                            : AppTokens.lightMuted),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
+                                            : AppTokens.lightMuted,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    _buildPresetOption(
+                                      BackupCadenceMode.afterEachEntry,
+                                      'Sau mỗi lần ghi',
+                                      'Tự động sao lưu sau 3 phút kể từ lần ghi chép gần nhất',
+                                      isDark,
+                                      accent,
+                                    ),
+                                    const SizedBox(height: 6),
+                                    _buildPresetOption(
+                                      BackupCadenceMode.daily,
+                                      'Mỗi ngày lúc 02:00',
+                                      'Sao lưu ban đêm khi bạn đang ngủ (Khuyên dùng)',
+                                      isDark,
+                                      accent,
+                                    ),
+                                    const SizedBox(height: 6),
+                                    _buildPresetOption(
+                                      BackupCadenceMode.weekly,
+                                      'Mỗi Chủ nhật lúc 23:00',
+                                      'Chốt sổ tuần vào lúc 23:00 tối Chủ Nhật',
+                                      isDark,
+                                      accent,
+                                    ),
+                                    const SizedBox(height: 6),
+                                    _buildPresetOption(
+                                      BackupCadenceMode.manualOnly,
+                                      'Tắt tự động',
+                                      'Chỉ sao lưu khi bạn chủ động nhấn nút bên dưới',
+                                      isDark,
+                                      accent,
+                                    ),
+                                    const SizedBox(height: 10),
 
-                          // KHỐI MỞ RỘNG ĐỔI TẦN SUẤT
-                          if (_isCadenceExpanded) ...[
+                                    // Custom Cadence Picker
+                                    Container(
+                                      padding: const EdgeInsets.all(10),
+                                      decoration: BoxDecoration(
+                                        color: isDark
+                                            ? AppTokens.darkCardSubtle
+                                            : AppTokens.lightCardSubtle,
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'Tần suất tùy chỉnh',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w700,
+                                              color: isDark
+                                                  ? AppTokens.darkText
+                                                  : AppTokens.lightText,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 6),
+                                          LayoutBuilder(
+                                              builder: (context, constraints) {
+                                            final tall =
+                                                MediaQuery.textScalerOf(context)
+                                                        .scale(14) >
+                                                    18;
+                                            final input = SizedBox(
+                                                width: 54,
+                                                height: tall ? 54 : 42,
+                                                child: TextField(
+                                                    controller:
+                                                        _customValueController,
+                                                    keyboardType:
+                                                        TextInputType.number,
+                                                    inputFormatters: [
+                                                      FilteringTextInputFormatter
+                                                          .digitsOnly
+                                                    ],
+                                                    textAlign: TextAlign.center,
+                                                    textAlignVertical:
+                                                        TextAlignVertical
+                                                            .center,
+                                                    style: const TextStyle(
+                                                        fontSize: 14,
+                                                        fontWeight:
+                                                            FontWeight.w800),
+                                                    decoration: InputDecoration(
+                                                        isDense: true,
+                                                        contentPadding:
+                                                            const EdgeInsets
+                                                                .symmetric(
+                                                                vertical: 10),
+                                                        border: OutlineInputBorder(
+                                                            borderRadius:
+                                                                BorderRadius
+                                                                    .circular(
+                                                                        10)))));
+                                            final unit = FlowyDropdown<String>(
+                                                minHeight: 42,
+                                                borderRadius:
+                                                    BorderRadius.circular(10),
+                                                title: 'Chu kỳ sao lưu',
+                                                value: _customUnit,
+                                                style: const TextStyle(
+                                                    fontSize: 12,
+                                                    fontWeight:
+                                                        FontWeight.w700),
+                                                items: const [
+                                                  DropdownMenuItem(
+                                                      value: 'hours',
+                                                      child:
+                                                          Text('Giờ (4–24)')),
+                                                  DropdownMenuItem(
+                                                      value: 'days',
+                                                      child:
+                                                          Text('Ngày (1–7)')),
+                                                  DropdownMenuItem(
+                                                      value: 'weeks',
+                                                      child:
+                                                          Text('Tuần (1–2)')),
+                                                ],
+                                                onChanged: (value) {
+                                                  if (value != null) {
+                                                    setState(() =>
+                                                        _customUnit = value);
+                                                  }
+                                                });
+                                            final apply = SizedBox(
+                                                height: tall ? 54 : 42,
+                                                child: FilledButton(
+                                                    style: FilledButton.styleFrom(
+                                                        backgroundColor:
+                                                            accent.primary,
+                                                        foregroundColor:
+                                                            Colors.white,
+                                                        padding:
+                                                            const EdgeInsets.symmetric(
+                                                                horizontal: 12),
+                                                        shape: RoundedRectangleBorder(
+                                                            borderRadius:
+                                                                BorderRadius.circular(
+                                                                    10))),
+                                                    onPressed:
+                                                        _validateAndApplyCustomCadence,
+                                                    child: const Text('Áp dụng',
+                                                        style: TextStyle(
+                                                            fontSize: 11,
+                                                            fontWeight:
+                                                                FontWeight
+                                                                    .w700))));
+                                            if (constraints.maxWidth < 310 ||
+                                                tall) {
+                                              return Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment
+                                                          .stretch,
+                                                  children: [
+                                                    Row(children: [
+                                                      input,
+                                                      const SizedBox(width: 8),
+                                                      Expanded(child: unit)
+                                                    ]),
+                                                    const SizedBox(height: 8),
+                                                    apply
+                                                  ]);
+                                            }
+                                            return Row(children: [
+                                              input,
+                                              const SizedBox(width: 8),
+                                              Expanded(child: unit),
+                                              const SizedBox(width: 8),
+                                              apply
+                                            ]);
+                                          }),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            'Tối thiểu 4 giờ giữa hai lần sao lưu tự động.',
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              color: isDark
+                                                  ? AppTokens.darkMuted
+                                                  : AppTokens.lightMuted,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
                             const SizedBox(height: 14),
+
+                            // =========================================================
+                            // KHỐI ĐIỀU KIỆN AN TOÀN
+                            // =========================================================
                             Text(
-                              'Chọn nhịp độ tự động:',
+                              'Điều kiện an toàn hệ thống:',
                               style: TextStyle(
-                                fontSize: 11,
+                                fontSize: 12,
                                 fontWeight: FontWeight.w700,
                                 color: isDark
                                     ? AppTokens.darkMuted
                                     : AppTokens.lightMuted,
                               ),
                             ),
-                            const SizedBox(height: 8),
-                            _buildPresetOption(
-                              BackupCadenceMode.afterEachEntry,
-                              '⚡ Sau mỗi lần ghi',
-                              'Tự động sao lưu sau 3 phút kể từ lần ghi chép gần nhất',
-                              isDark,
-                              accent,
-                            ),
                             const SizedBox(height: 6),
-                            _buildPresetOption(
-                              BackupCadenceMode.daily,
-                              '🌙 Mỗi ngày (02:00 sáng)',
-                              'Sao lưu ban đêm khi bạn đang ngủ (Khuyên dùng)',
-                              isDark,
-                              accent,
-                            ),
-                            const SizedBox(height: 6),
-                            _buildPresetOption(
-                              BackupCadenceMode.weekly,
-                              '📅 Mỗi tuần (Tối Chủ Nhật)',
-                              'Chốt sổ tuần vào lúc 23:00 tối Chủ Nhật',
-                              isDark,
-                              accent,
-                            ),
-                            const SizedBox(height: 6),
-                            _buildPresetOption(
-                              BackupCadenceMode.manualOnly,
-                              '✋ Tắt tự động',
-                              'Chỉ sao lưu khi bạn chủ động nhấn nút bên dưới',
-                              isDark,
-                              accent,
-                            ),
-                            const SizedBox(height: 10),
-
-                            // Custom Cadence Picker
                             Container(
-                              padding: const EdgeInsets.all(10),
                               decoration: BoxDecoration(
-                                color: isDark
-                                    ? AppTokens.darkCardSubtle
-                                    : AppTokens.lightCardSubtle,
-                                borderRadius: BorderRadius.circular(12),
+                                color:
+                                    isDark ? AppTokens.darkCard : Colors.white,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: isDark
+                                      ? AppTokens.darkBorder
+                                      : AppTokens.lightBorder,
+                                ),
                               ),
                               child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
-                                    '⏱️ Nhịp độ tùy chỉnh:',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w700,
-                                      color: isDark
-                                          ? AppTokens.darkText
-                                          : AppTokens.lightText,
+                                  SwitchListTile(
+                                    contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 14, vertical: 6),
+                                    dense: true,
+                                    title: Text(
+                                      'Chỉ tự động qua mạng không tính phí',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                        color: isDark
+                                            ? AppTokens.darkText
+                                            : AppTokens.lightText,
+                                      ),
                                     ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Row(
-                                    children: [
-                                      SizedBox(
-                                        width: 65,
-                                        height: 38,
-                                        child: TextField(
-                                          controller: _customValueController,
-                                          keyboardType: TextInputType.number,
-                                          textAlign: TextAlign.center,
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w800,
-                                            color: isDark
-                                                ? AppTokens.darkText
-                                                : AppTokens.lightText,
-                                          ),
-                                          decoration: InputDecoration(
-                                            contentPadding: EdgeInsets.zero,
-                                            border: OutlineInputBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(8)),
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: Padding(
-                                          padding: EdgeInsets.zero,
-                                          child: FlowyDropdown<String>(
-                                            title: 'Chu kỳ sao lưu',
-                                            value: _customUnit,
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w700,
-                                              color: isDark
-                                                  ? AppTokens.darkText
-                                                  : AppTokens.lightText,
-                                            ),
-                                            dropdownColor: isDark
-                                                ? AppTokens.darkCard
-                                                : Colors.white,
-                                            items: const [
-                                              DropdownMenuItem(
-                                                  value: 'hours',
-                                                  child:
-                                                      Text('Giờ (4h - 24h)')),
-                                              DropdownMenuItem(
-                                                  value: 'days',
-                                                  child:
-                                                      Text('Ngày (1d - 7d)')),
-                                              DropdownMenuItem(
-                                                  value: 'weeks',
-                                                  child:
-                                                      Text('Tuần (1w - 2w)')),
-                                            ],
-                                            onChanged: (val) {
-                                              if (val != null) {
-                                                setState(
-                                                    () => _customUnit = val);
-                                              }
-                                            },
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      ElevatedButton(
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: accent.primary,
-                                          foregroundColor: Colors.white,
-                                          visualDensity: VisualDensity.compact,
-                                          shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(8)),
-                                        ),
-                                        onPressed:
-                                            _validateAndApplyCustomCadence,
-                                        child: const Text('Áp dụng',
-                                            style: TextStyle(
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.bold)),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    '💡 Giới hạn tối thiểu 4 giờ để tối ưu tuổi thọ pin thiết bị.',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color: isDark
-                                          ? AppTokens.darkMuted
-                                          : AppTokens.lightMuted,
+                                    subtitle: Text(
+                                      'Tiết kiệm dữ liệu di động',
+                                      style: TextStyle(
+                                          fontSize: 10,
+                                          color: isDark
+                                              ? AppTokens.darkMuted
+                                              : AppTokens.lightMuted),
                                     ),
+                                    value: _wifiOnly,
+                                    activeThumbColor: accent.primary,
+                                    activeTrackColor:
+                                        accent.primary.withValues(alpha: .28),
+                                    onChanged: (val) {
+                                      HapticFeedback.selectionClick();
+                                      setState(() => _wifiOnly = val);
+                                      _persistPreferences();
+                                    },
+                                  ),
+                                  const Divider(height: 1),
+                                  SwitchListTile(
+                                    contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 14, vertical: 6),
+                                    dense: true,
+                                    title: Text(
+                                      'Hoãn tự động khi thiết bị báo pin yếu',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                        color: isDark
+                                            ? AppTokens.darkText
+                                            : AppTokens.lightText,
+                                      ),
+                                    ),
+                                    subtitle: Text(
+                                      'Tạm hoãn sao lưu tự động khi pin yếu',
+                                      style: TextStyle(
+                                          fontSize: 10,
+                                          color: isDark
+                                              ? AppTokens.darkMuted
+                                              : AppTokens.lightMuted),
+                                    ),
+                                    value: _batterySafe,
+                                    activeThumbColor: accent.primary,
+                                    activeTrackColor:
+                                        accent.primary.withValues(alpha: .28),
+                                    onChanged: (val) {
+                                      HapticFeedback.selectionClick();
+                                      setState(() => _batterySafe = val);
+                                      _persistPreferences();
+                                    },
                                   ),
                                 ],
                               ),
                             ),
-                          ],
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 14),
+                            const SizedBox(height: 20),
 
-                    // =========================================================
-                    // KHỐI ĐIỀU KIỆN AN TOÀN
-                    // =========================================================
-                    Text(
-                      'Điều kiện an toàn hệ thống:',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color:
-                            isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Container(
-                      decoration: BoxDecoration(
-                        color: isDark ? AppTokens.darkCard : Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: isDark
-                              ? AppTokens.darkBorder
-                              : AppTokens.lightBorder,
-                        ),
-                      ),
-                      child: Column(
-                        children: [
-                          SwitchListTile(
-                            contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 0),
-                            dense: true,
-                            title: Text(
-                              'Chỉ tự động qua mạng không tính phí',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: isDark
-                                    ? AppTokens.darkText
-                                    : AppTokens.lightText,
-                              ),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                  color: accent.primary.withValues(alpha: .06),
+                                  border: Border.all(
+                                      color:
+                                          accent.primary.withValues(alpha: .18),
+                                      width: .8),
+                                  borderRadius: BorderRadius.circular(18)),
+                              child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text('GÓI LƯU TRỮ TOÀN VẸN',
+                                        style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w800)),
+                                    const SizedBox(height: 8),
+                                    for (final label in const [
+                                      'Giao dịch, ví, công nợ, hũ tiết kiệm và thùng rác',
+                                      'Màu giao diện, phông chữ và phông tiền tệ',
+                                      'Chu kỳ, lịch nhắc và mã PIN két đã băm',
+                                    ])
+                                      Padding(
+                                          padding:
+                                              const EdgeInsets.only(bottom: 8),
+                                          child: Row(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Icon(Icons.check_rounded,
+                                                    size: 16,
+                                                    color: accent.primary),
+                                                const SizedBox(width: 8),
+                                                Expanded(
+                                                    child: Text(label,
+                                                        style: const TextStyle(
+                                                            fontSize: 12,
+                                                            height: 1.4))),
+                                              ])),
+                                    const SizedBox(height: 6),
+                                    const Text(
+                                        'Không sao lưu trạng thái hiện số dư hoặc phiên đăng nhập Google.'),
+                                    const SizedBox(height: 6),
+                                    const Text(
+                                        'Lịch tự động trên Android có thể trễ theo chế độ tiết kiệm pin. Sao lưu ngay không chịu các điều kiện tự động.'),
+                                  ]),
                             ),
-                            subtitle: Text(
-                              'Tiết kiệm dữ liệu di động',
-                              style: TextStyle(
-                                  fontSize: 10,
-                                  color: isDark
-                                      ? AppTokens.darkMuted
-                                      : AppTokens.lightMuted),
-                            ),
-                            value: _wifiOnly,
-                            activeThumbColor: accent.primary,
-                            onChanged: (val) {
-                              HapticFeedback.selectionClick();
-                              setState(() => _wifiOnly = val);
-                              _persistPreferences();
-                            },
-                          ),
-                          const Divider(height: 1),
-                          SwitchListTile(
-                            contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 0),
-                            dense: true,
-                            title: Text(
-                              'Hoãn tự động khi thiết bị báo pin yếu',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: isDark
-                                    ? AppTokens.darkText
-                                    : AppTokens.lightText,
-                              ),
-                            ),
-                            subtitle: Text(
-                              'Tạm hoãn sao lưu tự động khi pin yếu',
-                              style: TextStyle(
-                                  fontSize: 10,
-                                  color: isDark
-                                      ? AppTokens.darkMuted
-                                      : AppTokens.lightMuted),
-                            ),
-                            value: _batterySafe,
-                            activeThumbColor: accent.primary,
-                            onChanged: (val) {
-                              HapticFeedback.selectionClick();
-                              setState(() => _batterySafe = val);
-                              _persistPreferences();
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                          color: accent.primary.withValues(alpha: .06),
-                          borderRadius: BorderRadius.circular(16)),
-                      child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('Dữ liệu được sao lưu',
-                                style: TextStyle(fontWeight: FontWeight.w700)),
-                            const SizedBox(height: 8),
-                            const Text(
-                                'Giao dịch, ví, sổ nợ, hũ tiết kiệm và thùng rác'),
-                            Text(
-                                'Giao diện ${accent.label} • Phông tiền ${ref.watch(currencyFontProvider)}'),
-                            const Text(
-                                'Chu kỳ, lịch nhắc và mã PIN két đã băm'),
-                            const SizedBox(height: 6),
-                            const Text(
-                                'Không sao lưu trạng thái hiện số dư hoặc phiên đăng nhập Google.'),
-                            const SizedBox(height: 6),
-                            const Text(
-                                'Lịch tự động trên Android có thể trễ theo chế độ tiết kiệm pin. Sao lưu ngay không chịu các điều kiện tự động.'),
-                          ]),
-                    ),
-                    const SizedBox(height: 16),
-                    TextButton(
-                        onPressed: () =>
-                            RestoreDiffModal.showLocalRecovery(context),
-                        child: const Text(
-                            'Bản dự phòng trước khôi phục trên máy')),
-                    // =========================================================
-                    // THANH TIẾN ĐỘ SAO LƯU NẾU ĐANG CHẠY
-                    // =========================================================
-                    if (backupState.status == CloudBackupStatus.checkpointing ||
-                        backupState.status == CloudBackupStatus.encrypting ||
-                        backupState.status == CloudBackupStatus.uploading) ...[
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: accent.primary.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(
-                              color: accent.primary.withValues(alpha: 0.3)),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                SizedBox(
-                                  width: 14,
-                                  height: 14,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                        accent.primary),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    backupState.message ??
-                                        'Đang thực hiện sao lưu...',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.bold,
-                                      color: accent.primary,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            LinearProgressIndicator(
-                              value: backupState.progress,
-                              minHeight: 4,
-                              backgroundColor:
-                                  isDark ? Colors.white12 : Colors.black12,
-                              valueColor:
-                                  AlwaysStoppedAnimation<Color>(accent.primary),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                    ],
-
-                    // =========================================================
-                    // NÚT HÀNH ĐỘNG Ở CHÂN MODAL
-                    // =========================================================
-                    SizedBox(
-                      width: double.infinity,
-                      height: 48,
-                      child: ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: accent.primary,
-                          foregroundColor: Colors.white,
-                          elevation: 1,
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16)),
-                        ),
-                        onPressed: (!userProfile.isSignedIn ||
-                                backupState.status ==
+                            const SizedBox(height: 16),
+                            TextButton(
+                                onPressed: () =>
+                                    RestoreDiffModal.showLocalRecovery(context),
+                                child: const Text(
+                                    'Bản dự phòng trước khôi phục trên máy')),
+                            // =========================================================
+                            // THANH TIẾN ĐỘ SAO LƯU NẾU ĐANG CHẠY
+                            // =========================================================
+                            if (backupState.status ==
                                     CloudBackupStatus.checkpointing ||
                                 backupState.status ==
                                     CloudBackupStatus.encrypting ||
                                 backupState.status ==
-                                    CloudBackupStatus.uploading)
-                            ? null
-                            : () async {
-                                HapticFeedback.mediumImpact();
-                                try {
-                                  await ref
-                                      .read(
-                                          cloudBackupNotifierProvider.notifier)
-                                      .performBackup();
-                                  if (context.mounted) {
-                                    AppFeedback.showSuccess(
-                                      context,
-                                      'Đã sao lưu lên Google Drive.',
-                                    );
-                                  }
-                                } catch (e) {
-                                  if (context.mounted) {
-                                    AppFeedback.showError(
-                                      context,
-                                      'Lỗi sao lưu Google Drive: $e',
-                                    );
-                                  }
-                                }
-                              },
-                        icon: const Icon(Icons.cloud_upload_rounded, size: 18),
-                        label: const Text(
-                          'Sao lưu ngay',
-                          style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0.3),
+                                    CloudBackupStatus.uploading) ...[
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: accent.primary.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                      color: accent.primary
+                                          .withValues(alpha: 0.3)),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        SizedBox(
+                                          width: 14,
+                                          height: 14,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            valueColor:
+                                                AlwaysStoppedAnimation<Color>(
+                                                    accent.primary),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            backupState.message ??
+                                                'Đang thực hiện sao lưu...',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                              color: accent.primary,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 8),
+                                    LinearProgressIndicator(
+                                      value: backupState.progress,
+                                      minHeight: 4,
+                                      backgroundColor: isDark
+                                          ? Colors.white12
+                                          : Colors.black12,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                          accent.primary),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                            ],
+                          ]))),
+              SafeArea(
+                  top: false,
+                  child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 10, 20, 16),
+                      child: Column(mainAxisSize: MainAxisSize.min, children: [
+                        SizedBox(
+                          width: double.infinity,
+                          height: 50,
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: accent.primary,
+                              foregroundColor: Colors.white,
+                              elevation: 1,
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16)),
+                            ),
+                            onPressed: (!userProfile.isSignedIn ||
+                                    backupState.status ==
+                                        CloudBackupStatus.checkpointing ||
+                                    backupState.status ==
+                                        CloudBackupStatus.encrypting ||
+                                    backupState.status ==
+                                        CloudBackupStatus.uploading)
+                                ? null
+                                : () async {
+                                    HapticFeedback.mediumImpact();
+                                    try {
+                                      await ref
+                                          .read(cloudBackupNotifierProvider
+                                              .notifier)
+                                          .performBackup();
+                                      if (context.mounted) {
+                                        AppFeedback.showSuccess(
+                                          context,
+                                          'Đã sao lưu lên Google Drive.',
+                                        );
+                                      }
+                                    } catch (e) {
+                                      if (context.mounted) {
+                                        AppFeedback.showError(
+                                          context,
+                                          'Lỗi sao lưu Google Drive: $e',
+                                        );
+                                      }
+                                    }
+                                  },
+                            icon: const Icon(Icons.cloud_upload_rounded,
+                                size: 18),
+                            label: const Text(
+                              'Sao lưu ngay bây giờ',
+                              style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.3),
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
+                        const SizedBox(height: 10),
 
-                    // Nút Khôi phục dữ liệu từ Cloud
-                    SizedBox(
-                      width: double.infinity,
-                      height: 44,
-                      child: OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: accent.primary,
-                          side: BorderSide(
-                              color: accent.primary.withValues(alpha: 0.5)),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16)),
+                        // Nút Khôi phục dữ liệu từ Cloud
+                        SizedBox(
+                          width: double.infinity,
+                          height: 44,
+                          child: OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: accent.primary,
+                              side: BorderSide(
+                                  color: accent.primary.withValues(alpha: 0.5)),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16)),
+                            ),
+                            onPressed: () {
+                              HapticFeedback.selectionClick();
+                              _showHistory();
+                            },
+                            icon: const Icon(Icons.history_rounded, size: 18),
+                            label: const Text(
+                              'Lịch sử và khôi phục',
+                              style: TextStyle(
+                                  fontSize: 12, fontWeight: FontWeight.w700),
+                            ),
+                          ),
                         ),
-                        onPressed: () {
-                          HapticFeedback.selectionClick();
-                          _showHistory();
-                        },
-                        icon: const Icon(Icons.history_rounded, size: 18),
-                        label: const Text(
-                          'Lịch sử và khôi phục',
-                          style: TextStyle(
-                              fontSize: 12, fontWeight: FontWeight.w700),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+                      ]))),
+            ]),
           ),
         ),
       ),

@@ -21,6 +21,8 @@ const backupPreferenceKeys = <String>{
   'flowy_classification_schemes_v1',
   'notification_cycle_snapshot',
   'flowy_cycle_start_day',
+  'flowy_day_cutoff_hour',
+  'flowy_day_cutoff_minute',
   'user_display_name',
   'user_avatar_type',
   'user_avatar_value',
@@ -87,11 +89,18 @@ void validatePreferences(Map<String, dynamic> values) {
             entry.key != 'user_avatar_image_base64') ||
         (entry.key == 'vault_biometrics_enabled'
             ? entry.value is! bool
-            : entry.key == 'flowy_cycle_start_day'
+            : entry.key == 'flowy_cycle_start_day' ||
+                entry.key == 'flowy_day_cutoff_hour' ||
+                entry.key == 'flowy_day_cutoff_minute'
                 ? entry.value is! int
                 : entry.value is! String)) {
       throw const FormatException('Thiết lập sao lưu không hợp lệ');
     }
+  }
+  final cutoffHour = values['flowy_day_cutoff_hour'] as int? ?? 0;
+  final cutoffMinute = values['flowy_day_cutoff_minute'] as int? ?? 0;
+  if (cutoffHour < 0 || cutoffHour > 6 || cutoffMinute < 0 || cutoffMinute > 59 || cutoffHour * 60 + cutoffMinute > 360) {
+    throw const FormatException('Mốc bắt đầu ngày mới không hợp lệ');
   }
   if (values['user_avatar_image_base64'] != null &&
       base64Decode(values['user_avatar_image_base64'] as String).length >

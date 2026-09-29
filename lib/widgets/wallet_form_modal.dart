@@ -1,4 +1,6 @@
 import 'flowy_selection_picker.dart';
+import 'icon_color_picker_sheet.dart';
+import '../theme/app_icons.dart';
 // ==============================================================================
 // File: lib/widgets/wallet_form_modal.dart
 // Architecture: Executive Wealth Source Creation & Update Sheet (Schema V6)
@@ -72,16 +74,6 @@ class _WalletFormModalState extends ConsumerState<WalletFormModal> {
     '#EC4899', // Pink
     '#8B5CF6', // Purple
     '#64748B', // Slate
-  ];
-
-  final List<Map<String, dynamic>> _iconOptions = [
-    {'name': 'Wallet', 'icon': Icons.account_balance_wallet_rounded},
-    {'name': 'Bank', 'icon': Icons.account_balance_rounded},
-    {'name': 'Card', 'icon': Icons.credit_card_rounded},
-    {'name': 'Cash', 'icon': Icons.payments_rounded},
-    {'name': 'Savings', 'icon': Icons.savings_rounded},
-    {'name': 'Vault', 'icon': Icons.lock_outline_rounded},
-    {'name': 'Piggy', 'icon': Icons.paid_rounded},
   ];
 
   bool get _isEditing => widget.existingWallet != null;
@@ -587,53 +579,18 @@ class _WalletFormModalState extends ConsumerState<WalletFormModal> {
                       ),
                     ),
                     const SizedBox(height: 6),
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      physics: const BouncingScrollPhysics(),
-                      child: Row(
-                        children: _iconOptions.map((opt) {
-                          final isSelected = _selectedIcon == opt['name'];
-                          return Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: InkWell(
-                              onTap: () {
-                                HapticFeedback.selectionClick();
-                                setState(() =>
-                                    _selectedIcon = opt['name'] as String);
-                              },
-                              borderRadius: BorderRadius.circular(12),
-                              child: Container(
-                                width: 38,
-                                height: 38,
-                                decoration: BoxDecoration(
-                                  color: isSelected
-                                      ? accent.primary.withValues(alpha: 0.16)
-                                      : (isDark
-                                          ? AppTokens.darkCard
-                                          : AppTokens.lightCardSubtle),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: isSelected
-                                        ? accent.primary
-                                        : (isDark
-                                            ? AppTokens.darkBorder
-                                            : AppTokens.lightBorder),
-                                  ),
-                                ),
-                                child: Icon(
-                                  opt['icon'] as IconData,
-                                  size: 18,
-                                  color: isSelected
-                                      ? accent.primary
-                                      : (isDark
-                                          ? AppTokens.darkMuted
-                                          : AppTokens.lightMuted),
-                                ),
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                      ),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(AppIcons.resolve(_selectedIcon), color: AppIcons.parseColor(_selectedColor)),
+                      title: const Text('Biểu tượng và màu sắc'),
+                      trailing: const Icon(Icons.chevron_right_rounded),
+                      onTap: () async {
+                        final result = await IconColorPickerSheet.show(context,
+                          initialIconName: _selectedIcon, initialHexColor: _selectedColor,
+                          title: 'Biểu tượng nguồn tiền', confirmLabel: 'Áp dụng cho ví');
+                        if (!mounted || result == null) return;
+                        setState(() { _selectedIcon = result.iconName; _selectedColor = result.hexColor; });
+                      },
                     ),
                     const SizedBox(height: 14),
 

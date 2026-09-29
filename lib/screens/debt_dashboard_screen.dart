@@ -1,4 +1,5 @@
 import '../widgets/currency_text.dart';
+import '../theme/app_icons.dart';
 // ==============================================================================
 // File: lib/screens/debt_dashboard_screen.dart
 // Architecture: Debt Counterparty Overview & Contact Directory (Strict Drift Schema)
@@ -79,9 +80,13 @@ class _ParsedAvatar {
       );
     }
 
+    if (raw.startsWith('icon:')) {
+      final parts = raw.substring(5).split('|');
+      return _ParsedAvatar(type: 'ICON', colorHex: parts.length > 1 ? parts[1] : '#10B981', emoji: parts.first);
+    }
     final parts = raw.split('|');
     if (parts.length >= 3) {
-      final type = parts[0] == 'EMOJI' ? 'EMOJI' : 'INITIALS';
+      final type = parts[0] == 'ICON' ? 'ICON' : parts[0] == 'EMOJI' ? 'EMOJI' : 'INITIALS';
       final colorHex = parts[1].startsWith('#') ? parts[1] : '#10B981';
       final emoji = parts.sublist(2).join('|');
       return _ParsedAvatar(type: type, colorHex: colorHex, emoji: emoji);
@@ -859,7 +864,9 @@ class _DebtDashboardScreenState extends ConsumerState<DebtDashboardScreen> {
                       ),
                     ),
                     child: Center(
-                      child: Text(
+                      child: parsedAvatar.type == 'ICON'
+                          ? Icon(AppIcons.resolve(parsedAvatar.emoji), color: swatchColor, size: 22)
+                          : Text(
                         avatarContent,
                         style: TextStyle(
                           fontSize: isEmoji ? 20 : 17,
@@ -1069,7 +1076,9 @@ class _ContactEditModalState extends ConsumerState<_ContactEditModal> {
           : 'contact_${DateTime.now().millisecondsSinceEpoch}';
 
       // Đóng gói avatarType, colorHex, avatarValue thành 1 chuỗi lưu vào avatarUrl
-      final encodedAvatar = '$_avatarType|$_colorHex|$_avatarValue';
+      final encodedAvatar = _avatarType == 'ICON'
+          ? 'icon:$_avatarValue|$_colorHex'
+          : '$_avatarType|$_colorHex|$_avatarValue';
 
       // Tuân thủ nghiêm ngặt 100% các trường thực tế của DebtContactsCompanion
       final companion = DebtContactsCompanion(
