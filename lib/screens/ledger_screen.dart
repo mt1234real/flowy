@@ -1,20 +1,16 @@
-import '../widgets/ambient_canvas.dart';
-import '../services/fiscal_day.dart';
-import 'dart:convert';
-import '../widgets/currency_text.dart';
 // ==============================================================================
 // File: lib/screens/ledger_screen.dart
-// Architecture: Universal Fluid Sheet Engine Integration, Sliding Pill Milestone Physics & Motion Hardening
+// Architecture: Universal Fluid Sheet Engine Integration, Sliding Pill Milestone Physics & Vault Isolation
 // Stack: flutter_riverpod, drift, intl, dart:async, dart:math
-// ==============================================================================
-// Financial Cycle Milestone Picker Redesign:
-// - Dynamic frosted Horizon Card + preserved 140ms metric morph.
-// - 3 Smart Presets: Mùng 1 / Ngày lương kế thừa / Ngày 15.
-// - Infinite Cupertino day wheel with per-step selectionClick haptic.
-// - Wheel gesture temporarily owns vertical drag to avoid Fluid dismiss collision.
+// Version: Flowy v1.0.0-beta
+// Features: Clean & Zen Ledger Principle (100% Vault Transactions Filtered Out),
+//           Dual-Mode Period Viewing (Calendar vs Adaptive Cycle),
+//           Multi-Dimensional Filter Matrix & Diacritics-Insensitive Search,
+//           Smooth Metric Morphing & Reversible Soft-Delete Engine
 // ==============================================================================
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:ui';
 import 'package:drift/drift.dart' as drift;
@@ -27,8 +23,11 @@ import 'package:intl/intl.dart';
 import '../core/animation/app_animation_policy.dart';
 import '../core/feedback/app_feedback.dart';
 import '../data/database.dart';
+import '../services/fiscal_day.dart';
 import '../theme/app_theme.dart';
+import '../widgets/ambient_canvas.dart';
 import '../widgets/category_icon_badge.dart';
+import '../widgets/currency_text.dart';
 import '../widgets/debt_transaction_detail_sheet.dart';
 import '../widgets/preserved_sleek_dismissible.dart';
 import '../widgets/quick_entry_sheet.dart';
@@ -286,9 +285,13 @@ final unifiedLedgerStreamProvider = StreamProvider.autoDispose<List<UnifiedLedge
 
   queryStart = boundary.start(queryStart);
   queryEnd = boundary.end(queryEnd);
+
+  // 🌟 CLEAN & ZEN LEDGER: Loại trừ 100% dòng tiền nạp/rút Két Tiết Kiệm (goalId != null hoặc envelopeType == 'savings')
   final standardTxStream = (db.select(db.transactions)
     ..where((t) =>
     t.deletedAt.isNull() &
+    t.goalId.isNull() &
+    (t.envelopeType.equals('savings').not() | t.envelopeType.isNull()) &
     t.date.isBiggerOrEqualValue(queryStart) &
     t.date.isSmallerThanValue(queryEnd)))
       .watch();
@@ -322,6 +325,8 @@ final unifiedLedgerStreamProvider = StreamProvider.autoDispose<List<UnifiedLedge
     if (tabFilter != LedgerFilter.debt) {
       for (final tx in latestStandardTxs) {
         if (tx.deletedAt != null) continue;
+        // Kiểm tra an toàn thêm một lớp nữa đối với giao dịch Két
+        if (tx.goalId != null || tx.envelopeType == 'savings') continue;
         if (tabFilter == LedgerFilter.expense && tx.type != CategoryType.expense) continue;
         if (tabFilter == LedgerFilter.income && tx.type != CategoryType.income) continue;
         if (criteria.walletId != null && tx.walletId != criteria.walletId) continue;
@@ -724,7 +729,6 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> with TickerProvider
     return grouped;
   }
 
-  /// 🌟 MỞ FORM CHỈNH SỬA GIAO DỊCH QUA LAUNCHER TĨNH FLUID SHEET ENGINE
   void _openEditTransactionSheet(BuildContext context, Transaction tx) {
     QuickEntrySheet.show(
       context,
@@ -761,9 +765,6 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> with TickerProvider
     );
   }
 
-  /// 🌟 MỞ MODAL MỐC CHU KỲ QUA FLUID SHEET ENGINE.
-  /// Trong lúc xoay wheel, tạm khóa drag-dismiss để cử chỉ dọc thuộc về
-  /// CupertinoPicker thay vì bị Fluid Sheet nhận nhầm.
   Future<void> _openEditMilestoneModal(
       BuildContext context,
       DateTime anchorMonth,
@@ -950,7 +951,6 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> with TickerProvider
             glowColor: accent.primary,
             child: CustomScrollView(
               controller: _scrollController,
-              // 🌟 SỬA ĐỔI: Dùng BouncingScrollPhysics đồng bộ như SettingsScreen để cho phép kéo quá biên nảy đà
               physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
               slivers: [
                 SliverToBoxAdapter(
@@ -1433,7 +1433,7 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> with TickerProvider
                           dateStr == DateFormat('dd/MM/yyyy').format(today)
                               ? 'Hôm nay ($dateStr)'
                               : dateStr == DateFormat('dd/MM/yyyy').format(yesterday)
-                                  ? 'Hôm qua ($dateStr)' : dateStr,
+                              ? 'Hôm qua ($dateStr)' : dateStr,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
@@ -1492,11 +1492,7 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> with TickerProvider
       ) {
     final isMoneyIn = item.isMoneyIn;
     final amountColor = isMoneyIn ? AppTokens.income : AppTokens.expense;
-
-    // Absolute opaque foreground: the swipe-delete underlay must never bleed
-    // through the idle transaction card in Dark Theme.
-    final cardSurfaceColor =
-    isDark ? const Color(0xFF1E2430) : Colors.white;
+    final cardSurfaceColor = isDark ? const Color(0xFF1E2430) : Colors.white;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8.0),
@@ -1938,7 +1934,6 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> with TickerProvider
       ),
     );
   }
-
 }
 
 // ==============================================================================
@@ -2552,7 +2547,6 @@ class _FilterMatrixModalState extends ConsumerState<_FilterMatrixModal> {
 // 🌟 MODAL 1: FINANCIAL CYCLE MILESTONE PICKER — HORIZON + HAPTIC WHEEL
 // ==============================================================================
 
-/// Public launcher — dùng chung cho Dashboard & Ledger
 Future<void> showEditCycleMilestoneSheet({
   required BuildContext context,
   required DateTime anchorMonth,

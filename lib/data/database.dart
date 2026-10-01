@@ -1,15 +1,16 @@
 // ==============================================================================
 // File: lib/data/database.dart
-// Architecture: Local-First Reactive Drift Database (SQLite) with Soft-Delete & Recycle Bin
+// Architecture: Local-First Reactive Drift Database (SQLite) with Soft-Delete & Vault Isolation
 // Stack: drift, sqlite3_flutter_libs, path_provider, flutter_riverpod
 // Features: 2-Tier Hierarchical Categories, Reactive Streams, Transactions,
 //           Budgets, Debt Counterparty Ledger (DebtContacts & DebtTransactions),
 //           Project Budgets (Event & Project Finance System),
-//           Savings Goals (Secret Vault Savings System),
+//           Savings Goals (Secret Vault Savings System & Isolated Audit Ledger),
 //           Executive Wealth Source Management & Internal Transfers,
 //           Soft-Delete Engine with 30-Day Auto Cleanup & Recycle Bin Recovery for BOTH
-//           Transactions and DebtTransactions
-// Schema Version: 8 (Migration: add Transactions.deletedAt in v7, DebtTransactions.deletedAt in v8)
+//           Transactions and DebtTransactions,
+//           Two-Way Reversal Mutation & Vault Atomic Resolutions
+// Schema Version: 11 (Migration: add Transactions.goalId in v11 for Vault Isolation)
 // ACID Integrity: Atomic Balance Updates, Safe Soft-Deletions, Balance Reversal / Re-application,
 //                 Permanent Erase, Empty Bin Cleanup
 // ==============================================================================
@@ -87,6 +88,20 @@ class ProjectBudgets extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+class SavingsGoals extends Table {
+  TextColumn get id => text()();
+  TextColumn get title => text()();
+  TextColumn get icon => text().withDefault(const Constant('🐖'))();
+  TextColumn get colorHex => text().withDefault(const Constant('#10B981'))();
+  RealColumn get targetAmount => real()();
+  RealColumn get currentAmount => real().withDefault(const Constant(0.0))();
+  DateTimeColumn get targetDate => dateTime().nullable()();
+  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 class Transactions extends Table {
   TextColumn get id => text()();
   TextColumn get walletId => text().references(Wallets, #id, onDelete: KeyAction.cascade)();
@@ -103,6 +118,8 @@ class Transactions extends Table {
   BoolColumn get isCycleStart => boolean().withDefault(const Constant(false))();
   TextColumn get projectBudgetId => text().nullable().references(ProjectBudgets, #id, onDelete: KeyAction.setNull)();
   TextColumn get toWalletId => text().nullable().references(Wallets, #id, onDelete: KeyAction.setNull)();
+  // 🌟 Cột liên kết Hũ Tiết Kiệm: Phục vụ tách dòng tiền Két & làm sạch Sổ GD chính
+  TextColumn get goalId => text().nullable().references(SavingsGoals, #id, onDelete: KeyAction.cascade)();
   // 🌟 Cột soft-delete: Lưu thời điểm bị đưa vào Thùng rác (null = đang hoạt động)
   DateTimeColumn get deletedAt => dateTime().nullable()();
 
@@ -139,30 +156,14 @@ class DebtTransactions extends Table {
   TextColumn get id => text()();
   TextColumn get contactId => text().references(DebtContacts, #id, onDelete: KeyAction.cascade)();
   TextColumn get walletId => text().references(Wallets, #id)();
-  // type: 'LEND', 'COLLECT', 'BORROW', 'REPAY'
-  TextColumn get type => text()();
+  TextColumn get type => text()(); // 'LEND', 'COLLECT', 'BORROW', 'REPAY'
   RealColumn get amount => real()();
   DateTimeColumn get date => dateTime()();
   DateTimeColumn get dueDate => dateTime().nullable()();
   TextColumn get note => text().nullable()();
   BoolColumn get isSettled => boolean().withDefault(const Constant(false))();
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
-  // 🌟 Cột soft-delete cho giao dịch nợ: Lưu thời điểm bị đưa vào Thùng rác (null = đang hoạt động)
   DateTimeColumn get deletedAt => dateTime().nullable()();
-
-  @override
-  Set<Column> get primaryKey => {id};
-}
-
-class SavingsGoals extends Table {
-  TextColumn get id => text()();
-  TextColumn get title => text()();
-  TextColumn get icon => text().withDefault(const Constant('🐖'))();
-  TextColumn get colorHex => text().withDefault(const Constant('#10B981'))();
-  RealColumn get targetAmount => real()();
-  RealColumn get currentAmount => real().withDefault(const Constant(0.0))();
-  DateTimeColumn get targetDate => dateTime().nullable()();
-  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -226,10 +227,24 @@ class DeletedTransactionItem {
   });
 }
 
+// --- DTO: BẢN GHI NHẬT KÝ DÒNG TIỀN KÉT TIẾT KIỆM (VAULT AUDIT ITEM) ---
+class VaultTransactionItem {
+  final Transaction transaction;
+  final SavingsGoal? goal;
+  final Wallet? wallet;
+
+  const VaultTransactionItem({
+    required this.transaction,
+    this.goal,
+    this.wallet,
+  });
+
+  bool get isDeposit => transaction.type == CategoryType.expense;
+  bool get isWithdrawal => transaction.type == CategoryType.income;
+}
+
 // --- APP DATABASE & DAO IMPLEMENTATION ---
 
-// Small content-free ledger keeps deduplication after inbox retention cleanup.
-// Archive metadata keeps category/contact schemas and financial history intact.
 class EntityArchives extends Table {
   TextColumn get entityId => text()();
   TextColumn get entityType => text()();
@@ -253,7 +268,6 @@ class AppNotifications extends Table {
   TextColumn get payload => text().nullable()();
   TextColumn get relatedEntityId => text().nullable()();
   BoolColumn get isRead => boolean().withDefault(const Constant(false))();
-  // Keep a tombstone until retention cleanup so deleting never re-alerts.
   BoolColumn get isDismissed => boolean().withDefault(const Constant(false))();
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
   @override
@@ -277,7 +291,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 10; // Local notification inbox and deduplication.
+  int get schemaVersion => 11; // 🌟 v11: Thêm Transactions.goalId phục vụ Vault Isolation
 
   @override
   MigrationStrategy get migration {
@@ -320,11 +334,13 @@ class AppDatabase extends _$AppDatabase {
         if (from < 10) {
           await m.createTable(entityArchives);
         }
+        if (from < 11) {
+          await m.addColumn(transactions, transactions.goalId);
+        }
       },
       beforeOpen: (details) async {
         await customStatement('PRAGMA foreign_keys = ON');
         await purgeOldNotifications();
-        // Tự động dọn dẹp các mục trong thùng rác đã quá 30 ngày trên CẢ 2 BẢNG mỗi khi mở CSDL
         final thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
         await (delete(transactions)
           ..where((t) => t.deletedAt.isNotNull() & t.deletedAt.isSmallerThanValue(thirtyDaysAgo)))
@@ -344,7 +360,7 @@ class AppDatabase extends _$AppDatabase {
       ..addColumns([entityArchives.entityId])
       ..where(entityArchives.entityType.equals('category'));
     return c.id.isNotInQuery(archived) &
-        (c.parentId.isNull() | c.parentId.isNotInQuery(archived));
+    (c.parentId.isNull() | c.parentId.isNotInQuery(archived));
   }
 
   Stream<List<Category>> watchAvailableCategories() =>
@@ -361,7 +377,7 @@ class AppDatabase extends _$AppDatabase {
     if (type == 'contact') {
       final contact = await (select(debtContacts)..where((c) => c.id.equals(id))).getSingleOrNull();
       final outstanding = await (select(debtTransactions)..where((d) =>
-          d.contactId.equals(id) & d.deletedAt.isNull() & d.isSettled.equals(false) & d.type.isIn(['LEND', 'BORROW']))).get();
+      d.contactId.equals(id) & d.deletedAt.isNull() & d.isSettled.equals(false) & d.type.isIn(['LEND', 'BORROW']))).get();
       if (contact == null || contact.netBalance.abs() > .001 || outstanding.isNotEmpty) {
         throw StateError('Hãy tất toán các khoản vay trước khi lưu trữ đối tác.');
       }
@@ -391,9 +407,9 @@ class AppDatabase extends _$AppDatabase {
   Stream<List<AppNotification>> watchNotifications({String? filterType}) {
     return (select(appNotifications)
       ..where((n) => n.isDismissed.equals(false) &
-        n.createdAt.isSmallerOrEqualValue(DateTime.now()) &
-        (filterType == null ? const Constant(true) :
-          filterType == 'reminder' ? n.type.isIn(['reminder', 'digest', 'system']) : n.type.equals(filterType)))
+      n.createdAt.isSmallerOrEqualValue(DateTime.now()) &
+      (filterType == null ? const Constant(true) :
+      filterType == 'reminder' ? n.type.isIn(['reminder', 'digest', 'system']) : n.type.equals(filterType)))
       ..orderBy([(n) => OrderingTerm.desc(n.createdAt)])).watch();
   }
 
@@ -401,8 +417,8 @@ class AppDatabase extends _$AppDatabase {
     final count = appNotifications.id.count();
     return (selectOnly(appNotifications)..addColumns([count])
       ..where(appNotifications.isRead.equals(false) & appNotifications.isDismissed.equals(false) &
-        appNotifications.createdAt.isSmallerOrEqualValue(DateTime.now())))
-      .watchSingle().map((row) => row.read(count) ?? 0);
+      appNotifications.createdAt.isSmallerOrEqualValue(DateTime.now())))
+        .watchSingle().map((row) => row.read(count) ?? 0);
   }
 
   Future<AppNotification?> createNotificationIfNotExists({
@@ -424,19 +440,19 @@ class AppDatabase extends _$AppDatabase {
 
   Future<void> markAsRead(String id, {bool isRead = true}) async {
     await (update(appNotifications)..where((n) => n.id.equals(id)))
-      .write(AppNotificationsCompanion(isRead: Value(isRead)));
+        .write(AppNotificationsCompanion(isRead: Value(isRead)));
   }
   Future<void> markAllAsRead() async {
     await (update(appNotifications)..where((n) => n.createdAt.isSmallerOrEqualValue(DateTime.now())))
-      .write(const AppNotificationsCompanion(isRead: Value(true)));
+        .write(const AppNotificationsCompanion(isRead: Value(true)));
   }
   Future<void> deleteNotification(String id) async {
     await (update(appNotifications)..where((n) => n.id.equals(id)))
-      .write(const AppNotificationsCompanion(isDismissed: Value(true)));
+        .write(const AppNotificationsCompanion(isDismissed: Value(true)));
   }
   Future<void> revokeNotificationByEntityId(String entityId) async {
     await (update(appNotifications)..where((n) => n.relatedEntityId.equals(entityId)))
-      .write(const AppNotificationsCompanion(isDismissed: Value(true)));
+        .write(const AppNotificationsCompanion(isDismissed: Value(true)));
   }
   Future<void> purgeOldNotifications() async {
     await transaction(() async {
@@ -500,20 +516,10 @@ class AppDatabase extends _$AppDatabase {
     });
   }
 
-
   // ===========================================================================
   // ATOMIC TRANSACTION MUTATION ENGINE
   // ===========================================================================
 
-  /// Updates an existing standard income/expense transaction in-place.
-  ///
-  /// Invariants:
-  /// - Never soft-deletes + re-inserts the row.
-  /// - Validates category/wallet before mutating balances.
-  /// - Rolls back the old wallet effect and applies the new effect inside one
-  ///   SQLite transaction.
-  /// - If this row was left soft-deleted by the legacy edit bug, the mutation
-  ///   safely revives it without applying the old reversal a second time.
   Future<void> updateTransactionAtomically({
     required String transactionId,
     required String walletId,
@@ -558,14 +564,8 @@ class AppDatabase extends _$AppDatabase {
         throw StateError('Không tìm thấy nguồn tiền đã chọn');
       }
 
-      // Active rows still have their old balance effect applied. A legacy
-      // failed edit may have soft-deleted the row already; in that case the
-      // old effect was reversed by softDeleteTransaction(), so do not reverse
-      // it for a second time.
       if (persisted.deletedAt == null) {
-        final oldWallet = await (select(wallets)
-          ..where((w) => w.id.equals(persisted.walletId)))
-            .getSingleOrNull();
+        final oldWallet = await (select(wallets)..where((w) => w.id.equals(persisted.walletId))).getSingleOrNull();
         if (oldWallet == null) {
           throw StateError('Không tìm thấy nguồn tiền gốc của giao dịch');
         }
@@ -574,8 +574,7 @@ class AppDatabase extends _$AppDatabase {
             ? -persisted.amount
             : persisted.amount;
 
-        await (update(wallets)..where((w) => w.id.equals(persisted.walletId)))
-            .write(
+        await (update(wallets)..where((w) => w.id.equals(persisted.walletId))).write(
           WalletsCompanion(
             balance: Value(oldWallet.balance + oldReversal),
             updatedAt: Value(DateTime.now()),
@@ -583,8 +582,6 @@ class AppDatabase extends _$AppDatabase {
         );
       }
 
-      // The identity/primary key stays untouched. This is the real UPDATE that
-      // replaces the former soft-delete + INSERT mutation.
       final affected = await (update(transactions)
         ..where((t) => t.id.equals(transactionId)))
           .write(
@@ -604,11 +601,7 @@ class AppDatabase extends _$AppDatabase {
         throw StateError('Không thể cập nhật giao dịch');
       }
 
-      // Re-read after the rollback above so same-wallet edits never calculate
-      // from a stale balance snapshot.
-      final walletAfterRollback = await (select(wallets)
-        ..where((w) => w.id.equals(walletId)))
-          .getSingleOrNull();
+      final walletAfterRollback = await (select(wallets)..where((w) => w.id.equals(walletId))).getSingleOrNull();
       if (walletAfterRollback == null) {
         throw StateError('Không tìm thấy nguồn tiền sau khi đối soát');
       }
@@ -623,13 +616,6 @@ class AppDatabase extends _$AppDatabase {
     });
   }
 
-  /// Atomically converts a standard income/expense row into a debt transaction.
-  ///
-  /// Debt entries live in a separate physical table in the current schema, so
-  /// a literal single-table UPDATE cannot represent this mutation. This bridge
-  /// therefore performs the table move in ONE SQLite transaction: validate all
-  /// references -> insert the debt row -> reconcile balances/contact -> remove
-  /// the old standard row. Any failure rolls the whole operation back.
   Future<void> convertTransactionToDebtAtomically({
     required String transactionId,
     required String contactId,
@@ -651,9 +637,7 @@ class AppDatabase extends _$AppDatabase {
     }
 
     await transaction(() async {
-      final persisted = await (select(transactions)
-        ..where((t) => t.id.equals(transactionId)))
-          .getSingleOrNull();
+      final persisted = await (select(transactions)..where((t) => t.id.equals(transactionId))).getSingleOrNull();
       if (persisted == null) {
         throw StateError('Không tìm thấy giao dịch cần chuyển đổi');
       }
@@ -662,22 +646,16 @@ class AppDatabase extends _$AppDatabase {
         throw StateError('Chỉ có thể chuyển khoản chi / khoản thu sang vay nợ');
       }
 
-      final contact = await (select(debtContacts)
-        ..where((c) => c.id.equals(contactId)))
-          .getSingleOrNull();
+      final contact = await (select(debtContacts)..where((c) => c.id.equals(contactId))).getSingleOrNull();
       if (contact == null) {
         throw StateError('Không tìm thấy người liên quan');
       }
 
-      final targetWallet = await (select(wallets)
-        ..where((w) => w.id.equals(walletId)))
-          .getSingleOrNull();
+      final targetWallet = await (select(wallets)..where((w) => w.id.equals(walletId))).getSingleOrNull();
       if (targetWallet == null) {
         throw StateError('Không tìm thấy nguồn tiền đã chọn');
       }
 
-      // Insert first. If this fails, the original standard row has not been
-      // touched at all. Separate tables allow the logical id to be preserved.
       await into(debtTransactions).insert(
         DebtTransactionsCompanion(
           id: Value(transactionId),
@@ -694,12 +672,8 @@ class AppDatabase extends _$AppDatabase {
         ),
       );
 
-      // Undo the old standard effect only when it is still active. This also
-      // makes the repair tolerant of rows soft-deleted by the legacy bug.
       if (persisted.deletedAt == null) {
-        final oldWallet = await (select(wallets)
-          ..where((w) => w.id.equals(persisted.walletId)))
-            .getSingleOrNull();
+        final oldWallet = await (select(wallets)..where((w) => w.id.equals(persisted.walletId))).getSingleOrNull();
         if (oldWallet == null) {
           throw StateError('Không tìm thấy nguồn tiền gốc của giao dịch');
         }
@@ -707,8 +681,7 @@ class AppDatabase extends _$AppDatabase {
         final oldReversal = persisted.type == CategoryType.income
             ? -persisted.amount
             : persisted.amount;
-        await (update(wallets)..where((w) => w.id.equals(persisted.walletId)))
-            .write(
+        await (update(wallets)..where((w) => w.id.equals(persisted.walletId))).write(
           WalletsCompanion(
             balance: Value(oldWallet.balance + oldReversal),
             updatedAt: Value(DateTime.now()),
@@ -739,9 +712,7 @@ class AppDatabase extends _$AppDatabase {
           throw StateError('Loại giao dịch vay nợ không hợp lệ');
       }
 
-      final walletAfterRollback = await (select(wallets)
-        ..where((w) => w.id.equals(walletId)))
-          .getSingleOrNull();
+      final walletAfterRollback = await (select(wallets)..where((w) => w.id.equals(walletId))).getSingleOrNull();
       if (walletAfterRollback == null) {
         throw StateError('Không tìm thấy nguồn tiền sau khi đối soát');
       }
@@ -760,11 +731,7 @@ class AppDatabase extends _$AppDatabase {
         ),
       );
 
-      // This is a schema bridge, not a user deletion. Remove the source row
-      // only at the very end, while still inside the same atomic transaction.
-      final removed = await (delete(transactions)
-        ..where((t) => t.id.equals(transactionId)))
-          .go();
+      final removed = await (delete(transactions)..where((t) => t.id.equals(transactionId))).go();
       if (removed != 1) {
         throw StateError('Không thể hoàn tất chuyển đổi giao dịch');
       }
@@ -872,9 +839,6 @@ class AppDatabase extends _$AppDatabase {
   // 🌟 SOFT-DELETE & RECYCLE BIN ENGINE (DEBT TRANSACTIONS)
   // ==========================================
 
-  /// Xóa mềm giao dịch Vay/Nợ:
-  /// - Hoàn tác số dư ví và netBalance của đối tác nợ
-  /// - Gán deletedAt = DateTime.now()
   Future<void> softDeleteDebtTransaction(String txId) async {
     await transaction(() async {
       final tx = await (select(debtTransactions)..where((t) => t.id.equals(txId))).getSingleOrNull();
@@ -931,9 +895,6 @@ class AppDatabase extends _$AppDatabase {
     });
   }
 
-  /// Khôi phục giao dịch Vay/Nợ từ Thùng rác:
-  /// - Tái áp dụng số dư ví và netBalance của đối tác nợ
-  /// - Đặt deletedAt = null
   Future<void> restoreDebtTransaction(String txId) async {
     await transaction(() async {
       final tx = await (select(debtTransactions)..where((t) => t.id.equals(txId))).getSingleOrNull();
@@ -989,12 +950,10 @@ class AppDatabase extends _$AppDatabase {
     });
   }
 
-  /// Xóa vĩnh viễn giao dịch nợ khỏi SQLite
   Future<void> permanentDeleteDebtTransaction(String txId) async {
     await (delete(debtTransactions)..where((t) => t.id.equals(txId))).go();
   }
 
-  /// Dọn sạch toàn bộ Thùng Rác (Xóa vĩnh viễn cả transactions lẫn debtTransactions)
   Future<int> emptyRecycleBin() async {
     return await transaction(() async {
       final countTx = await (delete(transactions)..where((t) => t.deletedAt.isNotNull())).go();
@@ -1003,7 +962,6 @@ class AppDatabase extends _$AppDatabase {
     });
   }
 
-  /// Tự động dọn dẹp các bản ghi xóa mềm quá 30 ngày trên cả 2 bảng
   Future<int> purgeOldDeletedTransactions() async {
     final threshold = DateTime.now().subtract(const Duration(days: 30));
     return await transaction(() async {
@@ -1017,7 +975,6 @@ class AppDatabase extends _$AppDatabase {
     });
   }
 
-  /// Stream lấy danh sách các giao dịch thường trong Thùng Rác kèm danh mục, ví và đếm ngược 30 ngày
   Stream<List<DeletedTransactionItem>> watchDeletedTransactions() {
     final query = select(transactions).join([
       leftOuterJoin(categories, categories.id.equalsExp(transactions.categoryId)),
@@ -1047,7 +1004,6 @@ class AppDatabase extends _$AppDatabase {
     });
   }
 
-  /// Đếm tổng số lượng mục trong Thùng Rác (kết hợp cả transactions và debt_transactions)
   Stream<int> watchDeletedTransactionsCount() {
     final txCountExp = transactions.id.count();
     final txQuery = selectOnly(transactions)
@@ -1067,7 +1023,6 @@ class AppDatabase extends _$AppDatabase {
     });
   }
 
-  /// Tương thích ngược: Xóa giao dịch (chuyển sang Soft Delete để an toàn)
   Future<void> deleteTransactionWithBalanceReversal(String txId) async {
     await softDeleteTransaction(txId);
   }
@@ -1716,7 +1671,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   // ==========================================
-  // 🌟 SAVINGS GOALS DAOs & ATOMIC MUTATIONS (PHASE 2)
+  // 🌟 SAVINGS GOALS DAOs & REACTIVE STREAMS
   // ==========================================
 
   Stream<List<SavingsGoal>> watchAllSavingsGoals() {
@@ -1725,10 +1680,78 @@ class AppDatabase extends _$AppDatabase {
         .watch();
   }
 
+  // ===========================================================================
+  // 🌟 VAULT AUDIT LEDGER REACTIVE STREAMS (NHẬT KÝ TÍCH LŨY KÉT)
+  // ===========================================================================
+
+  /// Lắng nghe lịch sử nạp/rút tiền của MỘT HŨ CỤ THỂ (kèm thông tin ví đối ứng)
+  Stream<List<VaultTransactionItem>> watchVaultTransactionsByGoal(String goalId) {
+    final query = select(transactions).join([
+      leftOuterJoin(savingsGoals, savingsGoals.id.equalsExp(transactions.goalId)),
+      leftOuterJoin(wallets, wallets.id.equalsExp(transactions.walletId)),
+    ])
+      ..where(transactions.deletedAt.isNull() & transactions.goalId.equals(goalId))
+      ..orderBy([OrderingTerm.desc(transactions.date), OrderingTerm.desc(transactions.createdAt)]);
+
+    return query.watch().map((rows) {
+      return rows.map((row) {
+        final tx = row.readTable(transactions);
+        final g = row.readTableOrNull(savingsGoals);
+        final w = row.readTableOrNull(wallets);
+        return VaultTransactionItem(
+          transaction: tx,
+          goal: g,
+          wallet: w,
+        );
+      }).toList();
+    });
+  }
+
+  /// Lắng nghe lịch sử nạp/rút tiền của TOÀN BỘ KÉT TIẾT KIỆM (kèm bộ lọc tùy chọn)
+  /// filterType: 'all', 'deposit' (expense), 'withdrawal' (income)
+  Stream<List<VaultTransactionItem>> watchAllVaultTransactions({String filterType = 'all'}) {
+    final query = select(transactions).join([
+      innerJoin(savingsGoals, savingsGoals.id.equalsExp(transactions.goalId)),
+      leftOuterJoin(wallets, wallets.id.equalsExp(transactions.walletId)),
+    ])
+      ..where(transactions.deletedAt.isNull() & transactions.goalId.isNotNull());
+
+    if (filterType == 'deposit') {
+      query.where(transactions.type.equals(CategoryType.expense.index));
+    } else if (filterType == 'withdrawal') {
+      query.where(transactions.type.equals(CategoryType.income.index));
+    }
+
+    query.orderBy([OrderingTerm.desc(transactions.date), OrderingTerm.desc(transactions.createdAt)]);
+
+    return query.watch().map((rows) {
+      return rows.map((row) {
+        final tx = row.readTable(transactions);
+        final g = row.readTableOrNull(savingsGoals);
+        final w = row.readTableOrNull(wallets);
+        return VaultTransactionItem(
+          transaction: tx,
+          goal: g,
+          wallet: w,
+        );
+      }).toList();
+    });
+  }
+
+  // ===========================================================================
+  // 🌟 GIAI ĐOẠN 3: ATOMIC MUTATION & TWO-WAY REVERSAL ENGINE CHO KÉT TIẾT KIỆM
+  // ===========================================================================
+
+  /// Nạp tiền vào hũ tích lũy (Atomic ACID):
+  /// - Giảm số dư ví nguồn
+  /// - Tăng số dư hũ mục tiêu
+  /// - Ghi nhận dòng giao dịch gắn `goalId: goalId` và `envelopeType: 'savings'`
   Future<void> depositToGoal({
     required String goalId,
     required String walletId,
     required double amount,
+    DateTime? date,
+    String? note,
   }) async {
     if (amount <= 0) {
       throw ArgumentError('Số tiền nạp phải lớn hơn 0 ₫');
@@ -1762,29 +1785,37 @@ class AppDatabase extends _$AppDatabase {
       );
 
       final cat = await (select(categories)..limit(1)).getSingleOrNull();
-      if (cat != null) {
-        await into(transactions).insert(
-          TransactionsCompanion(
-            id: Value('tx_sav_dep_${DateTime.now().millisecondsSinceEpoch}'),
-            walletId: Value(walletId),
-            categoryId: Value(cat.id),
-            amount: Value(amount),
-            type: const Value(CategoryType.expense),
-            envelopeType: const Value('savings'),
-            date: Value(DateTime.now()),
-            note: Value('Trích nạp Két Tiết Kiệm: ${goal.title}'),
-            merchant: Value(goal.title),
-            createdAt: Value(DateTime.now()),
-          ),
-        );
-      }
+      final catId = cat?.id ?? 'cat_savings_deposit';
+      final effectiveDate = date ?? DateTime.now();
+
+      await into(transactions).insert(
+        TransactionsCompanion(
+          id: Value('tx_sav_dep_${DateTime.now().millisecondsSinceEpoch}'),
+          walletId: Value(walletId),
+          categoryId: Value(catId),
+          goalId: Value(goalId),
+          amount: Value(amount),
+          type: const Value(CategoryType.expense),
+          envelopeType: const Value('savings'),
+          date: Value(effectiveDate),
+          note: Value(note ?? 'Trích nạp Két Tiết Kiệm: ${goal.title}'),
+          merchant: Value(goal.title),
+          createdAt: Value(DateTime.now()),
+        ),
+      );
     });
   }
 
+  /// Rút tiền từ hũ về ví (Atomic ACID):
+  /// - Giảm số dư hũ mục tiêu
+  /// - Tăng số dư ví nhận tiền
+  /// - Ghi nhận dòng giao dịch gắn `goalId: goalId` và `envelopeType: 'savings'`
   Future<void> withdrawFromGoal({
     required String goalId,
     required String walletId,
     required double amount,
+    DateTime? date,
+    String? note,
   }) async {
     if (amount <= 0) {
       throw ArgumentError('Số tiền rút phải lớn hơn 0 ₫');
@@ -1818,22 +1849,247 @@ class AppDatabase extends _$AppDatabase {
       );
 
       final cat = await (select(categories)..limit(1)).getSingleOrNull();
-      if (cat != null) {
-        await into(transactions).insert(
-          TransactionsCompanion(
-            id: Value('tx_sav_wth_${DateTime.now().millisecondsSinceEpoch}'),
-            walletId: Value(walletId),
-            categoryId: Value(cat.id),
-            amount: Value(amount),
-            type: const Value(CategoryType.income),
-            envelopeType: const Value('savings'),
-            date: Value(DateTime.now()),
-            note: Value('Rút tiền từ Két Tiết Kiệm: ${goal.title}'),
-            merchant: Value(goal.title),
-            createdAt: Value(DateTime.now()),
-          ),
+      final catId = cat?.id ?? 'cat_savings_withdraw';
+      final effectiveDate = date ?? DateTime.now();
+
+      await into(transactions).insert(
+        TransactionsCompanion(
+          id: Value('tx_sav_wth_${DateTime.now().millisecondsSinceEpoch}'),
+          walletId: Value(walletId),
+          categoryId: Value(catId),
+          goalId: Value(goalId),
+          amount: Value(amount),
+          type: const Value(CategoryType.income),
+          envelopeType: const Value('savings'),
+          date: Value(effectiveDate),
+          note: Value(note ?? 'Rút tiền từ Két Tiết Kiệm: ${goal.title}'),
+          merchant: Value(goal.title),
+          createdAt: Value(DateTime.now()),
+        ),
+      );
+    });
+  }
+
+  /// 🌟 Cập nhật giao dịch nạp/rút trong két (Atomic Reversal Update)
+  /// Xử lý hoàn trả chênh lệch số dư của ví cũ/mới và hũ tương ứng
+  Future<void> updateVaultTransactionAtomically({
+    required String transactionId,
+    required String newWalletId,
+    required double newAmount,
+    required DateTime newDate,
+    String? newNote,
+  }) async {
+    if (newAmount <= 0) {
+      throw ArgumentError('Số tiền giao dịch phải lớn hơn 0 ₫');
+    }
+
+    await transaction(() async {
+      final oldTx = await (select(transactions)..where((t) => t.id.equals(transactionId))).getSingleOrNull();
+      if (oldTx == null || oldTx.goalId == null) {
+        throw StateError('Không tìm thấy giao dịch dòng tiền két');
+      }
+
+      final goal = await (select(savingsGoals)..where((g) => g.id.equals(oldTx.goalId!))).getSingleOrNull();
+      if (goal == null) {
+        throw StateError('Không tìm thấy hũ tiết kiệm liên quan');
+      }
+
+      final oldWallet = await (select(wallets)..where((w) => w.id.equals(oldTx.walletId))).getSingleOrNull();
+      if (oldWallet == null) {
+        throw StateError('Không tìm thấy ví liên kết cũ');
+      }
+
+      final newWallet = await (select(wallets)..where((w) => w.id.equals(newWalletId))).getSingleOrNull();
+      if (newWallet == null) {
+        throw StateError('Không tìm thấy ví liên kết mới');
+      }
+
+      // 1. Hoàn tác hoàn toàn hiệu ứng cũ
+      if (oldTx.type == CategoryType.expense) {
+        // Lệnh nạp cũ: hoàn lại tiền vào ví cũ, trừ lại tiền khỏi hũ
+        final rolledBackWalletBal = oldWallet.balance + oldTx.amount;
+        final rolledBackGoalBal = math.max(0.0, goal.currentAmount - oldTx.amount);
+
+        await (update(wallets)..where((w) => w.id.equals(oldWallet.id))).write(
+          WalletsCompanion(balance: Value(rolledBackWalletBal), updatedAt: Value(DateTime.now())),
+        );
+        await (update(savingsGoals)..where((g) => g.id.equals(goal.id))).write(
+          SavingsGoalsCompanion(currentAmount: Value(rolledBackGoalBal)),
+        );
+      } else if (oldTx.type == CategoryType.income) {
+        // Lệnh rút cũ: trừ lại tiền khỏi ví cũ, cộng lại tiền vào hũ
+        final rolledBackWalletBal = oldWallet.balance - oldTx.amount;
+        final rolledBackGoalBal = goal.currentAmount + oldTx.amount;
+
+        await (update(wallets)..where((w) => w.id.equals(oldWallet.id))).write(
+          WalletsCompanion(balance: Value(rolledBackWalletBal), updatedAt: Value(DateTime.now())),
+        );
+        await (update(savingsGoals)..where((g) => g.id.equals(goal.id))).write(
+          SavingsGoalsCompanion(currentAmount: Value(rolledBackGoalBal)),
         );
       }
+
+      // 2. Tái nạp thông tin ví mới sau khi đã rollback (đặc biệt khi oldWallet == newWallet)
+      final refreshedNewWallet = await (select(wallets)..where((w) => w.id.equals(newWalletId))).getSingleOrNull();
+      final refreshedGoal = await (select(savingsGoals)..where((g) => g.id.equals(goal.id))).getSingleOrNull();
+
+      if (refreshedNewWallet == null || refreshedGoal == null) {
+        throw StateError('Lỗi đọc lại trạng thái sau khi hoàn tác số dư');
+      }
+
+      // 3. Áp dụng hiệu ứng mới
+      if (oldTx.type == CategoryType.expense) {
+        // Áp dụng lệnh nạp mới: ví mới trừ tiền, hũ cộng tiền
+        if (refreshedNewWallet.balance < newAmount) {
+          throw StateError('Số dư ví "${refreshedNewWallet.name}" không đủ để thực hiện nạp ${newAmount} ₫');
+        }
+        await (update(wallets)..where((w) => w.id.equals(newWalletId))).write(
+          WalletsCompanion(balance: Value(refreshedNewWallet.balance - newAmount), updatedAt: Value(DateTime.now())),
+        );
+        await (update(savingsGoals)..where((g) => g.id.equals(goal.id))).write(
+          SavingsGoalsCompanion(currentAmount: Value(refreshedGoal.currentAmount + newAmount)),
+        );
+      } else if (oldTx.type == CategoryType.income) {
+        // Áp dụng lệnh rút mới: ví mới cộng tiền, hũ trừ tiền
+        if (refreshedGoal.currentAmount < newAmount) {
+          throw StateError('Số dư hũ "${refreshedGoal.title}" không đủ để rút ${newAmount} ₫');
+        }
+        await (update(wallets)..where((w) => w.id.equals(newWalletId))).write(
+          WalletsCompanion(balance: Value(refreshedNewWallet.balance + newAmount), updatedAt: Value(DateTime.now())),
+        );
+        await (update(savingsGoals)..where((g) => g.id.equals(goal.id))).write(
+          SavingsGoalsCompanion(currentAmount: Value(refreshedGoal.currentAmount - newAmount)),
+        );
+      }
+
+      // 4. Cập nhật dòng transaction
+      await (update(transactions)..where((t) => t.id.equals(transactionId))).write(
+        TransactionsCompanion(
+          walletId: Value(newWalletId),
+          amount: Value(newAmount),
+          date: Value(newDate),
+          note: Value(newNote),
+        ),
+      );
+    });
+  }
+
+  /// 🌟 Xóa bản ghi giao dịch nạp/rút trong két và khôi phục số dư đảo chiều nguyên tử
+  Future<void> deleteVaultTransactionAtomically(String transactionId) async {
+    await transaction(() async {
+      final tx = await (select(transactions)..where((t) => t.id.equals(transactionId))).getSingleOrNull();
+      if (tx == null || tx.goalId == null) return;
+
+      final goal = await (select(savingsGoals)..where((g) => g.id.equals(tx.goalId!))).getSingleOrNull();
+      final wallet = await (select(wallets)..where((w) => w.id.equals(tx.walletId))).getSingleOrNull();
+
+      if (tx.type == CategoryType.expense) {
+        // Lệnh nạp tiền: Xóa lệnh này -> Giảm tiền hũ, hoàn trả tiền về ví
+        if (goal != null) {
+          final newGoalBal = math.max(0.0, goal.currentAmount - tx.amount);
+          await (update(savingsGoals)..where((g) => g.id.equals(goal.id))).write(
+            SavingsGoalsCompanion(currentAmount: Value(newGoalBal)),
+          );
+        }
+        if (wallet != null) {
+          await (update(wallets)..where((w) => w.id.equals(wallet.id))).write(
+            WalletsCompanion(
+              balance: Value(wallet.balance + tx.amount),
+              updatedAt: Value(DateTime.now()),
+            ),
+          );
+        }
+      } else if (tx.type == CategoryType.income) {
+        // Lệnh rút tiền: Xóa lệnh này -> Tăng lại tiền vào hũ, trừ tiền ví
+        if (goal != null) {
+          await (update(savingsGoals)..where((g) => g.id.equals(goal.id))).write(
+            SavingsGoalsCompanion(currentAmount: Value(goal.currentAmount + tx.amount)),
+          );
+        }
+        if (wallet != null) {
+          await (update(wallets)..where((w) => w.id.equals(wallet.id))).write(
+            WalletsCompanion(
+              balance: Value(wallet.balance - tx.amount),
+              updatedAt: Value(DateTime.now()),
+            ),
+          );
+        }
+      }
+
+      // Xóa vĩnh viễn dòng transaction
+      await (delete(transactions)..where((t) => t.id.equals(transactionId))).go();
+    });
+  }
+
+  /// 🌟 XÓA HŨ TIẾT KIỆM KÈM GIẢI PHÁP ĐIỀU PHỐI DÒNG TIỀN NGUYÊN TỬ (Two-Way Resolution)
+  /// - Nếu hũ = 0 ₫: Xóa luôn.
+  /// - Nếu hũ > 0 ₫ và có refundWalletId: Hoàn trả số dư về ví và ghi transaction hoàn trả.
+  /// - Nếu hũ > 0 ₫ và có transferToGoalId: Chuyển toàn bộ số dư sang hũ khác và ghi transaction điều chuyển.
+  Future<void> deleteGoalWithBalanceResolution({
+    required String goalId,
+    String? refundWalletId,
+    String? transferToGoalId,
+  }) async {
+    await transaction(() async {
+      final goal = await (select(savingsGoals)..where((g) => g.id.equals(goalId))).getSingleOrNull();
+      if (goal == null) return;
+
+      final remaining = goal.currentAmount;
+
+      if (remaining > 0) {
+        if (refundWalletId != null) {
+          // Lựa chọn 1: Hoàn tiền về ví
+          final targetWallet = await (select(wallets)..where((w) => w.id.equals(refundWalletId))).getSingleOrNull();
+          if (targetWallet == null) {
+            throw StateError('Không tìm thấy ví nhận tiền hoàn trả');
+          }
+
+          await (update(wallets)..where((w) => w.id.equals(refundWalletId))).write(
+            WalletsCompanion(
+              balance: Value(targetWallet.balance + remaining),
+              updatedAt: Value(DateTime.now()),
+            ),
+          );
+
+          final cat = await (select(categories)..limit(1)).getSingleOrNull();
+          final catId = cat?.id ?? 'cat_savings_refund';
+
+          await into(transactions).insert(
+            TransactionsCompanion(
+              id: Value('tx_sav_close_refund_${DateTime.now().millisecondsSinceEpoch}'),
+              walletId: Value(refundWalletId),
+              categoryId: Value(catId),
+              amount: Value(remaining),
+              type: const Value(CategoryType.income),
+              envelopeType: const Value('savings'),
+              date: Value(DateTime.now()),
+              note: Value('Tất toán hũ [${goal.title}]: Hoàn trả số dư về ví'),
+              merchant: Value(goal.title),
+              createdAt: Value(DateTime.now()),
+            ),
+          );
+        } else if (transferToGoalId != null) {
+          // Lựa chọn 2: Chuyển sang hũ khác
+          final destGoal = await (select(savingsGoals)..where((g) => g.id.equals(transferToGoalId))).getSingleOrNull();
+          if (destGoal == null) {
+            throw StateError('Không tìm thấy hũ tiết kiệm nhận tiền');
+          }
+
+          await (update(savingsGoals)..where((g) => g.id.equals(transferToGoalId))).write(
+            SavingsGoalsCompanion(
+              currentAmount: Value(destGoal.currentAmount + remaining),
+            ),
+          );
+        } else {
+          throw StateError('Hũ vẫn còn số dư (${remaining} ₫). Bắt buộc chọn ví hoàn trả hoặc hũ chuyển tiếp.');
+        }
+      }
+
+      // Xóa các giao dịch liên kết của hũ này trước khi xóa hũ
+      await (delete(transactions)..where((t) => t.goalId.equals(goalId))).go();
+
+      // Xóa bản ghi hũ
+      await (delete(savingsGoals)..where((g) => g.id.equals(goalId))).go();
     });
   }
 
@@ -1880,24 +2136,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   Future<void> deleteSavingsGoal(String id, {String? refundWalletId}) async {
-    await transaction(() async {
-      final goal = await (select(savingsGoals)..where((g) => g.id.equals(id))).getSingleOrNull();
-      if (goal == null) return;
-
-      if (goal.currentAmount > 0 && refundWalletId != null) {
-        final wallet = await (select(wallets)..where((w) => w.id.equals(refundWalletId))).getSingleOrNull();
-        if (wallet != null) {
-          await (update(wallets)..where((w) => w.id.equals(refundWalletId))).write(
-            WalletsCompanion(
-              balance: Value(wallet.balance + goal.currentAmount),
-              updatedAt: Value(DateTime.now()),
-            ),
-          );
-        }
-      }
-
-      await (delete(savingsGoals)..where((g) => g.id.equals(id))).go();
-    });
+    await deleteGoalWithBalanceResolution(goalId: id, refundWalletId: refundWalletId);
   }
 }
 
@@ -1926,4 +2165,18 @@ final savingsGoalsStreamProvider = StreamProvider.autoDispose<List<SavingsGoal>>
 final deletedTransactionsCountStreamProvider = StreamProvider.autoDispose<int>((ref) {
   final db = ref.watch(databaseProvider);
   return db.watchDeletedTransactionsCount();
+});
+
+/// 🌟 Stream lấy lịch sử dòng tiền theo từng Hũ tiết kiệm cụ thể
+final vaultTransactionsByGoalStreamProvider =
+StreamProvider.autoDispose.family<List<VaultTransactionItem>, String>((ref, goalId) {
+  final db = ref.watch(databaseProvider);
+  return db.watchVaultTransactionsByGoal(goalId);
+});
+
+/// 🌟 Stream lấy toàn bộ lịch sử dòng tiền của Két tiết kiệm (hỗ trợ filter: 'all', 'deposit', 'withdrawal')
+final allVaultTransactionsStreamProvider =
+StreamProvider.autoDispose.family<List<VaultTransactionItem>, String>((ref, filterType) {
+  final db = ref.watch(databaseProvider);
+  return db.watchAllVaultTransactions(filterType: filterType);
 });
