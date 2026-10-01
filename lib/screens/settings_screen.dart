@@ -49,6 +49,8 @@ import 'category_manager_screen.dart';
 import 'debt_dashboard_screen.dart';
 import 'recycle_bin_screen.dart';
 
+import '../core/feedback/app_feedback.dart';
+
 class FontItemDef {
   final String name;
   final String badge;
@@ -1220,6 +1222,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         },
                       ),
                     ],
+                  ),
+                ),
+
+                //Version
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 16, bottom: 8),
+                    child: Text(
+                      'Flowy • Phiên bản 1.0.0-beta',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.3,
+                        color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                      ),
+                    ),
                   ),
                 ),
               ],

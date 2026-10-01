@@ -1,32 +1,11 @@
-import 'flowy_selection_picker.dart';
 // ==============================================================================
 // File: lib/widgets/quick_entry_sheet.dart
-// Architecture: Ergonomic Quick-Entry Sheet with Fluid Sheet Engine & Chromatic Precision
+// Architecture: Ergonomic Quick-Entry Sheet with Fluid Sheet Engine & Drum Wheel Time Picker
+// Version: Flowy v1.0.0-beta
 // Stack: flutter_riverpod, drift, intl, flutter/services.dart
-// Features:
-// 1. Phân Tầng Dual-Level Segmented Tabs:
-//    - Tầng 1 (Chế độ gốc): height 42px, 3 tabs [Khoản chi | Khoản thu | Vay / Nợ].
-//    - Tầng 2 (Bản chất nợ): height 34px, 4 tabs [Cho vay | Thu nợ | Đi vay | Trả nợ],
-//      nền màu đặc, chữ in đậm màu trắng tinh khiết nổi bật.
-// 2. Amount Header Cluster & Smooth Numeric Jump (32sp):
-//    - Chữ số 32sp font monospace, nhảy số 140ms trượt dọc vi mô 2px qua AnimatedSwitcher.
-//    - Màu sắc số tiền đồng bộ 100% với màu sắc ngữ nghĩa của sub-tab.
-// 3. Ergonomic Inputs (Height 46px):
-//    - Ô đối tác và ô ghi chú mở rộng lên 46px tạo không gian bấm thoải mái.
-//    - Dropdown ví cố định tối thiểu 110px, bo góc 14px mềm mại.
-// 4. Modal Chọn Ví Chuẩn Fluid Sheet Engine:
-//    - Mở qua AppAnimationPolicy.showFluidSheet(mode: FluidSheetMode.fixed, enableBlur: false).
-//    - Toàn bộ bề mặt kéo hạ 1:1, đàn hồi snap-back và quẹt đóng dứt khoát, triệt tiêu blur kép.
-// 5. Numpad Chromatic Tuning & Elastic Press Feedback:
-//    - Phím nén 0.93x trong 60ms kèm HapticFeedback.selectionClick().
-//    - Cột phím shortcut (+50k, +100k, +200k) nền xám trung tính, chữ đổi theo màu tab.
-// 6. Disabled Action Button Guardrail:
-//    - Nút Lưu/Xác nhận cao 50px ở đáy; khi số tiền = 0 tự động hạ 40% opacity và chặn bấm.
-// 7. Fluid Sheet Engine & In-Memory Draft Retention:
-//    - Khóa private constructor QuickEntrySheet._ và mở qua launcher tĩnh QuickEntrySheet.show(...).
-//    - Đồng bộ draft liên tục qua quickEntryDraftProvider trong RAM; nút "✕" reset trắng sạch.
 // ==============================================================================
 
+import 'dart:ui';
 import 'package:drift/drift.dart' as drift;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -37,9 +16,11 @@ import '../core/animation/app_animation_policy.dart';
 import '../core/feedback/app_feedback.dart';
 import '../data/database.dart';
 import '../services/cloud_backup_service.dart';
+import '../theme/app_icons.dart';
 import '../theme/app_theme.dart';
 import '../widgets/currency_text.dart';
 import 'category_tree_modal.dart';
+import 'flowy_selection_picker.dart';
 import 'overrun_resolution_sheet.dart';
 import 'sliding_segmented_bar.dart';
 
@@ -77,19 +58,19 @@ class QuickEntryDraft {
 final quickEntryDraftProvider = StateProvider<QuickEntryDraft?>((ref) => null);
 
 final quickEntryWalletsStreamProvider =
-    StreamProvider.autoDispose<List<Wallet>>((ref) {
+StreamProvider.autoDispose<List<Wallet>>((ref) {
   final db = ref.watch(databaseProvider);
   return (db.select(db.wallets)
-        ..where((w) => w.isArchived.equals(false))
-        ..orderBy([
+    ..where((w) => w.isArchived.equals(false))
+    ..orderBy([
           (w) => drift.OrderingTerm.asc(w.sortOrder),
           (w) => drift.OrderingTerm.asc(w.createdAt)
-        ]))
+    ]))
       .watch();
 });
 
 final quickEntryDebtContactsStreamProvider =
-    StreamProvider.autoDispose<List<DebtContact>>((ref) {
+StreamProvider.autoDispose<List<DebtContact>>((ref) {
   final db = ref.watch(databaseProvider);
   return db.watchAllDebtContacts();
 });
@@ -200,14 +181,14 @@ class QuickEntrySheet extends ConsumerStatefulWidget {
   });
 
   static Future<void> show(
-    BuildContext context, {
-    Transaction? initialTransaction,
-    DateTime? initialContextDate,
-    DebtContact? prefilledDebtContact,
-    double? prefilledAmount,
-    String? prefilledDebtType,
-    double? prefilledDailySafe,
-  }) {
+      BuildContext context, {
+        Transaction? initialTransaction,
+        DateTime? initialContextDate,
+        DebtContact? prefilledDebtContact,
+        double? prefilledAmount,
+        String? prefilledDebtType,
+        double? prefilledDailySafe,
+      }) {
     HapticFeedback.selectionClick();
     return AppAnimationPolicy.showFluidSheet(
       context: context,
@@ -250,9 +231,9 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
   bool _isAmortized = false;
 
   final AppValidationFeedbackController _categoryFeedback =
-      AppValidationFeedbackController();
+  AppValidationFeedbackController();
   final AppValidationFeedbackController _debtContactFeedback =
-      AppValidationFeedbackController();
+  AppValidationFeedbackController();
 
   late final AnimationController _colorMorphController;
   late Animation<Color?> _colorMorphAnimation;
@@ -290,9 +271,9 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
       _selectedDebtContact = widget.prefilledDebtContact;
       _debtActionType = widget.prefilledDebtType ?? 'LEND';
       _expression =
-          widget.prefilledAmount != null && widget.prefilledAmount! > 0
-              ? widget.prefilledAmount!.toStringAsFixed(0)
-              : '0';
+      widget.prefilledAmount != null && widget.prefilledAmount! > 0
+          ? widget.prefilledAmount!.toStringAsFixed(0)
+          : '0';
       _noteController = TextEditingController();
       _selectedDate = widget.initialContextDate ?? DateTime.now();
     } else {
@@ -311,9 +292,9 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
       } else {
         _activeTab = CategoryType.expense;
         _expression =
-            widget.prefilledAmount != null && widget.prefilledAmount! > 0
-                ? widget.prefilledAmount!.toStringAsFixed(0)
-                : '0';
+        widget.prefilledAmount != null && widget.prefilledAmount! > 0
+            ? widget.prefilledAmount!.toStringAsFixed(0)
+            : '0';
         _noteController = TextEditingController();
 
         final ctxDate = widget.initialContextDate;
@@ -342,8 +323,8 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
     );
     _colorMorphAnimation =
         ColorTween(begin: initialColor, end: initialColor).animate(
-      CurvedAnimation(parent: _colorMorphController, curve: Curves.easeOut),
-    );
+          CurvedAnimation(parent: _colorMorphController, curve: Curves.easeOut),
+        );
 
     _headShakeController = AppAnimationPolicy.createController(
       vsync: this,
@@ -387,14 +368,14 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
     final db = ref.read(databaseProvider);
 
     final cats = await (db.select(db.categories)
-          ..where((c) => c.id.equals(tx.categoryId)))
+      ..where((c) => c.id.equals(tx.categoryId)))
         .get();
     if (cats.isNotEmpty && mounted) {
       setState(() => _selectedCategory = cats.first);
     }
 
     final wallets = await (db.select(db.wallets)
-          ..where((w) => w.id.equals(tx.walletId)))
+      ..where((w) => w.id.equals(tx.walletId)))
         .get();
     if (wallets.isNotEmpty && mounted) {
       setState(() => _selectedWallet = wallets.first);
@@ -604,9 +585,6 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
       context,
       initialType: _activeTab,
       selectedCategoryId: _selectedCategory?.id,
-      // Quick Entry now accepts both parent and child categories.
-      // CategoryTreeModal already separates selection from expand/collapse:
-      // tapping the parent selects it, while "Chi tiết" expands its children.
       allowSelectParent: true,
     );
     if (chosen != null && mounted) {
@@ -643,20 +621,53 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
         accent: accent,
         onDateSelected: (newDate) {
           setState(() {
-            final now = DateTime.now();
             _selectedDate = DateTime(
               newDate.year,
               newDate.month,
               newDate.day,
-              now.hour,
-              now.minute,
-              now.second,
+              _selectedDate.hour,
+              _selectedDate.minute,
+              _selectedDate.second,
             );
           });
           _syncDraft();
         },
       ),
     );
+  }
+
+  void _openZenHybridTimePicker(bool isDark, AppAccentPreset accent) async {
+    HapticFeedback.selectionClick();
+    final initialTime = TimeOfDay(
+      hour: _selectedDate.hour,
+      minute: _selectedDate.minute,
+    );
+
+    final pickedTime = await AppAnimationPolicy.showFluidSheet<TimeOfDay>(
+      context: context,
+      mode: FluidSheetMode.fixed,
+      isDismissible: true,
+      canDismiss: () => false,
+      useRootNavigator: true,
+      builder: (ctx, _) => _ZenHybridTimePickerSheet(
+        initialTime: initialTime,
+        isDark: isDark,
+        accent: accent,
+      ),
+    );
+
+    if (pickedTime != null && mounted) {
+      setState(() {
+        _selectedDate = DateTime(
+          _selectedDate.year,
+          _selectedDate.month,
+          _selectedDate.day,
+          pickedTime.hour,
+          pickedTime.minute,
+        );
+      });
+      _syncDraft();
+    }
   }
 
   Future<void> _pickDueDate() async {
@@ -776,7 +787,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
 
     final db = ref.read(databaseProvider);
     final activeWallets = await (db.select(db.wallets)
-          ..where((w) => w.isArchived.equals(false)))
+      ..where((w) => w.isArchived.equals(false)))
         .get();
     if (activeWallets.isEmpty) {
       if (!mounted) return;
@@ -803,9 +814,6 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
 
       try {
         if (_isEditMode) {
-          // Standard transactions and debt transactions live in different
-          // physical tables. Use the DB atomic bridge; never soft-delete the
-          // original row in UI code and never expose a half-finished mutation.
           await db.convertTransactionToDebtAtomically(
             transactionId: widget.initialTransaction!.id,
             contactId: _selectedDebtContact!.id,
@@ -878,9 +886,6 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
       return;
     }
 
-    // Expense / income always require an explicit compatible category.
-    // Never silently pick the first category or create a fallback behind the
-    // user's back when the tab changed.
     final selectedCategory = _selectedCategory;
     if (selectedCategory == null || selectedCategory.type != _activeTab) {
       _categoryFeedback.reject();
@@ -895,13 +900,13 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
       final noteString = _noteController.text.trim();
       final finalNote = _isAmortized
           ? (noteString.isEmpty
-              ? '#amortized'
-              : (noteString.contains('#amortized')
-                  ? noteString
-                  : '$noteString #amortized'))
+          ? '#amortized'
+          : (noteString.contains('#amortized')
+          ? noteString
+          : '$noteString #amortized'))
           : (noteString.isEmpty
-              ? null
-              : noteString.replaceAll('#amortized', '').trim());
+          ? null
+          : noteString.replaceAll('#amortized', '').trim());
 
       if (_isEditMode) {
         final oldTx = widget.initialTransaction!;
@@ -1006,23 +1011,23 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
     final isToday =
         date.year == now.year && date.month == now.month && date.day == now.day;
     if (isToday) {
-      return '📅 Hôm nay, ${DateFormat('dd/MM').format(date)}';
+      return 'Hôm nay, ${DateFormat('dd/MM').format(date)}';
     }
     final yesterday = now.subtract(const Duration(days: 1));
     final isYesterday = date.year == yesterday.year &&
         date.month == yesterday.month &&
         date.day == yesterday.day;
     if (isYesterday) {
-      return '📅 Hôm qua, ${DateFormat('dd/MM').format(date)}';
+      return 'Hôm qua, ${DateFormat('dd/MM').format(date)}';
     }
     final dayBefore = now.subtract(const Duration(days: 2));
     final isDayBefore = date.year == dayBefore.year &&
         date.month == dayBefore.month &&
         date.day == dayBefore.day;
     if (isDayBefore) {
-      return '📅 Hôm kia, ${DateFormat('dd/MM').format(date)}';
+      return 'Hôm kia, ${DateFormat('dd/MM').format(date)}';
     }
-    return '📅 ${DateFormat('dd/MM/yyyy').format(date)}';
+    return DateFormat('dd/MM/yyyy').format(date);
   }
 
   @override
@@ -1040,22 +1045,14 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
 
     final now = DateTime.now();
 
-    final isSelectedYesterday = _selectedDate.year ==
-            now.subtract(const Duration(days: 1)).year &&
-        _selectedDate.month == now.subtract(const Duration(days: 1)).month &&
-        _selectedDate.day == now.subtract(const Duration(days: 1)).day;
-
-    final isSelectedDayBefore = _selectedDate.year ==
-            now.subtract(const Duration(days: 2)).year &&
-        _selectedDate.month == now.subtract(const Duration(days: 2)).month &&
-        _selectedDate.day == now.subtract(const Duration(days: 2)).day;
-
     final bool hasDraftData =
         _expression != '0' || _noteController.text.trim().isNotEmpty;
     final bool canSubmit = calculatedAmount > 0 && !_isSubmitting;
     final bool requiredSelectionReady = _activeTab == CategoryType.debt
         ? _selectedDebtContact != null
         : _selectedCategory != null && _selectedCategory!.type == _activeTab;
+
+    final textMuted = isDark ? const Color(0xFF85A497) : const Color(0xFF536D62);
 
     return AppFeedbackDismissRegion(
       child: AnimatedBuilder(
@@ -1071,7 +1068,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
             decoration: BoxDecoration(
               color: isDark ? AppTokens.darkBg : AppTokens.lightBg,
               borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(24)),
+              const BorderRadius.vertical(top: Radius.circular(24)),
               border: Border.all(
                 color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder,
                 width: 1,
@@ -1090,7 +1087,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          padding: const EdgeInsets.symmetric(vertical: 8),
                           child: Center(
                             child: Container(
                               width: 44,
@@ -1105,7 +1102,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
 
                         if (_isEditMode)
                           Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 2, 12, 6),
+                            padding: const EdgeInsets.fromLTRB(16, 0, 12, 4),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
@@ -1136,12 +1133,12 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
                           ),
 
                         // ===============================================================
-                        // 🌟 TẦNG 1: 3 TAB CHÍNH (HEIGHT 42PX, BO GÓC 12PX)
+                        // 🌟 TẦNG 1: 3 TAB CHÍNH (HEIGHT 38PX, BO GÓC 12PX)
                         // ===============================================================
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 16.0),
                           child: SlidingSegmentedBar<CategoryType>(
-                            height: 42,
+                            height: 38,
                             fontSize: 12,
                             selectedValue: _activeTab,
                             onValueChanged: _switchTab,
@@ -1151,14 +1148,14 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
                                 label: 'Khoản chi',
                                 activeColor: AppTokens.expense,
                                 activeBackgroundColor:
-                                    AppTokens.expense.withValues(alpha: 0.18),
+                                AppTokens.expense.withValues(alpha: 0.18),
                               ),
                               SlidingSegmentedItem<CategoryType>(
                                 value: CategoryType.income,
                                 label: 'Khoản thu',
                                 activeColor: AppTokens.income,
                                 activeBackgroundColor:
-                                    AppTokens.income.withValues(alpha: 0.18),
+                                AppTokens.income.withValues(alpha: 0.18),
                               ),
                               SlidingSegmentedItem<CategoryType>(
                                 value: CategoryType.debt,
@@ -1171,7 +1168,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
                           ),
                         ),
 
-                        const SizedBox(height: 10),
+                        const SizedBox(height: 8),
 
                         // ===============================================================
                         // 🌟 TẦNG 2: 4 SUB-TAB CÔNG NỢ (HEIGHT 34PX, SOLID BG, CHỮ TRẮNG)
@@ -1179,7 +1176,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
                         if (_activeTab == CategoryType.debt) ...[
                           Padding(
                             padding:
-                                const EdgeInsets.symmetric(horizontal: 16.0),
+                            const EdgeInsets.symmetric(horizontal: 16.0),
                             child: SlidingSegmentedBar<String>(
                               height: 34,
                               fontSize: 11,
@@ -1217,7 +1214,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
                               ],
                             ),
                           ),
-                          const SizedBox(height: 10),
+                          const SizedBox(height: 8),
                         ],
 
                         // ===============================================================
@@ -1225,7 +1222,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
                         // ===============================================================
                         Padding(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 20.0, vertical: 4.0),
+                              horizontal: 20.0, vertical: 2.0),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             crossAxisAlignment: CrossAxisAlignment.baseline,
@@ -1260,7 +1257,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
                                               ? Colors.white12
                                               : Colors.black12,
                                           borderRadius:
-                                              BorderRadius.circular(12),
+                                          BorderRadius.circular(12),
                                         ),
                                         child: Icon(
                                           Icons.close_rounded,
@@ -1315,7 +1312,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
                               );
                             },
                             child: Padding(
-                              padding: const EdgeInsets.fromLTRB(16, 6, 16, 4),
+                              padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
                               child: Container(
                                 padding: const EdgeInsets.all(10),
                                 decoration: BoxDecoration(
@@ -1356,30 +1353,30 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
                                             onTap: () {
                                               HapticFeedback.selectionClick();
                                               setState(
-                                                  () => _isAmortized = true);
+                                                      () => _isAmortized = true);
                                               _syncDraft();
                                             },
                                             borderRadius:
-                                                BorderRadius.circular(8),
+                                            BorderRadius.circular(8),
                                             child: Container(
                                               padding:
-                                                  const EdgeInsets.symmetric(
-                                                      vertical: 6),
+                                              const EdgeInsets.symmetric(
+                                                  vertical: 6),
                                               decoration: BoxDecoration(
                                                 color: _isAmortized
                                                     ? const Color(0xFF10B981)
                                                     : (isDark
-                                                        ? AppTokens.darkCard
-                                                        : Colors.white),
+                                                    ? AppTokens.darkCard
+                                                    : Colors.white),
                                                 borderRadius:
-                                                    BorderRadius.circular(8),
+                                                BorderRadius.circular(8),
                                                 border: Border.all(
                                                   color: _isAmortized
                                                       ? const Color(0xFF10B981)
                                                       : (isDark
-                                                          ? AppTokens.darkBorder
-                                                          : AppTokens
-                                                              .lightBorder),
+                                                      ? AppTokens.darkBorder
+                                                      : AppTokens
+                                                      .lightBorder),
                                                 ),
                                               ),
                                               child: Center(
@@ -1391,9 +1388,9 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
                                                     color: _isAmortized
                                                         ? Colors.white
                                                         : (isDark
-                                                            ? AppTokens.darkText
-                                                            : AppTokens
-                                                                .lightText),
+                                                        ? AppTokens.darkText
+                                                        : AppTokens
+                                                        .lightText),
                                                   ),
                                                 ),
                                               ),
@@ -1406,30 +1403,30 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
                                             onTap: () {
                                               HapticFeedback.selectionClick();
                                               setState(
-                                                  () => _isAmortized = false);
+                                                      () => _isAmortized = false);
                                               _syncDraft();
                                             },
                                             borderRadius:
-                                                BorderRadius.circular(8),
+                                            BorderRadius.circular(8),
                                             child: Container(
                                               padding:
-                                                  const EdgeInsets.symmetric(
-                                                      vertical: 6),
+                                              const EdgeInsets.symmetric(
+                                                  vertical: 6),
                                               decoration: BoxDecoration(
                                                 color: !_isAmortized
                                                     ? const Color(0xFFF59E0B)
                                                     : (isDark
-                                                        ? AppTokens.darkCard
-                                                        : Colors.white),
+                                                    ? AppTokens.darkCard
+                                                    : Colors.white),
                                                 borderRadius:
-                                                    BorderRadius.circular(8),
+                                                BorderRadius.circular(8),
                                                 border: Border.all(
                                                   color: !_isAmortized
                                                       ? const Color(0xFFF59E0B)
                                                       : (isDark
-                                                          ? AppTokens.darkBorder
-                                                          : AppTokens
-                                                              .lightBorder),
+                                                      ? AppTokens.darkBorder
+                                                      : AppTokens
+                                                      .lightBorder),
                                                 ),
                                               ),
                                               child: Center(
@@ -1441,9 +1438,9 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
                                                     color: !_isAmortized
                                                         ? Colors.white
                                                         : (isDark
-                                                            ? AppTokens.darkText
-                                                            : AppTokens
-                                                                .lightText),
+                                                        ? AppTokens.darkText
+                                                        : AppTokens
+                                                        .lightText),
                                                   ),
                                                 ),
                                               ),
@@ -1458,40 +1455,40 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
                             ),
                           ),
 
-                        const Divider(height: 14),
+                        const Divider(height: 12),
 
                         // ===============================================================
-                        // 🌟 CỤM INPUT: ĐỐI TÁC, DANH MỤC, GHI CHÚ & VÍ (CHIỀU CAO 46PX)
+                        // 🌟 ROW 1: FULL-WIDTH CATEGORY HOẶC CONTACT SELECTOR (H = 50DP)
                         // ===============================================================
                         if (_activeTab != CategoryType.debt)
                           Padding(
                             padding:
-                                const EdgeInsets.symmetric(horizontal: 16.0),
+                            const EdgeInsets.symmetric(horizontal: 16.0),
                             child: AppValidationFeedback(
                               controller: _categoryFeedback,
                               builder: (context, visual) {
                                 final restingBorder = _selectedCategory != null
                                     ? currentSemanticColor.withValues(
-                                        alpha: 0.5)
+                                    alpha: 0.5)
                                     : (isDark
-                                        ? AppTokens.darkBorder
-                                        : AppTokens.lightBorder);
+                                    ? AppTokens.darkBorder
+                                    : AppTokens.lightBorder);
 
                                 return InkWell(
                                   onTap: _openCategoryModal,
                                   borderRadius: BorderRadius.circular(16),
                                   child: Container(
-                                    height: 46,
+                                    height: 50,
                                     padding: const EdgeInsets.symmetric(
                                         horizontal: 14),
                                     decoration: BoxDecoration(
                                       color: isDark
                                           ? AppTokens.darkCard
                                           : Colors.white,
-                                      borderRadius: BorderRadius.circular(14),
+                                      borderRadius: BorderRadius.circular(16),
                                       border: Border.all(
                                         color:
-                                            visual.borderColor(restingBorder),
+                                        visual.borderColor(restingBorder),
                                         width: visual.isInvalid ? 1.4 : 1.0,
                                       ),
                                       boxShadow: [
@@ -1506,31 +1503,32 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
                                     child: Row(
                                       children: [
                                         Container(
-                                          padding: const EdgeInsets.all(6),
+                                          padding: const EdgeInsets.all(7),
                                           decoration: BoxDecoration(
                                             color: currentSemanticColor
                                                 .withValues(alpha: 0.15),
                                             borderRadius:
-                                                BorderRadius.circular(10),
+                                            BorderRadius.circular(10),
                                           ),
                                           child: Icon(
                                             Icons.folder_open_rounded,
-                                            size: 16,
+                                            size: 18,
                                             color: currentSemanticColor,
                                           ),
                                         ),
-                                        const SizedBox(width: 10),
+                                        const SizedBox(width: 12),
                                         Expanded(
                                           child: Column(
                                             mainAxisAlignment:
-                                                MainAxisAlignment.center,
+                                            MainAxisAlignment.center,
                                             crossAxisAlignment:
-                                                CrossAxisAlignment.start,
+                                            CrossAxisAlignment.start,
                                             children: [
                                               Text(
                                                 'Danh mục giao dịch',
                                                 style: TextStyle(
-                                                  fontSize: 10,
+                                                  fontSize: 10.5,
+                                                  fontWeight: FontWeight.w600,
                                                   color: isDark
                                                       ? AppTokens.darkMuted
                                                       : AppTokens.lightMuted,
@@ -1543,17 +1541,17 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
                                                 maxLines: 1,
                                                 overflow: TextOverflow.ellipsis,
                                                 style: TextStyle(
-                                                  fontSize: 13,
+                                                  fontSize: 13.5,
                                                   fontWeight: FontWeight.w700,
                                                   color: _selectedCategory !=
-                                                          null
+                                                      null
                                                       ? (isDark
-                                                          ? AppTokens.darkText
-                                                          : AppTokens.lightText)
+                                                      ? AppTokens.darkText
+                                                      : AppTokens.lightText)
                                                       : (isDark
-                                                          ? AppTokens.darkMuted
-                                                          : AppTokens
-                                                              .lightMuted),
+                                                      ? AppTokens.darkMuted
+                                                      : AppTokens
+                                                      .lightMuted),
                                                 ),
                                               ),
                                             ],
@@ -1561,7 +1559,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
                                         ),
                                         Icon(
                                           Icons.chevron_right_rounded,
-                                          size: 20,
+                                          size: 22,
                                           color: isDark
                                               ? AppTokens.darkMuted
                                               : AppTokens.lightMuted,
@@ -1577,7 +1575,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
                         if (_activeTab == CategoryType.debt)
                           Padding(
                             padding:
-                                const EdgeInsets.symmetric(horizontal: 16.0),
+                            const EdgeInsets.symmetric(horizontal: 16.0),
                             child: AppValidationFeedback(
                               controller: _debtContactFeedback,
                               builder: (context, visual) {
@@ -1585,21 +1583,21 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
                                     ? AppTokens.darkBorder
                                     : AppTokens.lightBorder;
                                 final validationBorder =
-                                    visual.borderColor(restingBorder);
+                                visual.borderColor(restingBorder);
 
                                 return Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     if (_selectedDebtContact != null)
                                       Container(
-                                        height: 46,
+                                        height: 50,
                                         padding: const EdgeInsets.symmetric(
-                                            horizontal: 12),
+                                            horizontal: 14),
                                         decoration: BoxDecoration(
                                           color: currentSemanticColor
                                               .withValues(alpha: 0.12),
                                           borderRadius:
-                                              BorderRadius.circular(14),
+                                          BorderRadius.circular(16),
                                           border: Border.all(
                                             color: visual.borderColor(
                                               currentSemanticColor.withValues(
@@ -1611,28 +1609,28 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
                                         child: Row(
                                           children: [
                                             CircleAvatar(
-                                              radius: 14,
+                                              radius: 15,
                                               backgroundColor:
-                                                  currentSemanticColor
-                                                      .withValues(alpha: 0.25),
+                                              currentSemanticColor
+                                                  .withValues(alpha: 0.25),
                                               child: Icon(Icons.person_rounded,
-                                                  size: 16,
+                                                  size: 18,
                                                   color: currentSemanticColor),
                                             ),
-                                            const SizedBox(width: 10),
+                                            const SizedBox(width: 12),
                                             Expanded(
                                               child: Column(
                                                 mainAxisAlignment:
-                                                    MainAxisAlignment.center,
+                                                MainAxisAlignment.center,
                                                 crossAxisAlignment:
-                                                    CrossAxisAlignment.start,
+                                                CrossAxisAlignment.start,
                                                 children: [
                                                   Text(
                                                     _selectedDebtContact!.name,
                                                     style: TextStyle(
-                                                      fontSize: 13,
+                                                      fontSize: 13.5,
                                                       fontWeight:
-                                                          FontWeight.w800,
+                                                      FontWeight.w800,
                                                       color: isDark
                                                           ? AppTokens.darkText
                                                           : AppTokens.lightText,
@@ -1640,33 +1638,33 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
                                                   ),
                                                   CurrencyText(
                                                     _selectedDebtContact!
-                                                                .netBalance >
-                                                            0
+                                                        .netBalance >
+                                                        0
                                                         ? 'Đang nợ bạn: ${_formatCurrency(_selectedDebtContact!.netBalance)}'
                                                         : (_selectedDebtContact!
-                                                                    .netBalance <
-                                                                0
-                                                            ? 'Bạn đang nợ: ${_formatCurrency(_selectedDebtContact!.netBalance.abs())}'
-                                                            : 'Đã tất toán sòng phẳng (0 ₫)'),
+                                                        .netBalance <
+                                                        0
+                                                        ? 'Bạn đang nợ: ${_formatCurrency(_selectedDebtContact!.netBalance.abs())}'
+                                                        : 'Đã tất toán sòng phẳng (0 ₫)'),
                                                     style: TextStyle(
-                                                      fontSize: 10,
+                                                      fontSize: 10.5,
                                                       fontWeight:
-                                                          FontWeight.w600,
+                                                      FontWeight.w600,
                                                       color: _selectedDebtContact!
-                                                                  .netBalance >
-                                                              0
+                                                          .netBalance >
+                                                          0
                                                           ? const Color(
-                                                              0xFF10B981)
+                                                          0xFF10B981)
                                                           : (_selectedDebtContact!
-                                                                      .netBalance <
-                                                                  0
-                                                              ? AppTokens
-                                                                  .expense
-                                                              : (isDark
-                                                                  ? AppTokens
-                                                                      .darkMuted
-                                                                  : AppTokens
-                                                                      .lightMuted)),
+                                                          .netBalance <
+                                                          0
+                                                          ? AppTokens
+                                                          .expense
+                                                          : (isDark
+                                                          ? AppTokens
+                                                          .darkMuted
+                                                          : AppTokens
+                                                          .lightMuted)),
                                                     ),
                                                   ),
                                                 ],
@@ -1677,19 +1675,19 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
                                                 HapticFeedback.selectionClick();
                                                 _debtContactFeedback.clear();
                                                 setState(() =>
-                                                    _selectedDebtContact =
-                                                        null);
+                                                _selectedDebtContact =
+                                                null);
                                                 _syncDraft();
                                               },
                                               borderRadius:
-                                                  BorderRadius.circular(8),
+                                              BorderRadius.circular(8),
                                               child: Padding(
                                                 padding:
-                                                    const EdgeInsets.all(4.0),
+                                                const EdgeInsets.all(4.0),
                                                 child: Icon(Icons.close_rounded,
-                                                    size: 16,
+                                                    size: 18,
                                                     color:
-                                                        currentSemanticColor),
+                                                    currentSemanticColor),
                                               ),
                                             ),
                                           ],
@@ -1697,49 +1695,49 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
                                       )
                                     else
                                       SizedBox(
-                                        height: 46,
+                                        height: 50,
                                         child: TextField(
                                           controller: _contactSearchController,
                                           onChanged: (text) {
                                             setState(
-                                              () => _isSearchingContact =
+                                                  () => _isSearchingContact =
                                                   text.trim().isNotEmpty,
                                             );
                                           },
                                           style: TextStyle(
-                                            fontSize: 13,
+                                            fontSize: 13.5,
                                             color: isDark
                                                 ? AppTokens.darkText
                                                 : AppTokens.lightText,
                                           ),
                                           decoration: InputDecoration(
                                             hintText:
-                                                'Nhập tên người vay / nợ (vd: Nam, Hải Anh)...',
+                                            'Nhập tên người vay / nợ (vd: Nam, Sơn)...',
                                             hintStyle: TextStyle(
-                                              fontSize: 12,
+                                              fontSize: 12.5,
                                               color: isDark
                                                   ? AppTokens.darkMuted
                                                   : AppTokens.lightMuted,
                                             ),
                                             prefixIcon: Icon(
                                                 Icons.person_outline_rounded,
-                                                size: 18,
+                                                size: 20,
                                                 color: currentSemanticColor),
                                             isDense: true,
                                             contentPadding:
-                                                const EdgeInsets.symmetric(
-                                                    horizontal: 14,
-                                                    vertical: 13),
+                                            const EdgeInsets.symmetric(
+                                                horizontal: 14,
+                                                vertical: 14),
                                             border: OutlineInputBorder(
                                               borderRadius:
-                                                  BorderRadius.circular(14),
+                                              BorderRadius.circular(16),
                                               borderSide: BorderSide(
                                                 color: validationBorder,
                                               ),
                                             ),
                                             enabledBorder: OutlineInputBorder(
                                               borderRadius:
-                                                  BorderRadius.circular(14),
+                                              BorderRadius.circular(16),
                                               borderSide: BorderSide(
                                                 color: validationBorder,
                                                 width: visual.isInvalid
@@ -1749,7 +1747,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
                                             ),
                                             focusedBorder: OutlineInputBorder(
                                               borderRadius:
-                                                  BorderRadius.circular(14),
+                                              BorderRadius.circular(16),
                                               borderSide: BorderSide(
                                                 color: visual.isInvalid
                                                     ? AppTokens.expense
@@ -1770,24 +1768,24 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
                                               .toLowerCase();
                                           final matched = contacts
                                               .where((c) => c.name
-                                                  .toLowerCase()
-                                                  .contains(query))
+                                              .toLowerCase()
+                                              .contains(query))
                                               .toList();
                                           final isExactMatch = matched.any(
-                                              (c) =>
-                                                  c.name.toLowerCase() ==
+                                                  (c) =>
+                                              c.name.toLowerCase() ==
                                                   query);
 
                                           return Container(
                                             margin:
-                                                const EdgeInsets.only(top: 6),
+                                            const EdgeInsets.only(top: 6),
                                             padding: const EdgeInsets.all(6),
                                             decoration: BoxDecoration(
                                               color: isDark
                                                   ? AppTokens.darkCard
                                                   : Colors.white,
                                               borderRadius:
-                                                  BorderRadius.circular(14),
+                                              BorderRadius.circular(14),
                                               border: Border.all(
                                                 color: isDark
                                                     ? AppTokens.darkBorder
@@ -1804,14 +1802,14 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
                                             ),
                                             child: Column(
                                               crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
+                                              CrossAxisAlignment.start,
                                               mainAxisSize: MainAxisSize.min,
                                               children: [
                                                 ...matched.map((c) {
                                                   return ListTile(
                                                     dense: true,
                                                     visualDensity:
-                                                        VisualDensity.compact,
+                                                    VisualDensity.compact,
                                                     leading: const Icon(
                                                         Icons
                                                             .account_circle_outlined,
@@ -1821,11 +1819,11 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
                                                       style: TextStyle(
                                                         fontSize: 13,
                                                         fontWeight:
-                                                            FontWeight.w700,
+                                                        FontWeight.w700,
                                                         color: isDark
                                                             ? AppTokens.darkText
                                                             : AppTokens
-                                                                .lightText,
+                                                            .lightText,
                                                       ),
                                                     ),
                                                     subtitle: CurrencyText(
@@ -1836,9 +1834,9 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
                                                         fontSize: 10,
                                                         color: isDark
                                                             ? AppTokens
-                                                                .darkMuted
+                                                            .darkMuted
                                                             : AppTokens
-                                                                .lightMuted,
+                                                            .lightMuted,
                                                       ),
                                                     ),
                                                     onTap: () {
@@ -1850,7 +1848,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
                                                         _contactSearchController
                                                             .clear();
                                                         _isSearchingContact =
-                                                            false;
+                                                        false;
                                                       });
                                                       _debtContactFeedback
                                                           .clear();
@@ -1869,8 +1867,8 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
                                                             _contactSearchController
                                                                 .text),
                                                     borderRadius:
-                                                        BorderRadius.circular(
-                                                            10),
+                                                    BorderRadius.circular(
+                                                        10),
                                                     child: Padding(
                                                       padding: const EdgeInsets
                                                           .symmetric(
@@ -1883,7 +1881,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
                                                                   .person_add_alt_1_rounded,
                                                               size: 18,
                                                               color:
-                                                                  currentSemanticColor),
+                                                              currentSemanticColor),
                                                           const SizedBox(
                                                               width: 8),
                                                           Expanded(
@@ -1892,10 +1890,10 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
                                                               style: TextStyle(
                                                                 fontSize: 12,
                                                                 fontWeight:
-                                                                    FontWeight
-                                                                        .w800,
+                                                                FontWeight
+                                                                    .w800,
                                                                 color:
-                                                                    currentSemanticColor,
+                                                                currentSemanticColor,
                                                               ),
                                                             ),
                                                           ),
@@ -1918,91 +1916,141 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
 
                         const SizedBox(height: 8),
 
-                        // Hàng Ghi chú & Dropdown Ví (Chiều cao 46px, minWidth 110px)
+                        // ===============================================================
+                        // 🌟 ROW 2: FULL-WIDTH WALLET SELECTOR CARD (H >= 52DP)
+                        // ===============================================================
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: SizedBox(
-                                  height: 46,
-                                  child: TextField(
-                                    controller: _noteController,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: isDark
-                                          ? AppTokens.darkText
-                                          : AppTokens.lightText,
-                                    ),
-                                    decoration: InputDecoration(
-                                      hintText: _activeTab == CategoryType.debt
-                                          ? 'Ghi chú (vd: Ăn trưa hộ, Mượn tiền mặt...)'
-                                          : 'Ghi chú / Cửa hàng...',
-                                      hintStyle: TextStyle(
-                                        fontSize: 12,
+                          child: walletsAsync.when(
+                            data: (wallets) {
+                              if (wallets.isEmpty) return const SizedBox();
+
+                              _selectedWallet = wallets
+                                  .where((w) => w.id == _selectedWallet?.id)
+                                  .firstOrNull ??
+                                  wallets.firstWhere(
+                                        (w) => w.isDefault,
+                                    orElse: () => wallets.first,
+                                  );
+
+                              final w = _selectedWallet!;
+                              final walletColor = AppIcons.parseColor(w.color);
+
+                              return Material(
+                                color:
+                                isDark ? AppTokens.darkCard : Colors.white,
+                                borderRadius: BorderRadius.circular(16),
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(16),
+                                  onTap: () => _openWalletPickerModal(
+                                      wallets, isDark, accent),
+                                  child: Container(
+                                    constraints:
+                                    const BoxConstraints(minHeight: 52),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 14, vertical: 8),
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(
                                         color: isDark
-                                            ? AppTokens.darkMuted
-                                            : AppTokens.lightMuted,
+                                            ? AppTokens.darkBorder
+                                            : AppTokens.lightBorder,
+                                        width: 1.0,
                                       ),
-                                      isDense: true,
-                                      contentPadding:
-                                          const EdgeInsets.symmetric(
-                                              horizontal: 14, vertical: 13),
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(14),
-                                        borderSide: BorderSide(
-                                          color: isDark
-                                              ? AppTokens.darkBorder
-                                              : AppTokens.lightBorder,
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black
+                                              .withValues(alpha: 0.03),
+                                          blurRadius: 6,
+                                          offset: const Offset(0, 2),
                                         ),
-                                      ),
-                                      enabledBorder: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(14),
-                                        borderSide: BorderSide(
-                                          color: isDark
-                                              ? AppTokens.darkBorder
-                                              : AppTokens.lightBorder,
+                                      ],
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          width: 36,
+                                          height: 36,
+                                          decoration: BoxDecoration(
+                                            color: walletColor.withValues(
+                                                alpha: 0.14),
+                                            borderRadius:
+                                            BorderRadius.circular(10),
+                                          ),
+                                          child: Icon(
+                                            AppIcons.resolve(w.icon),
+                                            color: walletColor,
+                                            size: 20,
+                                          ),
                                         ),
-                                      ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                            mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                            children: [
+                                              Text(
+                                                w.name,
+                                                style: TextStyle(
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: isDark
+                                                      ? AppTokens.darkText
+                                                      : AppTokens.lightText,
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                              const SizedBox(height: 1),
+                                              CurrencyText(
+                                                'Khả dụng: ${_formatCurrency(w.balance)}',
+                                                style: TextStyle(
+                                                  fontSize: 11.5,
+                                                  fontWeight: FontWeight.w500,
+                                                  color: isDark
+                                                      ? AppTokens.darkMuted
+                                                      : AppTokens.lightMuted,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        Icon(
+                                          Icons.keyboard_arrow_down_rounded,
+                                          size: 20,
+                                          color: isDark
+                                              ? AppTokens.darkMuted
+                                              : AppTokens.lightMuted,
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 ),
+                              );
+                            },
+                            loading: () => Container(
+                              height: 52,
+                              decoration: BoxDecoration(
+                                color: isDark
+                                    ? AppTokens.darkCard
+                                    : AppTokens.lightCard,
+                                borderRadius: BorderRadius.circular(16),
                               ),
-                              const SizedBox(width: 8),
-                              walletsAsync.when(
-                                data: (wallets) {
-                                  if (wallets.isEmpty) return const SizedBox();
-
-                                  _selectedWallet = wallets
-                                          .where((w) =>
-                                              w.id == _selectedWallet?.id)
-                                          .firstOrNull ??
-                                      wallets.firstWhere(
-                                        (w) => w.isDefault,
-                                        orElse: () => wallets.first,
-                                      );
-
-                                  return SizedBox(
-                                      width: MediaQuery.sizeOf(context).width *
-                                          .43,
-                                      child: FlowyPickerTrigger(
-                                          onTap: () => _openWalletPickerModal(
-                                              wallets, isDark, accent),
-                                          child: walletPickerLabel(
-                                              _selectedWallet!)));
-                                },
-                                loading: () => const SizedBox(),
-                                error: (_, __) => const SizedBox(),
-                              ),
-                            ],
+                            ),
+                            error: (_, __) => const SizedBox(),
                           ),
                         ),
 
-                        const SizedBox(height: 6),
+                        const SizedBox(height: 8),
 
-                        if (_activeTab == CategoryType.debt)
+                        // ===============================================================
+                        // 🌟 ROW 3A: DUE DATE SELECTOR (Chỉ hiện khi Tab là Vay/Nợ)
+                        // ===============================================================
+                        if (_activeTab == CategoryType.debt) ...[
                           Container(
-                            padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
+                            padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
                             color: isDark
                                 ? AppTokens.darkCardSubtle
                                 : AppTokens.lightCardSubtle,
@@ -2011,8 +2059,8 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
                                 Text(
                                   'Hạn trả:',
                                   style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
                                     color: isDark
                                         ? AppTokens.darkMuted
                                         : AppTokens.lightMuted,
@@ -2027,20 +2075,20 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
                                       children: [
                                         _buildDueDateChip(
                                             'Không hẹn', _debtDueDate == null,
-                                            () {
-                                          HapticFeedback.selectionClick();
-                                          setState(() => _debtDueDate = null);
-                                          _syncDraft();
-                                        }, isDark, currentSemanticColor),
+                                                () {
+                                              HapticFeedback.selectionClick();
+                                              setState(() => _debtDueDate = null);
+                                              _syncDraft();
+                                            }, isDark, currentSemanticColor),
                                         const SizedBox(width: 6),
                                         _buildDueDateChip(
                                           '7 ngày',
                                           _debtDueDate != null &&
                                               _debtDueDate!
-                                                      .difference(now)
-                                                      .inDays ==
+                                                  .difference(now)
+                                                  .inDays ==
                                                   7,
-                                          () {
+                                              () {
                                             HapticFeedback.selectionClick();
                                             setState(() => _debtDueDate = now
                                                 .add(const Duration(days: 7)));
@@ -2051,17 +2099,17 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
                                         ),
                                         const SizedBox(width: 6),
                                         _buildDueDateChip(
-                                          '1 tháng',
+                                          '30 ngày',
                                           _debtDueDate != null &&
                                               _debtDueDate!
-                                                      .difference(now)
-                                                      .inDays >=
+                                                  .difference(now)
+                                                  .inDays >=
                                                   28 &&
                                               _debtDueDate!
-                                                      .difference(now)
-                                                      .inDays <=
+                                                  .difference(now)
+                                                  .inDays <=
                                                   31,
-                                          () {
+                                              () {
                                             HapticFeedback.selectionClick();
                                             setState(() => _debtDueDate = now
                                                 .add(const Duration(days: 30)));
@@ -2074,8 +2122,8 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
                                         _buildDueDateChip(
                                           _debtDueDate != null
                                               ? DateFormat('dd/MM')
-                                                  .format(_debtDueDate!)
-                                              : '📅 Chọn ngày',
+                                              .format(_debtDueDate!)
+                                              : 'Tùy chọn',
                                           _debtDueDate != null,
                                           _pickDueDate,
                                           isDark,
@@ -2088,177 +2136,204 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
                               ],
                             ),
                           ),
+                          const SizedBox(height: 6),
+                        ],
 
-                        // Hàng Chip Ngày
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: isDark
-                                ? AppTokens.darkCardSubtle
-                                : AppTokens.lightCardSubtle,
-                            border: Border(
-                              top: BorderSide(
+                        // ===============================================================
+                        // 🌟 ROW 3B: HỢP NHẤT THỜI GIAN (SEGMENTED CAPSULE 6 : 4)
+                        // ===============================================================
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                          child: Container(
+                            height: 48,
+                            decoration: BoxDecoration(
+                              color: isDark ? AppTokens.darkCard : Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
                                 color: isDark
                                     ? AppTokens.darkBorder
                                     : AppTokens.lightBorder,
+                                width: 1.0,
                               ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.03),
+                                  blurRadius: 6,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
                             ),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              InkWell(
-                                onTap: () =>
-                                    _openMiniCalendarModal(isDark, accent),
-                                borderRadius: BorderRadius.circular(10),
-                                child: Container(
-                                  height: 32,
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 10),
-                                  decoration: BoxDecoration(
-                                    color: currentSemanticColor.withValues(
-                                        alpha: 0.12),
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(
-                                      color: currentSemanticColor.withValues(
-                                          alpha: 0.4),
-                                      width: 1.0,
-                                    ),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(
-                                        _formatDateChipLabel(_selectedDate),
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w800,
-                                          color: currentSemanticColor,
+                            child: Row(
+                              children: [
+                                // Nửa trái: Chọn Ngày Giao Dịch
+                                Expanded(
+                                  flex: 6,
+                                  child: Material(
+                                    color: Colors.transparent,
+                                    child: InkWell(
+                                      onTap: () =>
+                                          _openMiniCalendarModal(isDark, accent),
+                                      borderRadius: const BorderRadius.horizontal(
+                                        left: Radius.circular(16),
+                                      ),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 12),
+                                        alignment: Alignment.center,
+                                        child: Row(
+                                          mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                          children: [
+                                            Icon(
+                                              Icons.calendar_today_rounded,
+                                              size: 16,
+                                              color: textMuted,
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Flexible(
+                                              child: Text(
+                                                _formatDateChipLabel(_selectedDate),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: TextStyle(
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: isDark
+                                                      ? AppTokens.darkText
+                                                      : AppTokens.lightText,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
-                                      const SizedBox(width: 4),
-                                      Icon(Icons.keyboard_arrow_down_rounded,
-                                          size: 14,
-                                          color: currentSemanticColor),
-                                    ],
+                                    ),
                                   ),
                                 ),
-                              ),
-                              Row(
-                                children: [
-                                  InkWell(
-                                    onTap: () {
-                                      HapticFeedback.selectionClick();
-                                      setState(() {
-                                        final y = now
-                                            .subtract(const Duration(days: 1));
-                                        _selectedDate = DateTime(
-                                            y.year,
-                                            y.month,
-                                            y.day,
-                                            now.hour,
-                                            now.minute);
-                                      });
-                                      _syncDraft();
-                                    },
-                                    borderRadius: BorderRadius.circular(10),
-                                    child: Container(
-                                      height: 32,
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 10),
-                                      alignment: Alignment.center,
-                                      decoration: BoxDecoration(
-                                        color: isSelectedYesterday
-                                            ? currentSemanticColor.withValues(
-                                                alpha: 0.14)
-                                            : (isDark
-                                                ? AppTokens.darkCard
-                                                : Colors.white),
-                                        borderRadius: BorderRadius.circular(10),
-                                        border: Border.all(
-                                          color: isSelectedYesterday
-                                              ? currentSemanticColor
-                                              : (isDark
-                                                  ? AppTokens.darkBorder
-                                                  : AppTokens.lightBorder),
-                                          width: 1.0,
-                                        ),
+
+                                // Vạch phân cách dọc 1px
+                                Container(
+                                  width: 1,
+                                  height: 24,
+                                  color: isDark
+                                      ? AppTokens.darkBorder
+                                      : AppTokens.lightBorder,
+                                ),
+
+                                // Nửa phải: Chọn Giờ Giao Dịch
+                                Expanded(
+                                  flex: 4,
+                                  child: Material(
+                                    color: Colors.transparent,
+                                    child: InkWell(
+                                      onTap: () => _openZenHybridTimePicker(
+                                          isDark, accent),
+                                      borderRadius: const BorderRadius.horizontal(
+                                        right: Radius.circular(16),
                                       ),
-                                      child: Text(
-                                        'Hôm qua',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: isSelectedYesterday
-                                              ? FontWeight.w800
-                                              : FontWeight.w600,
-                                          color: isSelectedYesterday
-                                              ? currentSemanticColor
-                                              : (isDark
-                                                  ? AppTokens.darkText
-                                                  : AppTokens.lightText),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 12),
+                                        alignment: Alignment.center,
+                                        child: Row(
+                                          mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                          children: [
+                                            Icon(
+                                              Icons.access_time_rounded,
+                                              size: 16,
+                                              color: textMuted,
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              DateFormat('HH:mm')
+                                                  .format(_selectedDate),
+                                              style: TextStyle(
+                                                fontSize: 13.5,
+                                                fontWeight: FontWeight.w700,
+                                                color: isDark
+                                                    ? AppTokens.darkText
+                                                    : AppTokens.lightText,
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
                                     ),
                                   ),
-                                  const SizedBox(width: 6),
-                                  InkWell(
-                                    onTap: () {
-                                      HapticFeedback.selectionClick();
-                                      setState(() {
-                                        final d = now
-                                            .subtract(const Duration(days: 2));
-                                        _selectedDate = DateTime(
-                                            d.year,
-                                            d.month,
-                                            d.day,
-                                            now.hour,
-                                            now.minute);
-                                      });
-                                      _syncDraft();
-                                    },
-                                    borderRadius: BorderRadius.circular(10),
-                                    child: Container(
-                                      height: 32,
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 10),
-                                      alignment: Alignment.center,
-                                      decoration: BoxDecoration(
-                                        color: isSelectedDayBefore
-                                            ? currentSemanticColor.withValues(
-                                                alpha: 0.14)
-                                            : (isDark
-                                                ? AppTokens.darkCard
-                                                : Colors.white),
-                                        borderRadius: BorderRadius.circular(10),
-                                        border: Border.all(
-                                          color: isSelectedDayBefore
-                                              ? currentSemanticColor
-                                              : (isDark
-                                                  ? AppTokens.darkBorder
-                                                  : AppTokens.lightBorder),
-                                          width: 1.0,
-                                        ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(height: 8),
+
+                        // ===============================================================
+                        // 🌟 ROW 4: DYNAMIC MULTI-LINE NOTE BOX (XUỐNG DÒNG TỰ DO)
+                        // ===============================================================
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? AppTokens.darkCardSubtle
+                                  : AppTokens.lightCardSubtle,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: isDark
+                                    ? AppTokens.darkBorder
+                                    : AppTokens.lightBorder,
+                                width: 1.0,
+                              ),
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 4),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Padding(
+                                  padding:
+                                  const EdgeInsets.only(top: 10, right: 8),
+                                  child: Icon(
+                                    Icons.edit_note_rounded,
+                                    size: 20,
+                                    color: textMuted,
+                                  ),
+                                ),
+                                Expanded(
+                                  child: TextField(
+                                    controller: _noteController,
+                                    minLines: 1,
+                                    maxLines: null,
+                                    keyboardType: TextInputType.multiline,
+                                    textInputAction: TextInputAction.newline,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      height: 1.35,
+                                      color: isDark
+                                          ? AppTokens.darkText
+                                          : AppTokens.lightText,
+                                    ),
+                                    decoration: InputDecoration(
+                                      hintText:
+                                      'Thêm ghi chú (xuống dòng tự do)...',
+                                      hintStyle: TextStyle(
+                                        fontSize: 12.5,
+                                        color: isDark
+                                            ? AppTokens.darkMuted
+                                            : AppTokens.lightMuted,
                                       ),
-                                      child: Text(
-                                        'Hôm kia',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: isSelectedDayBefore
-                                              ? FontWeight.w800
-                                              : FontWeight.w600,
-                                          color: isSelectedDayBefore
-                                              ? currentSemanticColor
-                                              : (isDark
-                                                  ? AppTokens.darkText
-                                                  : AppTokens.lightText),
-                                        ),
-                                      ),
+                                      isDense: true,
+                                      border: InputBorder.none,
+                                      contentPadding:
+                                      const EdgeInsets.symmetric(
+                                          vertical: 10),
                                     ),
                                   ),
-                                ],
-                              ),
-                            ],
+                                ),
+                              ],
+                            ),
                           ),
                         ),
 
@@ -2298,8 +2373,8 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
                                   MediaQuery.of(context).size.width - 24;
                               final double currentWidth = _isSuccessMorphed
                                   ? fullWidth -
-                                      (fullWidth - 50.0) *
-                                          _morphWidthAnimation.value
+                                  (fullWidth - 50.0) *
+                                      _morphWidthAnimation.value
                                   : fullWidth;
 
                               return SizedBox(
@@ -2320,60 +2395,60 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
                                         borderRadius: BorderRadius.circular(
                                           _isSuccessMorphed
                                               ? 16.0 +
-                                                  (9.0 *
-                                                      _morphWidthAnimation
-                                                          .value)
+                                              (9.0 *
+                                                  _morphWidthAnimation
+                                                      .value)
                                               : 16.0,
                                         ),
                                       ),
                                     ),
                                     onPressed:
-                                        canSubmit ? _submitTransaction : null,
+                                    canSubmit ? _submitTransaction : null,
                                     child: _isSuccessMorphed
                                         ? ScaleTransition(
-                                            scale: _checkScaleAnimation,
-                                            child: const Icon(
-                                                Icons.check_rounded,
-                                                color: Colors.white,
-                                                size: 26),
-                                          )
+                                      scale: _checkScaleAnimation,
+                                      child: const Icon(
+                                          Icons.check_rounded,
+                                          color: Colors.white,
+                                          size: 26),
+                                    )
                                         : (_isSubmitting
-                                            ? const SizedBox(
-                                                width: 22,
-                                                height: 22,
-                                                child:
-                                                    CircularProgressIndicator(
-                                                  strokeWidth: 2.2,
-                                                  valueColor:
-                                                      AlwaysStoppedAnimation(
-                                                          Colors.white),
-                                                ),
-                                              )
-                                            : FittedBox(
-                                                fit: BoxFit.scaleDown,
-                                                child: Padding(
-                                                  padding: const EdgeInsets
-                                                      .symmetric(
-                                                      horizontal: 16.0),
-                                                  child: Text(
-                                                    _activeTab ==
-                                                            CategoryType.debt
-                                                        ? '✓ XÁC NHẬN GIAO DỊCH VAY NỢ'
-                                                        : (_isAmortized
-                                                            ? '✓ LƯU & DÀN ĐỀU CẢ KỲ'
-                                                            : (_isEditMode
-                                                                ? '✓ CẬP NHẬT GIAO DỊCH'
-                                                                : 'LƯU GIAO DỊCH')),
-                                                    maxLines: 1,
-                                                    style: const TextStyle(
-                                                      fontSize: 15,
-                                                      fontWeight:
-                                                          FontWeight.w900,
-                                                      letterSpacing: 0.5,
-                                                    ),
-                                                  ),
-                                                ),
-                                              )),
+                                        ? const SizedBox(
+                                      width: 22,
+                                      height: 22,
+                                      child:
+                                      CircularProgressIndicator(
+                                        strokeWidth: 2.2,
+                                        valueColor:
+                                        AlwaysStoppedAnimation(
+                                            Colors.white),
+                                      ),
+                                    )
+                                        : FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      child: Padding(
+                                        padding: const EdgeInsets
+                                            .symmetric(
+                                            horizontal: 16.0),
+                                        child: Text(
+                                          _activeTab ==
+                                              CategoryType.debt
+                                              ? '✓ XÁC NHẬN GIAO DỊCH VAY NỢ'
+                                              : (_isAmortized
+                                              ? '✓ LƯU & DÀN ĐỀU CẢ KỲ'
+                                              : (_isEditMode
+                                              ? '✓ CẬP NHẬT GIAO DỊCH'
+                                              : 'LƯU GIAO DỊCH')),
+                                          maxLines: 1,
+                                          style: const TextStyle(
+                                            fontSize: 15,
+                                            fontWeight:
+                                            FontWeight.w900,
+                                            letterSpacing: 0.5,
+                                          ),
+                                        ),
+                                      ),
+                                    )),
                                   ),
                                 ),
                               );
@@ -2437,11 +2512,11 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
     ];
 
     final Color normalKeyBg =
-        isDark ? AppTokens.darkCardSubtle : AppTokens.lightCardSubtle;
+    isDark ? AppTokens.darkCardSubtle : AppTokens.lightCardSubtle;
     final Color shortcutKeyBg =
-        isDark ? Colors.white.withValues(alpha: 0.06) : const Color(0xFFF1F5F9);
+    isDark ? Colors.white.withValues(alpha: 0.06) : const Color(0xFFF1F5F9);
     final Color normalKeyText =
-        isDark ? AppTokens.darkText : AppTokens.lightText;
+    isDark ? AppTokens.darkText : AppTokens.lightText;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -2483,6 +2558,478 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
           ),
         );
       }).toList(),
+    );
+  }
+}
+
+// ==============================================================================
+// 🌟 MODAL CHỈNH GIỜ: ZEN DRUM WHEEL TIME PICKER (TINH GIẢN & SẠCH BÓNG)
+// ==============================================================================
+
+class _ZenHybridTimePickerSheet extends ConsumerStatefulWidget {
+  final TimeOfDay initialTime;
+  final bool isDark;
+  final AppAccentPreset accent;
+
+  const _ZenHybridTimePickerSheet({
+    required this.initialTime,
+    required this.isDark,
+    required this.accent,
+  });
+
+  @override
+  ConsumerState<_ZenHybridTimePickerSheet> createState() =>
+      _ZenHybridTimePickerSheetState();
+}
+
+class _ZenHybridTimePickerSheetState
+    extends ConsumerState<_ZenHybridTimePickerSheet> {
+  late int _selectedHour;
+  late int _selectedMinute;
+
+  late final FixedExtentScrollController _hourWheelController;
+  late final FixedExtentScrollController _minuteWheelController;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedHour = widget.initialTime.hour;
+    _selectedMinute = widget.initialTime.minute;
+
+    _hourWheelController = FixedExtentScrollController(
+      initialItem: _selectedHour,
+    );
+    _minuteWheelController = FixedExtentScrollController(
+      initialItem: _selectedMinute,
+    );
+  }
+
+  @override
+  void dispose() {
+    _hourWheelController.dispose();
+    _minuteWheelController.dispose();
+    super.dispose();
+  }
+
+  // Cập nhật giờ và cuộn con lăn mượt mà
+  void _applyTime(int hour, int minute) {
+    HapticFeedback.selectionClick();
+    setState(() {
+      _selectedHour = hour.clamp(0, 23);
+      _selectedMinute = minute.clamp(0, 59);
+    });
+
+    if (_hourWheelController.hasClients) {
+      _hourWheelController.animateToItem(
+        _selectedHour,
+        duration: const Duration(milliseconds: 240),
+        curve: Curves.easeOutCubic,
+      );
+    }
+    if (_minuteWheelController.hasClients) {
+      _minuteWheelController.animateToItem(
+        _selectedMinute,
+        duration: const Duration(milliseconds: 240),
+        curve: Curves.easeOutCubic,
+      );
+    }
+  }
+
+  // 🌟 Hàm cộng/trừ thời gian dựa trên GIÁ TRỊ ĐANG CHỌN (Accumulative delta)
+  void _adjustCurrentTime({int deltaHours = 0, int deltaMinutes = 0}) {
+    // Tạo mốc DateTime giả định mang giờ và phút hiện đang chọn trên UI
+    final base = DateTime(2026, 1, 1, _selectedHour, _selectedMinute);
+    final adjusted = base.add(Duration(hours: deltaHours, minutes: deltaMinutes));
+    _applyTime(adjusted.hour, adjusted.minute);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = widget.isDark;
+    final primaryBrand = widget.accent.primary;
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+
+    final systemFont = Theme.of(context).textTheme.bodyMedium?.fontFamily ??
+        ref.watch(fontFamilyProvider);
+
+    final containerBg = isDark
+        ? const Color(0xFF151C28).withValues(alpha: 0.98)
+        : Colors.white.withValues(alpha: 0.98);
+
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+        child: Container(
+          padding: EdgeInsets.fromLTRB(20, 12, 20, 24 + bottomInset),
+          decoration: BoxDecoration(
+            color: containerBg,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+            border: Border.all(
+              color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder,
+              width: 1,
+            ),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Drag Handle
+                Container(
+                  width: 44,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.white24 : Colors.black26,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 14),
+
+                // Modal Header
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Thời gian giao dịch',
+                          style: TextStyle(
+                            fontFamily: systemFont,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: isDark
+                                ? AppTokens.darkText
+                                : AppTokens.lightText,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Cuộn vòng xoay để chọn giờ và phút',
+                          style: TextStyle(
+                            fontFamily: systemFont,
+                            fontSize: 11,
+                            color: isDark
+                                ? AppTokens.darkMuted
+                                : AppTokens.lightMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+                    IconButton(
+                      visualDensity: VisualDensity.compact,
+                      icon: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: isDark
+                              ? Colors.white10
+                              : Colors.black.withValues(alpha: 0.05),
+                        ),
+                        child: Icon(
+                          Icons.close_rounded,
+                          size: 18,
+                          color: isDark
+                              ? AppTokens.darkMuted
+                              : AppTokens.lightMuted,
+                        ),
+                      ),
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // ===================================================================
+                // 1. QUICK PRESET CHIPS ROW (LƯU TRẠNG THÁI TIẾP NỐI)
+                // ===================================================================
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
+                  child: Row(
+                    children: [
+                      // "Vừa xong": Reset về đúng thời gian thực của máy
+                      _buildPresetChip('Vừa xong', () {
+                        final now = DateTime.now();
+                        _applyTime(now.hour, now.minute);
+                      }, isDark, primaryBrand, systemFont),
+                      const SizedBox(width: 8),
+
+                      // "-15 phút": Trừ 15 phút từ mốc ĐANG CHỌN
+                      _buildPresetChip('-15 phút', () {
+                        _adjustCurrentTime(deltaMinutes: -15);
+                      }, isDark, primaryBrand, systemFont),
+                      const SizedBox(width: 8),
+
+                      // "-1 giờ": Trừ 1 giờ từ mốc ĐANG CHỌN
+                      _buildPresetChip('-1 giờ', () {
+                        _adjustCurrentTime(deltaHours: -1);
+                      }, isDark, primaryBrand, systemFont),
+                      const SizedBox(width: 8),
+
+                      // Các mốc gán thẳng
+                      _buildPresetChip('12:00', () {
+                        _applyTime(12, 0);
+                      }, isDark, primaryBrand, systemFont),
+                      const SizedBox(width: 8),
+
+                      _buildPresetChip('19:00', () {
+                        _applyTime(19, 0);
+                      }, isDark, primaryBrand, systemFont),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 18),
+
+                // ===================================================================
+                // 2. DRUM WHEEL 3D
+                // ===================================================================
+                Listener(
+                  behavior: HitTestBehavior.opaque,
+                  child: SizedBox(
+                    height: 160,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        // Khung kính viền Accent ở trung tâm
+                        Container(
+                          height: 52,
+                          margin: const EdgeInsets.symmetric(horizontal: 20),
+                          decoration: BoxDecoration(
+                            color: primaryBrand.withValues(
+                                alpha: isDark ? 0.16 : 0.08),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: primaryBrand.withValues(
+                                  alpha: isDark ? 0.40 : 0.25),
+                              width: 1.4,
+                            ),
+                          ),
+                        ),
+
+                        // Mask gradient hòa sắc nền (không bị dải đen)
+                        IgnorePointer(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  (isDark ? const Color(0xFF151C28) : Colors.white)
+                                      .withValues(alpha: 0.95),
+                                  (isDark ? const Color(0xFF151C28) : Colors.white)
+                                      .withValues(alpha: 0.0),
+                                  (isDark ? const Color(0xFF151C28) : Colors.white)
+                                      .withValues(alpha: 0.0),
+                                  (isDark ? const Color(0xFF151C28) : Colors.white)
+                                      .withValues(alpha: 0.95),
+                                ],
+                                stops: const [0.0, 0.28, 0.72, 1.0],
+                              ),
+                            ),
+                          ),
+                        ),
+
+                        // Trục cuộn: Giờ & Phút
+                        Row(
+                          children: [
+                            // Cột Giờ (00 - 23)
+                            Expanded(
+                              child: ListWheelScrollView.useDelegate(
+                                controller: _hourWheelController,
+                                itemExtent: 50,
+                                diameterRatio: 1.5,
+                                perspective: 0.003,
+                                physics: const FixedExtentScrollPhysics(),
+                                onSelectedItemChanged: (index) {
+                                  HapticFeedback.selectionClick();
+                                  setState(() => _selectedHour = index);
+                                },
+                                childDelegate: ListWheelChildBuilderDelegate(
+                                  childCount: 24,
+                                  builder: (context, index) {
+                                    final isSelected = index == _selectedHour;
+                                    final distance =
+                                    (index - _selectedHour).abs();
+                                    final opacity = isSelected
+                                        ? 1.0
+                                        : (distance == 1 ? 0.45 : 0.20);
+
+                                    return Center(
+                                      child: AnimatedDefaultTextStyle(
+                                        duration:
+                                        const Duration(milliseconds: 140),
+                                        style: TextStyle(
+                                          fontFamily: systemFont,
+                                          fontSize: isSelected ? 32 : 18,
+                                          fontWeight: isSelected
+                                              ? FontWeight.w900
+                                              : FontWeight.w600,
+                                          color: isSelected
+                                              ? primaryBrand
+                                              : (isDark
+                                              ? AppTokens.darkText
+                                              : AppTokens.lightText)
+                                              .withValues(alpha: opacity),
+                                          letterSpacing: isSelected ? -0.5 : 0,
+                                        ),
+                                        child: Text(
+                                            index.toString().padLeft(2, '0')),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ),
+
+                            // Dấu hai chấm
+                            Padding(
+                              padding:
+                              const EdgeInsets.symmetric(horizontal: 4.0),
+                              child: Text(
+                                ':',
+                                style: TextStyle(
+                                  fontFamily: systemFont,
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.w900,
+                                  color: isDark
+                                      ? AppTokens.darkText
+                                      : AppTokens.lightText,
+                                ),
+                              ),
+                            ),
+
+                            // Cột Phút (00 - 59)
+                            Expanded(
+                              child: ListWheelScrollView.useDelegate(
+                                controller: _minuteWheelController,
+                                itemExtent: 50,
+                                diameterRatio: 1.5,
+                                perspective: 0.003,
+                                physics: const FixedExtentScrollPhysics(),
+                                onSelectedItemChanged: (index) {
+                                  HapticFeedback.selectionClick();
+                                  setState(() => _selectedMinute = index);
+                                },
+                                childDelegate: ListWheelChildBuilderDelegate(
+                                  childCount: 60,
+                                  builder: (context, index) {
+                                    final isSelected = index == _selectedMinute;
+                                    final distance =
+                                    (index - _selectedMinute).abs();
+                                    final opacity = isSelected
+                                        ? 1.0
+                                        : (distance == 1 ? 0.45 : 0.20);
+
+                                    return Center(
+                                      child: AnimatedDefaultTextStyle(
+                                        duration:
+                                        const Duration(milliseconds: 140),
+                                        style: TextStyle(
+                                          fontFamily: systemFont,
+                                          fontSize: isSelected ? 32 : 18,
+                                          fontWeight: isSelected
+                                              ? FontWeight.w900
+                                              : FontWeight.w600,
+                                          color: isSelected
+                                              ? primaryBrand
+                                              : (isDark
+                                              ? AppTokens.darkText
+                                              : AppTokens.lightText)
+                                              .withValues(alpha: opacity),
+                                          letterSpacing: isSelected ? -0.5 : 0,
+                                        ),
+                                        child: Text(
+                                            index.toString().padLeft(2, '0')),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+
+                // ===================================================================
+                // 3. NÚT XÁC NHẬN
+                // ===================================================================
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryBrand,
+                      foregroundColor: Colors.white,
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    onPressed: () {
+                      HapticFeedback.mediumImpact();
+                      FocusScope.of(context).unfocus();
+                      Navigator.of(context).pop(
+                        TimeOfDay(
+                            hour: _selectedHour, minute: _selectedMinute),
+                      );
+                    },
+                    child: Text(
+                      '✓  Xác nhận thời gian',
+                      style: TextStyle(
+                        fontFamily: systemFont,
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPresetChip(
+      String label,
+      VoidCallback onTap,
+      bool isDark,
+      Color primaryColor,
+      String? fontFamily,
+      ) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        height: 34,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1B3329) : const Color(0xFFF1F5F9),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isDark ? const Color(0xFF223F33) : const Color(0xFFE2E8F0),
+            width: 1.0,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontFamily: fontFamily,
+            fontSize: 11.5,
+            fontWeight: FontWeight.w700,
+            color: isDark ? AppTokens.darkText : AppTokens.lightText,
+          ),
+        ),
+      ),
     );
   }
 }
@@ -2602,11 +3149,11 @@ class _MiniCalendarSheetState extends State<_MiniCalendarSheet> {
                           fontWeight: FontWeight.w700,
                           color: isWeekend
                               ? (widget.isDark
-                                  ? Colors.amber.shade300
-                                  : Colors.amber.shade800)
+                              ? Colors.amber.shade300
+                              : Colors.amber.shade800)
                               : (widget.isDark
-                                  ? AppTokens.darkMuted
-                                  : AppTokens.lightMuted),
+                              ? AppTokens.darkMuted
+                              : AppTokens.lightMuted),
                         ),
                       ),
                     ),
@@ -2648,23 +3195,23 @@ class _MiniCalendarSheetState extends State<_MiniCalendarSheet> {
                     onTap: isDisabled
                         ? null
                         : () {
-                            HapticFeedback.selectionClick();
-                            setState(() => _currentPickedDate = cellDate);
-                            widget.onDateSelected(cellDate);
-                            Navigator.of(context).pop();
-                          },
+                      HapticFeedback.selectionClick();
+                      setState(() => _currentPickedDate = cellDate);
+                      widget.onDateSelected(cellDate);
+                      Navigator.of(context).pop();
+                    },
                     borderRadius: BorderRadius.circular(12),
                     child: Container(
                       decoration: BoxDecoration(
                         color: isSelected
                             ? widget.accent.primary
                             : (isToday
-                                ? widget.accent.primary.withValues(alpha: 0.15)
-                                : Colors.transparent),
+                            ? widget.accent.primary.withValues(alpha: 0.15)
+                            : Colors.transparent),
                         borderRadius: BorderRadius.circular(12),
                         border: isToday && !isSelected
                             ? Border.all(
-                                color: widget.accent.primary, width: 1.5)
+                            color: widget.accent.primary, width: 1.5)
                             : null,
                       ),
                       child: Center(
@@ -2675,13 +3222,13 @@ class _MiniCalendarSheetState extends State<_MiniCalendarSheet> {
                             fontWeight: FontWeight.w800,
                             color: isDisabled
                                 ? (widget.isDark
-                                    ? Colors.white24
-                                    : Colors.black26)
+                                ? Colors.white24
+                                : Colors.black26)
                                 : (isSelected
-                                    ? Colors.white
-                                    : (widget.isDark
-                                        ? AppTokens.darkText
-                                        : AppTokens.lightText)),
+                                ? Colors.white
+                                : (widget.isDark
+                                ? AppTokens.darkText
+                                : AppTokens.lightText)),
                           ),
                         ),
                       ),
