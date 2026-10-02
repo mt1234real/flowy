@@ -79,10 +79,15 @@ final allCategoriesStreamProvider = StreamProvider.autoDispose<List<Category>>((
 });
 
 // StreamProvider lấy danh sách giao dịch khoản chi
-final expenseTransactionsStreamProvider = StreamProvider.autoDispose<List<Transaction>>((ref) {
+final expenseTransactionsStreamProvider =
+    StreamProvider.autoDispose<List<Transaction>>((ref) {
   final db = ref.watch(databaseProvider);
   return (db.select(db.transactions)
-    ..where((t) => t.type.equals(CategoryType.expense.index)))
+        ..where((t) =>
+            t.type.equals(CategoryType.expense.index) &
+            t.deletedAt.isNull() &
+            t.goalId.isNull() &
+            (t.envelopeType.equals('savings').not() | t.envelopeType.isNull())))
       .watch();
 });
 
@@ -972,7 +977,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen>
                                         label: const FittedBox(
                                           fit: BoxFit.scaleDown,
                                           child: Text(
-                                            '+ Thiết lập ngân sách mới',
+                                            'Thiết lập ngân sách mới',
                                             style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
                                           ),
                                         ),

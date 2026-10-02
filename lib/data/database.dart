@@ -31,6 +31,12 @@ part 'database.g.dart';
 enum CategoryType { expense, income, debt, transfer }
 enum EnvelopeType { needs, wants, savings }
 
+class VaultTransactionDeletionException implements Exception {
+  final String message;
+
+  const VaultTransactionDeletionException(this.message);
+}
+
 // --- TABLES DEFINITION ---
 
 class Wallets extends Table {
@@ -289,6 +295,7 @@ class AppNotifications extends Table {
 ])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
+  AppDatabase.forTesting(super.e);
 
   @override
   int get schemaVersion => 11; // 🌟 v11: Thêm Transactions.goalId phục vụ Vault Isolation
@@ -340,6 +347,11 @@ class AppDatabase extends _$AppDatabase {
       },
       beforeOpen: (details) async {
         await customStatement('PRAGMA foreign_keys = ON');
+        // Repair the former category editor's self-parent bug without changing
+        // category IDs or any linked transactions and budgets.
+        await customStatement(
+          'UPDATE categories SET parent_id = NULL WHERE parent_id = id',
+        );
         await purgeOldNotifications();
         final thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
         await (delete(transactions)
@@ -354,6 +366,57 @@ class AppDatabase extends _$AppDatabase {
 
   SimpleSelectStatement<EntityArchives, EntityArchive> _archives(String type) =>
       select(entityArchives)..where((a) => a.entityType.equals(type));
+
+  /// Keep edits within the two-level category tree, using fresh database state.
+  Future<void> saveCategoryInHierarchy({
+    required String id,
+    required String name,
+    required CategoryType type,
+    required String icon,
+    required String color,
+    required bool isEditing,
+    String? parentId,
+  }) async {
+    await transaction(() async {
+      if (isEditing) {
+        final existing = await (select(categories)..where((c) => c.id.equals(id)))
+            .getSingleOrNull();
+        if (existing == null) {
+          throw ArgumentError('Danh mục không còn tồn tại. Hãy mở lại danh sách.');
+        }
+      }
+      if (parentId != null) {
+        if (parentId == id) {
+          throw ArgumentError('Không thể chọn chính danh mục này làm nhóm cha.');
+        }
+        final parent = await (select(categories)
+              ..where((c) => c.id.equals(parentId) & categoryAvailable(c)))
+            .getSingleOrNull();
+        if (parent == null || parent.type != type ||
+            (parent.parentId != null && parent.parentId!.isNotEmpty)) {
+          throw ArgumentError('Hãy chọn một nhóm cha hợp lệ trong cùng loại thu chi.');
+        }
+        final children = await (select(categories)
+              ..where((c) => c.parentId.equals(id))
+              ..limit(1))
+            .get();
+        if (children.isNotEmpty) {
+          throw ArgumentError('Nhóm này đang có danh mục con. Hãy chuyển các danh mục con sang nhóm khác trước.');
+        }
+      }
+      if (isEditing) {
+        await (update(categories)..where((c) => c.id.equals(id))).write(
+          CategoriesCompanion(name: Value(name), icon: Value(icon),
+              color: Value(color), parentId: Value(parentId)),
+        );
+      } else {
+        await into(categories).insert(CategoriesCompanion.insert(
+          id: id, name: name, type: type, icon: Value(icon),
+          color: Value(color), parentId: Value(parentId),
+        ));
+      }
+    });
+  }
 
   Expression<bool> categoryAvailable(Categories c) {
     final archived = selectOnly(entityArchives)
@@ -744,12 +807,17 @@ class AppDatabase extends _$AppDatabase {
 
   Future<void> softDeleteTransaction(String txId) async {
     await transaction(() async {
-      final tx = await (select(transactions)..where((t) => t.id.equals(txId))).getSingleOrNull();
+      final tx = await (select(transactions)..where((t) => t.id.equals(txId)))
+          .getSingleOrNull();
       if (tx == null || tx.deletedAt != null) return;
       await revokeNotificationByEntityId(txId);
 
-      final wallet = await (select(wallets)..where((w) => w.id.equals(tx.walletId))).getSingleOrNull();
-      if (wallet != null) {
+      final wallet = await (select(wallets)
+            ..where((w) => w.id.equals(tx.walletId)))
+          .getSingleOrNull();
+      if (tx.type == CategoryType.transfer) {
+        await _applyTransferBalanceDelta(tx, sourceDelta: tx.amount);
+      } else if (wallet != null) {
         double reversal = 0.0;
         if (tx.type == CategoryType.income) {
           reversal = -tx.amount;
@@ -767,18 +835,6 @@ class AppDatabase extends _$AppDatabase {
         }
       }
 
-      if (tx.type == CategoryType.transfer && tx.toWalletId != null) {
-        final toWallet = await (select(wallets)..where((w) => w.id.equals(tx.toWalletId!))).getSingleOrNull();
-        if (toWallet != null) {
-          await (update(wallets)..where((w) => w.id.equals(tx.toWalletId!))).write(
-            WalletsCompanion(
-              balance: Value(toWallet.balance - tx.amount),
-              updatedAt: Value(DateTime.now()),
-            ),
-          );
-        }
-      }
-
       await (update(transactions)..where((t) => t.id.equals(txId))).write(
         TransactionsCompanion(
           deletedAt: Value(DateTime.now()),
@@ -789,11 +845,16 @@ class AppDatabase extends _$AppDatabase {
 
   Future<void> restoreTransaction(String txId) async {
     await transaction(() async {
-      final tx = await (select(transactions)..where((t) => t.id.equals(txId))).getSingleOrNull();
+      final tx = await (select(transactions)..where((t) => t.id.equals(txId)))
+          .getSingleOrNull();
       if (tx == null || tx.deletedAt == null) return;
 
-      final wallet = await (select(wallets)..where((w) => w.id.equals(tx.walletId))).getSingleOrNull();
-      if (wallet != null) {
+      final wallet = await (select(wallets)
+            ..where((w) => w.id.equals(tx.walletId)))
+          .getSingleOrNull();
+      if (tx.type == CategoryType.transfer) {
+        await _applyTransferBalanceDelta(tx, sourceDelta: -tx.amount);
+      } else if (wallet != null) {
         double delta = 0.0;
         if (tx.type == CategoryType.income) {
           delta = tx.amount;
@@ -811,24 +872,45 @@ class AppDatabase extends _$AppDatabase {
         }
       }
 
-      if (tx.type == CategoryType.transfer && tx.toWalletId != null) {
-        final toWallet = await (select(wallets)..where((w) => w.id.equals(tx.toWalletId!))).getSingleOrNull();
-        if (toWallet != null) {
-          await (update(wallets)..where((w) => w.id.equals(tx.toWalletId!))).write(
-            WalletsCompanion(
-              balance: Value(toWallet.balance + tx.amount),
-              updatedAt: Value(DateTime.now()),
-            ),
-          );
-        }
-      }
-
       await (update(transactions)..where((t) => t.id.equals(txId))).write(
         const TransactionsCompanion(
           deletedAt: Value(null),
         ),
       );
     });
+  }
+
+  // Called inside the delete/restore transaction; fees are separate expenses.
+  Future<void> _applyTransferBalanceDelta(
+    Transaction tx, {
+    required double sourceDelta,
+  }) async {
+    final destinationId = tx.toWalletId;
+    if (destinationId == null || destinationId == tx.walletId) {
+      throw StateError('Giao dịch chuyển tiền không có đủ hai ví hợp lệ.');
+    }
+    final source = await (select(wallets)
+          ..where((w) => w.id.equals(tx.walletId)))
+        .getSingleOrNull();
+    final destination = await (select(wallets)
+          ..where((w) => w.id.equals(destinationId)))
+        .getSingleOrNull();
+    if (source == null || destination == null) {
+      throw StateError('Không tìm thấy đủ hai ví để đối soát chuyển tiền.');
+    }
+    final now = DateTime.now();
+    await (update(wallets)..where((w) => w.id.equals(source.id))).write(
+      WalletsCompanion(
+        balance: Value(source.balance + sourceDelta),
+        updatedAt: Value(now),
+      ),
+    );
+    await (update(wallets)..where((w) => w.id.equals(destination.id))).write(
+      WalletsCompanion(
+        balance: Value(destination.balance - sourceDelta),
+        updatedAt: Value(now),
+      ),
+    );
   }
 
   Future<void> permanentDeleteTransaction(String txId) async {
@@ -1409,69 +1491,91 @@ class AppDatabase extends _$AppDatabase {
   }
 
   Future<void> updateDebtTransaction({
-    required DebtTransaction oldTx,
     required DebtTransaction newTx,
   }) async {
     await transaction(() async {
-      final oldWallet = await (select(wallets)..where((w) => w.id.equals(oldTx.walletId))).getSingleOrNull();
-      if (oldWallet != null) {
-        final double walletRollback = (oldTx.type == 'LEND' || oldTx.type == 'REPAY')
-            ? oldTx.amount
-            : -oldTx.amount;
-        await (update(wallets)..where((w) => w.id.equals(oldTx.walletId))).write(
-          WalletsCompanion(
-            balance: Value(oldWallet.balance + walletRollback),
-            updatedAt: Value(DateTime.now()),
-          ),
-        );
+      final persisted = await (select(debtTransactions)
+            ..where((t) => t.id.equals(newTx.id)))
+          .getSingleOrNull();
+      if (persisted == null || persisted.deletedAt != null) {
+        throw StateError('Khoản nợ không còn khả dụng để chỉnh sửa');
+      }
+      const supportedTypes = {'LEND', 'COLLECT', 'BORROW', 'REPAY'};
+      if (!supportedTypes.contains(persisted.type) ||
+          !supportedTypes.contains(newTx.type)) {
+        throw StateError('Loại giao dịch vay nợ không hợp lệ');
+      }
+      if (!newTx.amount.isFinite || newTx.amount <= 0) {
+        throw ArgumentError('Số tiền giao dịch phải lớn hơn 0');
+      }
+      final oldWallet = await (select(wallets)
+            ..where((w) => w.id.equals(persisted.walletId)))
+          .getSingleOrNull();
+      final oldContact = await (select(debtContacts)
+            ..where((c) => c.id.equals(persisted.contactId)))
+          .getSingleOrNull();
+      final newWallet = await (select(wallets)
+            ..where((w) => w.id.equals(newTx.walletId)))
+          .getSingleOrNull();
+      final newContact = await (select(debtContacts)
+            ..where((c) => c.id.equals(newTx.contactId)))
+          .getSingleOrNull();
+      if (oldWallet == null ||
+          oldContact == null ||
+          newWallet == null ||
+          newContact == null) {
+        throw StateError('Không tìm thấy đầy đủ ví và đối tác liên quan');
       }
 
-      final oldContact = await (select(debtContacts)..where((c) => c.id.equals(oldTx.contactId))).getSingleOrNull();
-      if (oldContact != null) {
-        double contactRollback = 0.0;
-        if (oldTx.type == 'LEND') contactRollback = -oldTx.amount;
-        if (oldTx.type == 'COLLECT') contactRollback = oldTx.amount;
-        if (oldTx.type == 'BORROW') contactRollback = oldTx.amount;
-        if (oldTx.type == 'REPAY') contactRollback = -oldTx.amount;
+      // Roll back the current ledger row, never the snapshot held by the UI.
+      final walletRollback =
+          (persisted.type == 'LEND' || persisted.type == 'REPAY')
+              ? persisted.amount
+              : -persisted.amount;
+      final walletReapply = (newTx.type == 'LEND' || newTx.type == 'REPAY')
+          ? -newTx.amount
+          : newTx.amount;
+      final oldWalletRows = await (update(wallets)
+            ..where((w) => w.id.equals(persisted.walletId)))
+          .write(WalletsCompanion(
+        balance: Value(oldWallet.balance + walletRollback),
+        updatedAt: Value(DateTime.now()),
+      ));
+      final oldContactRows = await (update(debtContacts)
+            ..where((c) => c.id.equals(persisted.contactId)))
+          .write(DebtContactsCompanion(
+        netBalance: Value(oldContact.netBalance - walletRollback),
+        updatedAt: Value(DateTime.now()),
+      ));
 
-        await (update(debtContacts)..where((c) => c.id.equals(oldTx.contactId))).write(
-          DebtContactsCompanion(
-            netBalance: Value(oldContact.netBalance + contactRollback),
-            updatedAt: Value(DateTime.now()),
-          ),
-        );
+      // Reload after rollback: old and new IDs may refer to the same entity.
+      final refreshedWallet = await (select(wallets)
+            ..where((w) => w.id.equals(newTx.walletId)))
+          .getSingle();
+      final refreshedContact = await (select(debtContacts)
+            ..where((c) => c.id.equals(newTx.contactId)))
+          .getSingle();
+      final newWalletRows = await (update(wallets)
+            ..where((w) => w.id.equals(newTx.walletId)))
+          .write(WalletsCompanion(
+        balance: Value(refreshedWallet.balance + walletReapply),
+        updatedAt: Value(DateTime.now()),
+      ));
+      final newContactRows = await (update(debtContacts)
+            ..where((c) => c.id.equals(newTx.contactId)))
+          .write(DebtContactsCompanion(
+        netBalance: Value(refreshedContact.netBalance - walletReapply),
+        updatedAt: Value(DateTime.now()),
+      ));
+      if (oldWalletRows != 1 ||
+          oldContactRows != 1 ||
+          newWalletRows != 1 ||
+          newContactRows != 1) {
+        throw StateError('Không thể cập nhật đủ hai phía của khoản nợ');
       }
-
-      final newWallet = await (select(wallets)..where((w) => w.id.equals(newTx.walletId))).getSingleOrNull();
-      if (newWallet != null) {
-        final double walletReapply = (newTx.type == 'LEND' || newTx.type == 'REPAY')
-            ? -newTx.amount
-            : newTx.amount;
-        await (update(wallets)..where((w) => w.id.equals(newTx.walletId))).write(
-          WalletsCompanion(
-            balance: Value(newWallet.balance + walletReapply),
-            updatedAt: Value(DateTime.now()),
-          ),
-        );
-      }
-
-      final newContact = await (select(debtContacts)..where((c) => c.id.equals(newTx.contactId))).getSingleOrNull();
-      if (newContact != null) {
-        double contactReapply = 0.0;
-        if (newTx.type == 'LEND') contactReapply = newTx.amount;
-        if (newTx.type == 'COLLECT') contactReapply = -newTx.amount;
-        if (newTx.type == 'BORROW') contactReapply = -newTx.amount;
-        if (newTx.type == 'REPAY') contactReapply = newTx.amount;
-
-        await (update(debtContacts)..where((c) => c.id.equals(newTx.contactId))).write(
-          DebtContactsCompanion(
-            netBalance: Value(newContact.netBalance + contactReapply),
-            updatedAt: Value(DateTime.now()),
-          ),
-        );
-      }
-
-      await (update(debtTransactions)..where((t) => t.id.equals(newTx.id))).write(
+      final updated = await (update(debtTransactions)
+            ..where((t) => t.id.equals(persisted.id) & t.deletedAt.isNull()))
+          .write(
         DebtTransactionsCompanion(
           contactId: Value(newTx.contactId),
           walletId: Value(newTx.walletId),
@@ -1483,6 +1587,9 @@ class AppDatabase extends _$AppDatabase {
           isSettled: Value(newTx.isSettled),
         ),
       );
+      if (updated != 1) {
+        throw StateError('Không thể hoàn tất cập nhật khoản nợ');
+      }
     });
   }
 
@@ -1506,6 +1613,24 @@ class AppDatabase extends _$AppDatabase {
     await into(debtContacts).insertOnConflictUpdate(contact);
   }
 
+  Future<void> updateDebtContactMetadata({
+    required String id,
+    required String name,
+    String? phone,
+    String? avatarUrl,
+  }) async {
+    final updated = await (update(debtContacts)..where((c) => c.id.equals(id)))
+        .write(DebtContactsCompanion(
+      name: Value(name),
+      phone: Value(phone),
+      avatarUrl: Value(avatarUrl),
+      updatedAt: Value(DateTime.now()),
+    ));
+    if (updated != 1) {
+      throw StateError('Đối tác không còn tồn tại. Hãy mở lại danh sách.');
+    }
+  }
+
   // ==========================================
   // 🌟 PROJECT BUDGET DAOs & REPOSITORY METHODS
   // ==========================================
@@ -1525,10 +1650,15 @@ class AppDatabase extends _$AppDatabase {
     return (select(transactions)
       ..where((t) {
         final isNotDeleted = t.deletedAt.isNull();
+        final isNotSavings = t.goalId.isNull() &
+            (t.envelopeType.equals('savings').not() |
+                t.envelopeType.isNull());
         final matchesId = t.projectBudgetId.equals(projectId);
         final matchesTagNote = t.note.isNotNull() & t.note.like('%$cleanTag%');
         final matchesTagMerchant = t.merchant.isNotNull() & t.merchant.like('%$cleanTag%');
-        return isNotDeleted & (matchesId | matchesTagNote | matchesTagMerchant);
+        return isNotDeleted &
+            isNotSavings &
+            (matchesId | matchesTagNote | matchesTagMerchant);
       })
       ..orderBy([(t) => OrderingTerm.desc(t.date)]))
         .watch();
@@ -1539,11 +1669,16 @@ class AppDatabase extends _$AppDatabase {
     final query = select(transactions)
       ..where((t) {
         final isNotDeleted = t.deletedAt.isNull();
+        final isNotSavings = t.goalId.isNull() &
+            (t.envelopeType.equals('savings').not() | t.envelopeType.isNull());
         final isExpense = t.type.equals(CategoryType.expense.index);
         final matchesId = t.projectBudgetId.equals(projectId);
         final matchesTagNote = t.note.isNotNull() & t.note.like('%$cleanTag%');
         final matchesTagMerchant = t.merchant.isNotNull() & t.merchant.like('%$cleanTag%');
-        return isNotDeleted & isExpense & (matchesId | matchesTagNote | matchesTagMerchant);
+        return isNotDeleted &
+            isNotSavings &
+            isExpense &
+            (matchesId | matchesTagNote | matchesTagMerchant);
       });
 
     final txs = await query.get();
@@ -1570,8 +1705,15 @@ class AppDatabase extends _$AppDatabase {
         final isNotDeleted = t.deletedAt.isNull();
         final isExpense = t.type.equals(CategoryType.expense.index);
         final inCategory = t.categoryId.isIn(targetCategoryIds);
+        final isNotSavings = t.goalId.isNull() &
+            (t.envelopeType.equals('savings').not() |
+                t.envelopeType.isNull());
         final inRange = t.date.isBiggerOrEqualValue(startDate) & t.date.isSmallerOrEqualValue(endDate);
-        return isNotDeleted & isExpense & inCategory & inRange;
+        return isNotDeleted &
+            isNotSavings &
+            isExpense &
+            inCategory &
+            inRange;
       }))
         .get();
 
@@ -1977,47 +2119,67 @@ class AppDatabase extends _$AppDatabase {
   /// 🌟 Xóa bản ghi giao dịch nạp/rút trong két và khôi phục số dư đảo chiều nguyên tử
   Future<void> deleteVaultTransactionAtomically(String transactionId) async {
     await transaction(() async {
-      final tx = await (select(transactions)..where((t) => t.id.equals(transactionId))).getSingleOrNull();
-      if (tx == null || tx.goalId == null) return;
-
-      final goal = await (select(savingsGoals)..where((g) => g.id.equals(tx.goalId!))).getSingleOrNull();
-      final wallet = await (select(wallets)..where((w) => w.id.equals(tx.walletId))).getSingleOrNull();
-
-      if (tx.type == CategoryType.expense) {
-        // Lệnh nạp tiền: Xóa lệnh này -> Giảm tiền hũ, hoàn trả tiền về ví
-        if (goal != null) {
-          final newGoalBal = math.max(0.0, goal.currentAmount - tx.amount);
-          await (update(savingsGoals)..where((g) => g.id.equals(goal.id))).write(
-            SavingsGoalsCompanion(currentAmount: Value(newGoalBal)),
-          );
-        }
-        if (wallet != null) {
-          await (update(wallets)..where((w) => w.id.equals(wallet.id))).write(
-            WalletsCompanion(
-              balance: Value(wallet.balance + tx.amount),
-              updatedAt: Value(DateTime.now()),
-            ),
-          );
-        }
-      } else if (tx.type == CategoryType.income) {
-        // Lệnh rút tiền: Xóa lệnh này -> Tăng lại tiền vào hũ, trừ tiền ví
-        if (goal != null) {
-          await (update(savingsGoals)..where((g) => g.id.equals(goal.id))).write(
-            SavingsGoalsCompanion(currentAmount: Value(goal.currentAmount + tx.amount)),
-          );
-        }
-        if (wallet != null) {
-          await (update(wallets)..where((w) => w.id.equals(wallet.id))).write(
-            WalletsCompanion(
-              balance: Value(wallet.balance - tx.amount),
-              updatedAt: Value(DateTime.now()),
-            ),
-          );
-        }
+      final tx = await (select(transactions)
+            ..where((t) => t.id.equals(transactionId)))
+          .getSingleOrNull();
+      if (tx == null || tx.goalId == null || tx.deletedAt != null) {
+        throw const VaultTransactionDeletionException(
+          'Giao dịch không còn khả dụng. Hãy mở lại lịch sử Két.',
+        );
       }
 
+      final goal = await (select(savingsGoals)
+            ..where((g) => g.id.equals(tx.goalId!)))
+          .getSingleOrNull();
+      final wallet = await (select(wallets)
+            ..where((w) => w.id.equals(tx.walletId)))
+          .getSingleOrNull();
+      if (goal == null || wallet == null) {
+        throw const VaultTransactionDeletionException(
+          'Không thể xóa vì không tìm thấy hũ hoặc ví liên kết.',
+        );
+      }
+      if (tx.type != CategoryType.expense && tx.type != CategoryType.income) {
+        throw const VaultTransactionDeletionException(
+          'Loại giao dịch này chưa hỗ trợ hoàn tác trong Két.',
+        );
+      }
+
+      final isDeposit = tx.type == CategoryType.expense;
+      final goalDelta = isDeposit ? -tx.amount : tx.amount;
+      final newGoalBalance = goal.currentAmount + goalDelta;
+      // Same 0.001 monetary tolerance used by wallet balance reconciliation.
+      const balanceTolerance = 0.001;
+      if (isDeposit && newGoalBalance < -balanceTolerance) {
+        throw const VaultTransactionDeletionException(
+          'Hũ không còn đủ tiền để hoàn tác lần nạp này. '
+          'Hãy nạp lại đủ số dư trước khi xóa.',
+        );
+      }
+
+      // Only normalize a tiny negative floating-point remainder, never a deficit.
+      final normalizedGoalBalance =
+          isDeposit && newGoalBalance < 0 ? 0.0 : newGoalBalance;
+      final goalUpdated = await (update(savingsGoals)
+            ..where((g) => g.id.equals(goal.id)))
+          .write(SavingsGoalsCompanion(
+              currentAmount: Value(normalizedGoalBalance)));
+      final walletUpdated = await (update(wallets)
+            ..where((w) => w.id.equals(wallet.id)))
+          .write(WalletsCompanion(
+        balance: Value(wallet.balance - goalDelta),
+        updatedAt: Value(DateTime.now()),
+      ));
+      if (goalUpdated != 1 || walletUpdated != 1) {
+        throw StateError('Vault balance reversal did not update both sides');
+      }
       // Xóa vĩnh viễn dòng transaction
-      await (delete(transactions)..where((t) => t.id.equals(transactionId))).go();
+      final removed = await (delete(transactions)
+            ..where((t) => t.id.equals(transactionId)))
+          .go();
+      if (removed != 1) {
+        throw StateError('Vault transaction deletion did not complete');
+      }
     });
   }
 

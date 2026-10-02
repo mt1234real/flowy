@@ -49,6 +49,8 @@ final chartExpensesStreamProvider =
   return (db.select(db.transactions)
         ..where((t) =>
             t.deletedAt.isNull() &
+            t.goalId.isNull() &
+            (t.envelopeType.equals('savings').not() | t.envelopeType.isNull()) &
             t.type.equals(CategoryType.expense.index) &
             t.date.isBiggerOrEqualValue(oneYearAgo))
         ..orderBy([(t) => drift.OrderingTerm.asc(t.date)]))

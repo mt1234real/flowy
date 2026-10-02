@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:drift/drift.dart' hide Column;
 import '../../services/fiscal_day.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,8 +8,19 @@ import '../../theme/app_theme.dart';
 import '../../screens/ledger_screen.dart' show computeMonthCycleRange;
 
 final insightsTransactionsProvider =
-    StreamProvider.autoDispose<List<Transaction>>(
-        (ref) => ref.watch(databaseProvider).watchAllTransactions());
+    StreamProvider.autoDispose<List<Transaction>>((ref) {
+  final db = ref.watch(databaseProvider);
+  return (db.select(db.transactions)
+        ..where((t) =>
+            t.deletedAt.isNull() &
+            t.goalId.isNull() &
+            (t.envelopeType.equals('savings').not() | t.envelopeType.isNull()))
+        ..orderBy([
+          (t) => OrderingTerm.desc(t.date),
+          (t) => OrderingTerm.desc(t.createdAt),
+        ]))
+      .watch();
+});
 final insightsCategoriesProvider =
     StreamProvider.autoDispose<List<Category>>((ref) {
   final db = ref.watch(databaseProvider);
@@ -255,6 +267,8 @@ InsightsReport buildInsightsReport(
 
   final eligible = transactions.where((t) =>
       t.deletedAt == null &&
+      t.goalId == null &&
+      t.envelopeType != 'savings' &&
       t.type == type &&
       t.amount.isFinite &&
       t.amount > 0 &&

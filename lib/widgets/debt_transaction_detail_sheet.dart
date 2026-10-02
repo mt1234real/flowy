@@ -120,6 +120,7 @@ class _DebtTransactionDetailSheetState
     DateTime selectedDate = _currentTx.date;
     DateTime? selectedDueDate = _currentTx.dueDate;
     double currentAmountVal = _currentTx.amount;
+    bool isSaving = false;
 
     try {
       await AppAnimationPolicy.showFluidSheet<void>(
@@ -603,57 +604,69 @@ class _DebtTransactionDetailSheetState
                                       borderRadius: BorderRadius.circular(14)),
                                   elevation: 2,
                                 ),
-                                onPressed: () async {
-                                  if (currentAmountVal <= 0) {
-                                    amountFeedback.reject();
-                                    return;
-                                  }
+                                onPressed: isSaving
+                                    ? null
+                                    : () async {
+                                        if (isSaving) return;
+                                        if (currentAmountVal <= 0) {
+                                          amountFeedback.reject();
+                                          return;
+                                        }
 
-                                  amountFeedback.clear();
+                                        amountFeedback.clear();
 
-                                  final db = ref.read(databaseProvider);
-                                  final updatedTx = DebtTransaction(
-                                    id: _currentTx.id,
-                                    contactId: selectedContactId,
-                                    walletId: selectedWalletId,
-                                    type: _currentTx.type,
-                                    amount: currentAmountVal,
-                                    date: selectedDate,
-                                    dueDate: selectedDueDate,
-                                    note: noteController.text.trim().isEmpty
-                                        ? null
-                                        : noteController.text.trim(),
-                                    isSettled: _currentTx.isSettled,
-                                    createdAt: _currentTx.createdAt,
-                                  );
+                                        final db = ref.read(databaseProvider);
+                                        final updatedTx = DebtTransaction(
+                                          id: _currentTx.id,
+                                          contactId: selectedContactId,
+                                          walletId: selectedWalletId,
+                                          type: _currentTx.type,
+                                          amount: currentAmountVal,
+                                          date: selectedDate,
+                                          dueDate: selectedDueDate,
+                                          note:
+                                              noteController.text.trim().isEmpty
+                                                  ? null
+                                                  : noteController.text.trim(),
+                                          isSettled: _currentTx.isSettled,
+                                          createdAt: _currentTx.createdAt,
+                                        );
 
-                                  // Động cơ Rollback & Re-apply ACID cập nhật CSDL
-                                  await db.updateDebtTransaction(
-                                    oldTx: _currentTx,
-                                    newTx: updatedTx,
-                                  );
+                                        setModalState(() => isSaving = true);
+                                        try {
+                                          await db.updateDebtTransaction(
+                                              newTx: updatedTx);
+                                          if (!mounted) return;
 
-                                  // Làm mới tức thì các provider để UI cập nhật ngay frame tiếp theo
-                                  ref.invalidate(unifiedLedgerStreamProvider);
-                                  ref.invalidate(debtSummaryStreamProvider);
-                                  ref.invalidate(debtContactsStreamProvider);
-                                  ref.invalidate(
-                                      debtTransactionsByContactStreamProvider(
-                                          selectedContactId));
+                                          ref.invalidate(
+                                              unifiedLedgerStreamProvider);
+                                          ref.invalidate(
+                                              debtSummaryStreamProvider);
+                                          ref.invalidate(
+                                              debtContactsStreamProvider);
+                                          ref.invalidate(
+                                              debtTransactionsByContactStreamProvider(
+                                                  updatedTx.contactId));
+                                          HapticFeedback.mediumImpact();
+                                          setState(
+                                              () => _currentTx = updatedTx);
 
-                                  HapticFeedback.mediumImpact();
-
-                                  if (!mounted) return;
-                                  setState(() {
-                                    _currentTx = updatedTx;
-                                  });
-
-                                  AppFeedback.showSuccess(
-                                    modalCtx,
-                                    '✓ Đã cập nhật và đồng bộ lại số dư ví thành công!',
-                                  );
-                                  Navigator.of(modalCtx).pop();
-                                },
+                                          if (!ctx.mounted) return;
+                                          AppFeedback.showSuccess(ctx,
+                                              'Đã cập nhật khoản nợ và số dư ví.');
+                                          Navigator.of(ctx).pop();
+                                        } catch (_) {
+                                          if (ctx.mounted) {
+                                            AppFeedback.showInfo(ctx,
+                                                'Chưa thể cập nhật khoản nợ. Hãy đóng và mở lại giao dịch rồi thử lại.');
+                                          }
+                                        } finally {
+                                          if (ctx.mounted) {
+                                            setModalState(
+                                                () => isSaving = false);
+                                          }
+                                        }
+                                      },
                                 child: const Text(
                                   'LƯU THAY ĐỔI',
                                   style: TextStyle(

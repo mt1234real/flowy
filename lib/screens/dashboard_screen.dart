@@ -88,7 +88,10 @@ final recentTransactionsStreamProvider =
     StreamProvider.autoDispose<List<Transaction>>((ref) {
   final db = ref.watch(databaseProvider);
   return (db.select(db.transactions)
-        ..where((t) => t.deletedAt.isNull())
+        ..where((t) =>
+            t.deletedAt.isNull() &
+            t.goalId.isNull() &
+            (t.envelopeType.equals('savings').not() | t.envelopeType.isNull()))
         ..orderBy([(t) => drift.OrderingTerm.desc(t.date)])
         ..limit(15))
       .watch();
@@ -98,8 +101,14 @@ final recentTransactionsStreamProvider =
 final dashboardPeriodTransactionsProvider = StreamProvider.autoDispose
     .family<List<Transaction>, DateTimeRange>((ref, range) {
   final db = ref.watch(databaseProvider);
-  return (db.select(db.transactions)..where((t) => t.deletedAt.isNull() &
-      t.date.isBiggerOrEqualValue(range.start) & t.date.isSmallerThanValue(range.end))).watch();
+  return (db.select(db.transactions)
+        ..where((t) =>
+            t.deletedAt.isNull() &
+            t.goalId.isNull() &
+            (t.envelopeType.equals('savings').not() | t.envelopeType.isNull()) &
+            t.date.isBiggerOrEqualValue(range.start) &
+            t.date.isSmallerThanValue(range.end)))
+      .watch();
 });
 
 final dashboardWalletsStreamProvider =

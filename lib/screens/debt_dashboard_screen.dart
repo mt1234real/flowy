@@ -43,7 +43,7 @@ final contactDueDatesStreamProvider =
     StreamProvider.autoDispose<Map<String, DateTime?>>((ref) {
   final db = ref.watch(databaseProvider);
   return (db.select(db.debtTransactions)
-        ..where((t) => t.dueDate.isNotNull() & t.isSettled.equals(false))
+        ..where((t) => t.dueDate.isNotNull() & t.isSettled.equals(false) & t.deletedAt.isNull())
         ..orderBy([(t) => drift.OrderingTerm.asc(t.dueDate)]))
       .watch()
       .map((txs) {
@@ -1080,19 +1080,25 @@ class _ContactEditModalState extends ConsumerState<_ContactEditModal> {
           ? 'icon:$_avatarValue|$_colorHex'
           : '$_avatarType|$_colorHex|$_avatarValue';
 
-      // Tuân thủ nghiêm ngặt 100% các trường thực tế của DebtContactsCompanion
-      final companion = DebtContactsCompanion(
-        id: drift.Value(contactId),
-        name: drift.Value(name),
-        phone: drift.Value(_phoneController.text.trim().isEmpty
-            ? null
-            : _phoneController.text.trim()),
-        avatarUrl: drift.Value(encodedAvatar),
-        netBalance: drift.Value(widget.contact?.netBalance ?? 0.0),
-        updatedAt: drift.Value(DateTime.now()),
-      );
-
-      await db.upsertDebtContact(companion);
+      final phone = _phoneController.text.trim().isEmpty
+          ? null
+          : _phoneController.text.trim();
+      if (isEdit) {
+        await db.updateDebtContactMetadata(
+          id: contactId,
+          name: name,
+          phone: phone,
+          avatarUrl: encodedAvatar,
+        );
+      } else {
+        await db.upsertDebtContact(DebtContactsCompanion(
+          id: drift.Value(contactId),
+          name: drift.Value(name),
+          phone: drift.Value(phone),
+          avatarUrl: drift.Value(encodedAvatar),
+          updatedAt: drift.Value(DateTime.now()),
+        ));
+      }
 
       if (!mounted) return;
       AppFeedback.showSuccess(

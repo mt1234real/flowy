@@ -9,7 +9,6 @@ import '../widgets/flowy_selection_picker.dart';
 // ==============================================================================
 
 import 'dart:ui';
-import 'package:drift/drift.dart' as drift;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -66,6 +65,7 @@ class _CategoryManagerScreenState extends ConsumerState<CategoryManagerScreen> {
         await (db.select(db.categories)..where(db.categoryAvailable)).get();
     final parentOptions = allCats
         .where((c) =>
+            c.id != editingCategory?.id &&
             c.type == _activeType &&
             (c.parentId == null || c.parentId!.isEmpty))
         .toList();
@@ -510,6 +510,9 @@ class _CategoryFormModalState extends ConsumerState<_CategoryFormModal> {
   String _selectedHexColor = '#10B981';
 
   bool _isSaving = false;
+  String? _parentError;
+  final AppValidationFeedbackController _parentFeedback =
+      AppValidationFeedbackController();
   final AppValidationFeedbackController _nameFeedback =
       AppValidationFeedbackController();
 
@@ -522,8 +525,8 @@ class _CategoryFormModalState extends ConsumerState<_CategoryFormModal> {
       _nameController = TextEditingController(text: cat.name);
       _isChildCategory = cat.parentId != null && cat.parentId!.isNotEmpty;
       _selectedParentId = cat.parentId;
-      _selectedIconName = cat.icon ?? 'restaurant';
-      _selectedHexColor = cat.color ?? '#10B981';
+      _selectedIconName = cat.icon;
+      _selectedHexColor = cat.color;
     } else {
       _nameController = TextEditingController();
       _isChildCategory = false;
@@ -535,6 +538,7 @@ class _CategoryFormModalState extends ConsumerState<_CategoryFormModal> {
 
   @override
   void dispose() {
+    _parentFeedback.dispose();
     _nameFeedback.dispose();
     _nameController.dispose();
     super.dispose();
@@ -567,6 +571,7 @@ class _CategoryFormModalState extends ConsumerState<_CategoryFormModal> {
   }
 
   Future<void> _saveCategory() async {
+    if (_isSaving) return;
     final name = _nameController.text.trim();
     if (name.isEmpty) {
       _nameFeedback.reject();
@@ -574,6 +579,17 @@ class _CategoryFormModalState extends ConsumerState<_CategoryFormModal> {
     }
 
     _nameFeedback.clear();
+    if (_isChildCategory && (_selectedParentId == null ||
+        _selectedParentId == widget.initialCategory?.id ||
+        !widget.parentOptions.any((c) => c.id == _selectedParentId))) {
+      setState(() => _parentError = widget.parentOptions.isEmpty
+          ? 'Chưa có nhóm cha phù hợp. Hãy tạo nhóm cha khác trước.'
+          : 'Hãy chọn một nhóm cha khác cho danh mục này.');
+      _parentFeedback.reject();
+      return;
+    }
+    _parentFeedback.clear();
+    setState(() => _parentError = null);
 
     setState(() => _isSaving = true);
     final db = ref.read(databaseProvider);
@@ -581,32 +597,15 @@ class _CategoryFormModalState extends ConsumerState<_CategoryFormModal> {
     try {
       final parentId = _isChildCategory ? _selectedParentId : null;
 
-      if (widget.isEditing) {
-        // Cập nhật danh mục
-        await (db.update(db.categories)
-              ..where((c) => c.id.equals(widget.initialCategory!.id)))
-            .write(
-          CategoriesCompanion(
-            name: drift.Value(name),
-            icon: drift.Value(_selectedIconName),
-            color: drift.Value(_selectedHexColor),
-            parentId: drift.Value(parentId),
-          ),
-        );
-      } else {
-        // Tạo mới danh mục
-        final newId = 'cat_${DateTime.now().millisecondsSinceEpoch}';
-        await db.into(db.categories).insert(
-              CategoriesCompanion.insert(
-                id: newId,
-                name: name,
-                type: widget.activeType,
-                parentId: drift.Value(parentId),
-                icon: drift.Value(_selectedIconName),
-                color: drift.Value(_selectedHexColor),
-              ),
-            );
-      }
+      await db.saveCategoryInHierarchy(
+        id: widget.initialCategory?.id ?? 'cat_${DateTime.now().microsecondsSinceEpoch}',
+        name: name,
+        type: widget.activeType,
+        icon: _selectedIconName,
+        color: _selectedHexColor,
+        parentId: parentId,
+        isEditing: widget.isEditing,
+      );
 
       if (!mounted) return;
 
@@ -615,6 +614,10 @@ class _CategoryFormModalState extends ConsumerState<_CategoryFormModal> {
         widget.isEditing ? 'Đã cập nhật danh mục' : 'Đã tạo danh mục mới',
       );
       Navigator.of(context).pop();
+    } on ArgumentError catch (e) {
+      if (!mounted) return;
+      setState(() => _parentError = e.message.toString());
+      _parentFeedback.reject();
     } catch (e) {
       if (!mounted) return;
       AppFeedback.showError(context, 'Lỗi: $e');
@@ -676,9 +679,12 @@ class _CategoryFormModalState extends ConsumerState<_CategoryFormModal> {
                     const SizedBox(height: 16),
 
                     // 1. Phân loại 2 cấp: Nhóm Cha vs Danh Mục Con
-                    Container(
+                    AppValidationFeedback(
+                      controller: _parentFeedback,
+                      builder: (context, visual) => Container(
                       padding: const EdgeInsets.all(3),
                       decoration: BoxDecoration(
+                        border: Border.all(color: visual.borderColor(Colors.transparent)),
                         color: isDark
                             ? AppTokens.darkCardSubtle
                             : AppTokens.lightCardSubtle,
@@ -688,8 +694,10 @@ class _CategoryFormModalState extends ConsumerState<_CategoryFormModal> {
                         children: [
                           Expanded(
                             child: InkWell(
-                              onTap: () =>
-                                  setState(() => _isChildCategory = false),
+                              onTap: _isSaving ? null : () {
+                                _parentFeedback.clear();
+                                setState(() { _isChildCategory = false; _parentError = null; });
+                              },
                               borderRadius: BorderRadius.circular(11),
                               child: Container(
                                 padding:
@@ -725,8 +733,10 @@ class _CategoryFormModalState extends ConsumerState<_CategoryFormModal> {
                           ),
                           Expanded(
                             child: InkWell(
-                              onTap: () =>
-                                  setState(() => _isChildCategory = true),
+                              onTap: _isSaving ? null : () {
+                                _parentFeedback.clear();
+                                setState(() { _isChildCategory = true; _parentError = null; });
+                              },
                               borderRadius: BorderRadius.circular(11),
                               child: Container(
                                 padding:
@@ -763,6 +773,12 @@ class _CategoryFormModalState extends ConsumerState<_CategoryFormModal> {
                         ],
                       ),
                     ),
+
+                    ),
+                    if (_parentError != null)
+                      Padding(padding: const EdgeInsets.only(top: 8),
+                        child: Text(_parentError!, style: TextStyle(
+                            color: Theme.of(context).colorScheme.error, fontSize: 12))),
 
                     // 2. Nếu là danh mục con -> Hiển thị Dropdown chọn nhóm cha
                     if (_isChildCategory) ...[
@@ -804,8 +820,11 @@ class _CategoryFormModalState extends ConsumerState<_CategoryFormModal> {
                                       ]))
                                 ])))
                             .toList(),
-                        onChanged: (val) =>
-                            setState(() => _selectedParentId = val),
+                        onChanged: (val) {
+                          if (_isSaving) return;
+                          _parentFeedback.clear();
+                          setState(() { _selectedParentId = val; _parentError = null; });
+                        },
                       ),
                     ],
 

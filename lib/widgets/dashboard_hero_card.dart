@@ -12,6 +12,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../core/animation/app_animation_policy.dart';
+import '../core/feedback/app_feedback.dart';
 import '../theme/app_theme.dart';
 import 'overrun_resolution_sheet.dart';
 import 'pre_purchase_advisor_sheet.dart';
@@ -112,12 +113,9 @@ class DashboardHeroCard extends ConsumerWidget {
       ref.read(fastRecoveryDailyLimitProvider.notifier).state = 0.0;
       HapticFeedback.mediumImpact();
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            behavior: SnackBarBehavior.floating,
-            backgroundColor: Color(0xFF10B981),
-            content: Text('✓ Đã khôi phục hạn mức chi tiêu về mức tiêu chuẩn.'),
-          ),
+        AppFeedback.showSuccess(
+          context,
+          '✓ Đã khôi phục hạn mức chi tiêu về mức tiêu chuẩn.',
         );
       }
     }

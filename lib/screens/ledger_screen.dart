@@ -244,6 +244,48 @@ class UnifiedLedgerItem {
   bool get isDebt => debtTx != null;
 }
 
+class LedgerSummary {
+  final double moneyIn;
+  final double moneyOut;
+
+  const LedgerSummary({required this.moneyIn, required this.moneyOut});
+
+  double get net => moneyIn - moneyOut;
+}
+
+// Items are the active, filtered history; transfers only cross a single-wallet
+// scope. In the all-wallet scope both sides are internal and contribute zero.
+LedgerSummary computeLedgerSummary(
+  Iterable<UnifiedLedgerItem> items, {
+  String? walletId,
+}) {
+  var moneyIn = 0.0;
+  var moneyOut = 0.0;
+  for (final item in items) {
+    final tx = item.standardTx;
+    if (tx != null && tx.type == CategoryType.transfer) {
+      if (walletId == null) {
+        continue;
+      }
+      final sourceInScope = tx.walletId == walletId;
+      final destinationInScope = tx.toWalletId == walletId;
+      if (sourceInScope == destinationInScope) {
+        continue;
+      }
+      if (destinationInScope) {
+        moneyIn += item.amount;
+      } else {
+        moneyOut += item.amount;
+      }
+    } else if (item.isMoneyIn) {
+      moneyIn += item.amount;
+    } else {
+      moneyOut += item.amount;
+    }
+  }
+  return LedgerSummary(moneyIn: moneyIn, moneyOut: moneyOut);
+}
+
 final unifiedLedgerStreamProvider = StreamProvider.autoDispose<List<UnifiedLedgerItem>>((ref) {
   final db = ref.watch(databaseProvider);
   final mode = ref.watch(cycleModeProvider);
@@ -329,13 +371,21 @@ final unifiedLedgerStreamProvider = StreamProvider.autoDispose<List<UnifiedLedge
         if (tx.goalId != null || tx.envelopeType == 'savings') continue;
         if (tabFilter == LedgerFilter.expense && tx.type != CategoryType.expense) continue;
         if (tabFilter == LedgerFilter.income && tx.type != CategoryType.income) continue;
-        if (criteria.walletId != null && tx.walletId != criteria.walletId) continue;
+        if (criteria.walletId != null &&
+            tx.walletId != criteria.walletId &&
+            !(tx.type == CategoryType.transfer &&
+                tx.toWalletId == criteria.walletId)) {
+          continue;
+        }
         if (criteria.categoryIds.isNotEmpty && !criteria.categoryIds.contains(tx.categoryId)) continue;
         if (criteria.minAmount != null && tx.amount < criteria.minAmount!) continue;
         if (criteria.maxAmount != null && tx.amount > criteria.maxAmount!) continue;
 
-        final isIncome = tx.type == CategoryType.income;
-        final wallet = walletsMap[tx.walletId];
+        final isIncome = tx.type == CategoryType.income ||
+            (tx.type == CategoryType.transfer &&
+                criteria.walletId != null &&
+                tx.toWalletId == criteria.walletId);
+        final wallet = walletsMap[criteria.walletId ?? tx.walletId];
         final category = categoriesMap[tx.categoryId];
         final categoryName = category?.name ?? 'Chung';
         final title = tx.note ?? tx.merchant ?? categoryName;
@@ -1259,7 +1309,8 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> with TickerProvider
                           children: [
                             Padding(
                               padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
-                              child: _buildSummaryCard(visibleItems, isDark),
+                              child: _buildSummaryCard(visibleItems, isDark,
+                                  walletId: criteria.walletId),
                             ),
                             const SizedBox(height: 6),
                             visibleItems.isEmpty
@@ -1404,6 +1455,7 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> with TickerProvider
     final today = ref.watch(fiscalTodayProvider);
     final yesterday = DateTime(today.year, today.month, today.day - 1);
     final dateKeys = groupedMap.keys.toList();
+    final walletId = ref.watch(ledgerFilterCriteriaProvider).walletId;
 
     return Padding(
       key: const ValueKey('ledger_list_content'),
@@ -1415,9 +1467,8 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> with TickerProvider
         itemBuilder: (context, index) {
           final dateStr = dateKeys[index];
           final dayItems = groupedMap[dateStr]!;
-          final dailyIn = dayItems.where((t) => t.isMoneyIn).fold(0.0, (sum, t) => sum + t.amount);
-          final dailyOut = dayItems.where((t) => !t.isMoneyIn).fold(0.0, (sum, t) => sum + t.amount);
-          final netDaily = dailyIn - dailyOut;
+          final netDaily =
+              computeLedgerSummary(dayItems, walletId: walletId).net;
 
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1863,10 +1914,12 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> with TickerProvider
     }
   }
 
-  Widget _buildSummaryCard(List<UnifiedLedgerItem> items, bool isDark) {
-    final totalIncome = items.where((t) => t.isMoneyIn).fold(0.0, (sum, t) => sum + t.amount);
-    final totalExpense = items.where((t) => !t.isMoneyIn).fold(0.0, (sum, t) => sum + t.amount);
-    final netBalance = totalIncome - totalExpense;
+  Widget _buildSummaryCard(List<UnifiedLedgerItem> items, bool isDark,
+      {String? walletId}) {
+    final summary = computeLedgerSummary(items, walletId: walletId);
+    final totalIncome = summary.moneyIn;
+    final totalExpense = summary.moneyOut;
+    final netBalance = summary.net;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),

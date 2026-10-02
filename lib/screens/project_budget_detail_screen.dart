@@ -142,7 +142,10 @@ class ProjectBudgetDetailScreen extends ConsumerWidget {
           final isArchived = project.status == 'ARCHIVED' || isPast;
 
           // Tính tổng tiền đã chi cho sự kiện
-          final double totalSpent = txs.fold(0.0, (sum, t) => sum + t.amount);
+          final expenseTxs =
+              txs.where((t) => t.type == CategoryType.expense).toList();
+          final double totalSpent =
+              expenseTxs.fold(0.0, (sum, t) => sum + t.amount);
           final double remaining = project.targetAmount - totalSpent;
           final bool isOver = remaining < 0;
           final double spendRatio = project.targetAmount > 0 ? (totalSpent / project.targetAmount).clamp(0.0, 1.0) : 0.0;
@@ -166,7 +169,7 @@ class ProjectBudgetDetailScreen extends ConsumerWidget {
 
           // Tính tỷ trọng phân bổ chi phí theo danh mục (Expense Breakdown)
           final Map<String, double> categorySpentMap = {};
-          for (final t in txs) {
+          for (final t in expenseTxs) {
             categorySpentMap[t.categoryId] = (categorySpentMap[t.categoryId] ?? 0.0) + t.amount;
           }
 

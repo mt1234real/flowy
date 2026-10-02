@@ -228,6 +228,10 @@ class NotificationCoordinator {
     final txs = await (db.select(db.transactions)
           ..where((t) => t.deletedAt.isNull()))
         .get();
+    // Reminders count all activity; financial summaries exclude Vault movements.
+    final reportableTxs = txs
+        .where((t) => t.goalId == null && t.envelopeType != 'savings')
+        .toList();
     final debts = await (db.select(db.debtTransactions)
           ..where((d) => d.deletedAt.isNull()))
         .get();
@@ -270,8 +274,9 @@ class NotificationCoordinator {
       reminder('midday', 12 * 60 + 30);
       if (date.weekday == DateTime.sunday && prefs.flag('digest')) {
         final start = date.subtract(const Duration(days: 6));
-        final week =
-            txs.where((t) => !t.date.isBefore(boundary.start(start)) && t.date.isBefore(boundary.start(end)));
+        final week = reportableTxs.where((t) =>
+            !t.date.isBefore(boundary.start(start)) &&
+            t.date.isBefore(boundary.start(end)));
         final expense = week
             .where((t) => t.type == CategoryType.expense)
             .fold(0.0, (s, t) => s + t.amount);
@@ -339,13 +344,17 @@ class NotificationCoordinator {
               .map((c) => c.id));
           changed = ids.length != before;
         }
-        final spent = txs
-            .where((t) =>
-                t.type == CategoryType.expense &&
-                ids.contains(t.categoryId) &&
-                !t.date.isBefore(boundary.start(window.startDate)) &&
-                t.date.isBefore(boundary.end(window.endDate)))
-            .fold(0.0, (s, t) => s + t.amount);
+        final category =
+            categories.where((c) => c.id == budget.categoryId).firstOrNull;
+        final spent = await db.calculateRecurringSpentForCategory(
+          categoryId: budget.categoryId,
+          startDate: boundary.start(window.startDate),
+          // The DAO's end is inclusive; the fiscal window's end is exclusive.
+          endDate: boundary
+              .end(window.endDate)
+              .subtract(const Duration(microseconds: 1)),
+          isParentCategory: category?.parentId?.isEmpty ?? true,
+        );
         final threshold = spent >= budget.amount
             ? 100
             : spent >= budget.amount * .8

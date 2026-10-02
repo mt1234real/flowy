@@ -1144,7 +1144,7 @@ class _SavingsVaultScreenState extends ConsumerState<SavingsVaultScreen>
             onPressed: () => _showCreateOrEditGoalModal(context),
             icon: const Icon(Icons.add_rounded, size: 18),
             label: const Text(
-              '+ Thêm mục tiêu đầu tiên',
+              'Thêm mục tiêu đầu tiên',
               style: TextStyle(fontWeight: FontWeight.w800),
             ),
           ),
@@ -1984,10 +1984,24 @@ class _VaultMasterAuditLedgerSheetState
                                     );
 
                                     if (confirmed == true) {
-                                      await db.deleteVaultTransactionAtomically(tx.id);
-                                      if (context.mounted) {
-                                        AppFeedback.showSuccess(context,
-                                            'Đã hoàn tác giao dịch và cân bằng số dư');
+                                      try {
+                                        await db
+                                            .deleteVaultTransactionAtomically(
+                                                tx.id);
+                                        if (context.mounted) {
+                                          AppFeedback.showSuccess(context,
+                                              'Đã hoàn tác giao dịch và cân bằng số dư');
+                                        }
+                                      } on VaultTransactionDeletionException catch (error) {
+                                        if (context.mounted) {
+                                          AppFeedback.showInfo(
+                                              context, error.message);
+                                        }
+                                      } catch (_) {
+                                        if (context.mounted) {
+                                          AppFeedback.showError(context,
+                                              'Chưa thể xóa giao dịch. Vui lòng thử lại.');
+                                        }
                                       }
                                     }
                                   },
@@ -2594,10 +2608,22 @@ class SavingsGoalDetailSheet extends ConsumerWidget {
                             );
 
                             if (confirmed == true) {
-                              await db.deleteVaultTransactionAtomically(tx.id);
-                              if (context.mounted) {
-                                AppFeedback.showSuccess(
-                                    context, 'Đã hoàn tác giao dịch và cân bằng số dư');
+                              try {
+                                await db
+                                    .deleteVaultTransactionAtomically(tx.id);
+                                if (context.mounted) {
+                                  AppFeedback.showSuccess(context,
+                                      'Đã hoàn tác giao dịch và cân bằng số dư');
+                                }
+                              } on VaultTransactionDeletionException catch (error) {
+                                if (context.mounted) {
+                                  AppFeedback.showInfo(context, error.message);
+                                }
+                              } catch (_) {
+                                if (context.mounted) {
+                                  AppFeedback.showError(context,
+                                      'Chưa thể xóa giao dịch. Vui lòng thử lại.');
+                                }
                               }
                             }
                           },
