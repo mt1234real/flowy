@@ -9,6 +9,7 @@ import 'vault_security_service.dart';
 import 'avatar_storage.dart';
 import 'backup_schedule.dart';
 import 'backup_crypto.dart';
+import 'backup_state.dart';
 
 const backupCadencePreferenceKeys = <String>{
   'pfm_backup_cadence_mode',
@@ -37,6 +38,91 @@ const backupPreferenceKeys = <String>{
   'user_avatar_color_hex',
   'vault_biometrics_enabled',
 };
+
+// Local recovery only: never include presence metadata in the Cloud payload.
+// Scheduler refresh can also write its failure status during preference apply.
+const restorePreferenceKeys = <String>{
+  ...backupPreferenceKeys,
+  'flowy_restored_private',
+  backupLastFailureKey,
+  backupLastFailureMessageKey,
+};
+
+Future<Map<String, dynamic>> snapshotRestorePreferences(
+    SharedPreferences prefs) async {
+  await prefs.reload();
+  return {
+    'snapshotVersion': 1,
+    'entries': {
+      for (final key in restorePreferenceKeys)
+        key: {
+          'existed': prefs.containsKey(key),
+          if (prefs.containsKey(key)) 'value': prefs.get(key),
+        },
+    },
+  };
+}
+
+/// Restore exact local values/presence, without avatar or Cloud-import transforms.
+/// Old recovery journals retain their original manifest/import semantics.
+Future<void> restorePreferenceSnapshot(
+    SharedPreferences prefs, Map<String, dynamic> snapshot,
+    {BackupWorkScheduler? scheduler}) async {
+  if (!snapshot.containsKey('snapshotVersion')) {
+    await applyBackupPreferences(prefs, snapshot, scheduler: scheduler);
+    return;
+  }
+  final entries = snapshot['entries'];
+  if (snapshot['snapshotVersion'] != 1 ||
+      entries is! Map ||
+      entries.length != restorePreferenceKeys.length ||
+      !restorePreferenceKeys.every(entries.containsKey)) {
+    throw const FormatException('Bản phục hồi thiết lập không hợp lệ');
+  }
+  // Validate the entire local journal before changing any preferences.
+  for (final entry in entries.values) {
+    if (entry is! Map || entry['existed'] is! bool) {
+      throw const FormatException('Bản phục hồi thiết lập không hợp lệ');
+    }
+    if (entry['existed'] == true) {
+      final value = entry['value'];
+      if (value is! bool &&
+          value is! int &&
+          value is! double &&
+          value is! String &&
+          !(value is List && value.every((v) => v is String))) {
+        throw const FormatException('Giá trị phục hồi thiết lập không hợp lệ');
+      }
+    }
+  }
+  Future<void> restoreKey(String key) async {
+    final entry = entries[key] as Map;
+    final value = entry['value'];
+    final bool saved;
+    if (entry['existed'] == false) {
+      saved = await prefs.remove(key);
+    } else if (value is bool) {
+      saved = await prefs.setBool(key, value);
+    } else if (value is int) {
+      saved = await prefs.setInt(key, value);
+    } else if (value is double) {
+      saved = await prefs.setDouble(key, value);
+    } else if (value is String) {
+      saved = await prefs.setString(key, value);
+    } else {
+      saved = await prefs.setStringList(key, List<String>.from(value as List));
+    }
+    if (!saved) throw StateError('Không phục hồi được thiết lập $key');
+  }
+
+  for (final key in restorePreferenceKeys) {
+    await restoreKey(key);
+  }
+  await recoverPendingBackup(prefs, scheduler: scheduler);
+  // A scheduler failure must not replace the pre-restore local status either.
+  await restoreKey(backupLastFailureKey);
+  await restoreKey(backupLastFailureMessageKey);
+}
 
 Future<Map<String, Object>> exportBackupPreferences(
     SharedPreferences prefs) async {
@@ -429,7 +515,7 @@ Future<void> recoverInterruptedRestore(
     if (await file.exists()) await file.delete();
   }
   await File(p.join(folder, 'pfm_local_vault.sqlite')).copy(target);
-  await applyBackupPreferences(
+  await restorePreferenceSnapshot(
       prefs, readManifest(folder, 'preferences_manifest.json')!);
   await VaultSecurityService.restorePersistedSnapshot(
       readManifest(folder, 'security_manifest.json')!);

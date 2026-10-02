@@ -11,10 +11,85 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pfm_app/data/database.dart';
 import 'package:pfm_app/services/auth_profile_service.dart';
 import 'package:pfm_app/services/backup_capsule.dart';
+import 'package:pfm_app/services/backup_schedule.dart';
 import 'package:pfm_app/services/cloud_backup_service.dart';
 import 'package:pfm_app/services/vault_security_service.dart';
 import 'package:pfm_app/theme/app_theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:workmanager/workmanager.dart';
+
+const _cloudPreferences = <String, Object>{
+  'user_display_name': 'Cloud name',
+  'pfm_backup_cadence_mode': 3,
+  'pfm_backup_custom_unit': 'weeks',
+  'pfm_backup_custom_value': 9,
+  'pfm_backup_wifi_only': true,
+  'pfm_backup_battery_safe': true,
+};
+
+class _Scheduler implements BackupWorkScheduler {
+  final pending = <String, Constraints>{};
+  bool fail = false;
+  @override
+  Future<void> cancel(String name) async => pending.remove(name);
+  @override
+  Future<void> entry(Constraints constraints) async {
+    pending[cloudEntryBackupTask] = constraints;
+  }
+
+  @override
+  Future<void> periodic(Constraints constraints) async {
+    if (fail) throw StateError('Injected scheduler failure');
+    pending[cloudBackupTask] = constraints;
+  }
+}
+
+/// Fail the actual finalize delete once; rollback can then clean the marker.
+final class _FinalizeFault extends IOOverrides {
+  final String markerPath;
+  final Future<void> Function() beforeFailure;
+  bool fired = false;
+  _FinalizeFault(this.markerPath, this.beforeFailure);
+  @override
+  File createFile(String path) {
+    final file = super.createFile(path);
+    return path.replaceAll('\\', '/') == markerPath.replaceAll('\\', '/')
+        ? _MarkerFile(file, this)
+        : file;
+  }
+}
+
+class _MarkerFile implements File {
+  final File delegate;
+  final _FinalizeFault fault;
+  _MarkerFile(this.delegate, this.fault);
+  @override
+  String get path => delegate.path;
+  @override
+  Future<bool> exists() => delegate.exists();
+  @override
+  Future<String> readAsString({Encoding encoding = utf8}) =>
+      delegate.readAsString(encoding: encoding);
+  @override
+  Future<File> writeAsString(String contents,
+          {FileMode mode = FileMode.write,
+          Encoding encoding = utf8,
+          bool flush = false}) =>
+      delegate.writeAsString(contents,
+          mode: mode, encoding: encoding, flush: flush);
+  @override
+  Future<FileSystemEntity> delete({bool recursive = false}) async {
+    if (!fault.fired && await delegate.readAsString() == 'installing') {
+      fault.fired = true;
+      await fault.beforeFailure();
+      throw FileSystemException('Injected finalize marker failure', path);
+    }
+    return delegate.delete(recursive: recursive);
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
 
 Map<String, dynamic> _security(int sentinel) => {
       'algorithm': 'pbkdf2-sha256',
@@ -266,5 +341,217 @@ void main() {
     expect(storage[VaultSecurityService.storageKey], isNotNull);
     expect(await service.verifyPin('1234'), isTrue);
     expect(await service.verifyPin('4321'), isFalse);
+  });
+
+  Future<void> seedLocalCadence(String presence) async {
+    for (final key in backupCadencePreferenceKeys) {
+      await prefs.remove(key);
+    }
+    if (presence != 'absent') {
+      await prefs.setInt('pfm_backup_cadence_mode', 2);
+      await prefs.setBool('pfm_backup_wifi_only', false);
+    }
+    if (presence == 'existing') {
+      await prefs.setString('pfm_backup_custom_unit', 'days');
+      await prefs.setInt('pfm_backup_custom_value', 3);
+      await prefs.setBool('pfm_backup_battery_safe', true);
+    }
+  }
+
+  for (final presence in ['absent', 'existing', 'mixed']) {
+    test('failedRestore_${presence}CadencePreferencesRestoreExactly', () async {
+      await seedLocalCadence(presence);
+      if (presence == 'absent') {
+        expect(prefs.getInt('pfm_backup_cadence_mode') ?? 1, 1);
+      }
+      await prefs.setInt('flowy_day_cutoff_minute', 0);
+      await prefs.setString('flowy_font_family', '');
+      // An exact local snapshot must retain the path, not embed/transform it.
+      await prefs.setString('user_avatar_type', 'customImage');
+      await prefs.setString('user_avatar_value', '${root.path}/old-cache.png');
+      storage.data[VaultSecurityService.storageKey] = existing;
+      final beforeDb = ledgerFingerprint(live.path);
+      final beforePrefs = preferenceSnapshot();
+      final beforeSecurity = Map<String, String>.from(storage);
+      await File('${cloud.parent.path}/preferences_manifest.json')
+          .writeAsString(jsonEncode(_cloudPreferences));
+      await File('${cloud.parent.path}/security_manifest.json')
+          .writeAsString(restored);
+      storage.failAfterWriting = restored;
+      await expectLater(
+          container
+              .read(cloudBackupServiceProvider)
+              .restorePreparedBackup(cloud),
+          throwsA(isA<StateError>().having((e) => e.message, 'fault',
+              'Injected failure after security write')));
+      await prefs.reload();
+      expect(storage.failAfterWriting, isNull);
+      for (final key in backupCadencePreferenceKeys) {
+        expect(prefs.containsKey(key), beforePrefs.containsKey(key),
+            reason: key);
+        expect(prefs.get(key), beforePrefs[key], reason: key);
+      }
+      expect(ledgerFingerprint(live.path), beforeDb);
+      expect(preferenceSnapshot(), beforePrefs);
+      expect(storage, beforeSecurity);
+    });
+  }
+
+  for (final priorFlag in [null, false, true]) {
+    test('finalizeFailure_restoresRestoredPrivate_${priorFlag ?? 'absent'}',
+        () async {
+      await seedLocalCadence('mixed');
+      if (priorFlag != null) {
+        await prefs.setBool('flowy_restored_private', priorFlag);
+        storage.data[VaultSecurityService.storageKey] = existing;
+      }
+      final beforeDb = ledgerFingerprint(live.path);
+      final beforePrefs = preferenceSnapshot();
+      final beforeSecurity = Map<String, String>.from(storage);
+      await File('${cloud.parent.path}/preferences_manifest.json')
+          .writeAsString(jsonEncode(_cloudPreferences));
+      await File('${cloud.parent.path}/security_manifest.json')
+          .writeAsString(restored);
+      final fault =
+          _FinalizeFault('${docs.path}/restore_recovery/pending', () async {
+        expect(prefs.getBool('flowy_restored_private'), true);
+        expect(prefs.getInt('pfm_backup_cadence_mode'), 3);
+        expect(storage[VaultSecurityService.storageKey], restored);
+        expect(ledgerFingerprint(live.path), ledgerFingerprint(cloud.path));
+      });
+      await expectLater(
+          IOOverrides.runWithIOOverrides(
+              () => container
+                  .read(cloudBackupServiceProvider)
+                  .restorePreparedBackup(cloud),
+              fault),
+          throwsA(isA<FileSystemException>().having(
+              (e) => e.message, 'fault', 'Injected finalize marker failure')));
+      await prefs.reload();
+      expect(fault.fired, true);
+      expect(ledgerFingerprint(live.path), beforeDb);
+      expect(preferenceSnapshot(), beforePrefs);
+      expect(storage, beforeSecurity);
+      expect(File('${docs.path}/restore_recovery/pending').existsSync(), false);
+    });
+  }
+
+  for (final configured in [false, true]) {
+    test('interruptedRestore_exactPreferencePresenceAndIdempotence_$configured',
+        () async {
+      await seedLocalCadence('mixed');
+      await prefs.setBool('flowy_restored_private', false);
+      if (configured) storage.data[VaultSecurityService.storageKey] = existing;
+      final beforeDb = ledgerFingerprint(live.path);
+      final beforePrefs = preferenceSnapshot();
+      final beforeSecurity = Map<String, String>.from(storage);
+      final journal = await Directory('${docs.path}/restore_recovery').create();
+      await liveDb.customStatement(
+          'VACUUM INTO ?', ['${journal.path}/pfm_local_vault.sqlite']);
+      await File('${journal.path}/preferences_manifest.json').writeAsString(
+          jsonEncode(await snapshotRestorePreferences(prefs)),
+          flush: true);
+      await File('${journal.path}/security_manifest.json').writeAsString(
+          jsonEncode(await VaultSecurityService().snapshotPersistedState()),
+          flush: true);
+      await File('${journal.path}/pending')
+          .writeAsString('installing', flush: true);
+      await liveDb.close();
+      await cloud.copy(live.path);
+      await applyBackupPreferences(prefs, _cloudPreferences);
+      await prefs.setBool('flowy_restored_private', true);
+      await VaultSecurityService.restoreManifest(_security(2));
+      for (var attempt = 0; attempt < 2; attempt++) {
+        await recoverInterruptedRestore(docs.path, prefs);
+        await prefs.reload();
+        expect(ledgerFingerprint(live.path), beforeDb);
+        expect(preferenceSnapshot(), beforePrefs);
+        expect(storage, beforeSecurity);
+        expect(File('${journal.path}/pending').existsSync(), false);
+      }
+    });
+  }
+
+  test('successfulRestore_stillAppliesCloudPreferences', () async {
+    await seedLocalCadence('absent');
+    await File('${cloud.parent.path}/preferences_manifest.json')
+        .writeAsString(jsonEncode(_cloudPreferences));
+    await container
+        .read(cloudBackupServiceProvider)
+        .restorePreparedBackup(cloud);
+    for (final entry in _cloudPreferences.entries) {
+      expect(prefs.get(entry.key), entry.value);
+    }
+    expect(prefs.getBool('flowy_restored_private'), true);
+    expect(ledgerFingerprint(live.path), ledgerFingerprint(cloud.path));
+  });
+
+  test('legacyBackup_missingCadenceKeys_preservesSuccessfulImportBehavior',
+      () async {
+    await seedLocalCadence('existing');
+    final cadence = {
+      for (final key in backupCadencePreferenceKeys) key: prefs.get(key)
+    };
+    await File('${cloud.parent.path}/preferences_manifest.json')
+        .writeAsString(jsonEncode({'user_display_name': 'Legacy Cloud name'}));
+    await container
+        .read(cloudBackupServiceProvider)
+        .restorePreparedBackup(cloud);
+    for (final entry in cadence.entries) {
+      expect(prefs.get(entry.key), entry.value);
+    }
+    expect(prefs.getString('user_display_name'), 'Legacy Cloud name');
+  });
+
+  for (final presence in ['absent', 'existing']) {
+    test('failedRestore_reconfiguresSchedulerToLocal_$presence', () async {
+      await seedLocalCadence(presence);
+      final scheduler = _Scheduler();
+      final before = preferenceSnapshot();
+      final snapshot = await snapshotRestorePreferences(prefs);
+      await applyBackupPreferences(prefs, _cloudPreferences,
+          scheduler: scheduler);
+      expect(scheduler.pending, isEmpty); // Imported manual-only.
+      await restorePreferenceSnapshot(prefs, snapshot, scheduler: scheduler);
+      expect(scheduler.pending.keys, [cloudBackupTask]);
+      expect(scheduler.pending[cloudBackupTask]!.networkType,
+          presence == 'absent' ? NetworkType.unmetered : NetworkType.connected);
+      expect(scheduler.pending[cloudBackupTask]!.requiresBatteryNotLow, true);
+      expect(preferenceSnapshot(), before);
+      expect(prefs.getInt('pfm_backup_cadence_mode') ?? 1,
+          presence == 'absent' ? 1 : 2);
+    });
+  }
+
+  test('snapshot_isReadOnlyAndRestoresFalseZeroEmptyAndTypedValues', () async {
+    await prefs.setBool('pfm_backup_wifi_only', false);
+    await prefs.setInt('flowy_day_cutoff_minute', 0);
+    await prefs.setString('flowy_font_family', '');
+    await prefs.setDouble('flowy_accent_preset', 1.5);
+    await prefs.setStringList('flowy_currency_font', ['old', 'values']);
+    final before = preferenceSnapshot();
+    final snapshot =
+        jsonDecode(jsonEncode(await snapshotRestorePreferences(prefs)))
+            as Map<String, dynamic>;
+    expect(preferenceSnapshot(), before);
+    expect(snapshot['entries']['pfm_backup_wifi_only'],
+        {'existed': true, 'value': false});
+    await applyBackupPreferences(prefs, _cloudPreferences);
+    await restorePreferenceSnapshot(prefs, snapshot);
+    await restorePreferenceSnapshot(prefs, snapshot);
+    expect(preferenceSnapshot(), before);
+  });
+
+  test('rollback_schedulerFailureDoesNotChangePreRestoreFailureStatus',
+      () async {
+    await seedLocalCadence('absent');
+    await prefs.setString('pfm_backup_last_failure_at', 'prior time');
+    await prefs.setString('pfm_backup_last_failure_message', 'prior message');
+    final before = preferenceSnapshot();
+    final snapshot = await snapshotRestorePreferences(prefs);
+    await applyBackupPreferences(prefs, _cloudPreferences);
+    await restorePreferenceSnapshot(prefs, snapshot,
+        scheduler: _Scheduler()..fail = true);
+    expect(preferenceSnapshot(), before);
   });
 }

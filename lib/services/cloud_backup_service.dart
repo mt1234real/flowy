@@ -705,7 +705,7 @@ class CloudBackupService {
     final progress = _ref.read(backupOperationProvider.notifier);
     progress.state = 'Đang kiểm tra bản khôi phục…';
     late SharedPreferences prefs;
-    late Map<String, Object> beforePrefs;
+    late Map<String, dynamic> beforePrefs;
     late Map<String, dynamic> beforeSecurity;
     late File mainFile;
     late Directory recovery;
@@ -719,7 +719,7 @@ class CloudBackupService {
       // Reject or migrate before taking read-only rollback snapshots.
       await compute(backup_database.normalizeStagedBackup, stagedFile.path);
       prefs = await SharedPreferences.getInstance();
-      beforePrefs = await exportBackupPreferences(prefs);
+      beforePrefs = await snapshotRestorePreferences(prefs);
       final securityService = _ref.read(vaultSecurityServiceProvider);
       beforeSecurity = await securityService.snapshotPersistedState();
       final folder = await getApplicationDocumentsDirectory();
@@ -786,13 +786,15 @@ class CloudBackupService {
       if (security != null) {
         await VaultSecurityService.restoreManifest(security);
       }
-      await prefs.setBool('flowy_restored_private', true);
+      if (!await prefs.setBool('flowy_restored_private', true)) {
+        throw StateError('Không lưu được trạng thái khôi phục');
+      }
       await File(p.join(recovery.path, 'pending')).delete();
     } catch (_) {
       if (replacing) {
         await File(p.join(recovery.path, 'pfm_local_vault.sqlite'))
             .copy(mainFile.path);
-        await applyBackupPreferences(prefs, beforePrefs);
+        await restorePreferenceSnapshot(prefs, beforePrefs);
         await VaultSecurityService.restorePersistedSnapshot(beforeSecurity);
         final marker = File(p.join(recovery.path, 'pending'));
         if (await marker.exists()) await marker.delete();
