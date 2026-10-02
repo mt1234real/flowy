@@ -31,7 +31,8 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../core/animation/app_animation_policy.dart';
 import '../core/feedback/app_feedback.dart';
-import '../main.dart' show resetAppRootSession, hasCompletedOnboardingProvider;
+import '../main.dart' show resetAppRootSession;
+import '../features/onboarding/onboarding_completion.dart';
 import '../services/backup_capsule.dart';
 import 'flowy_selection_picker.dart';
 import '../services/cloud_backup_service.dart';
@@ -390,13 +391,10 @@ class _RestoreDiffModalState extends ConsumerState<RestoreDiffModal> {
           selected: _keepLocal ? _selected : <String>{},
           walletMapping: _walletMapping);
       if (!mounted) return;
-      if (widget.finishOnboarding) {
-        await ref
-            .read(sharedPreferencesProvider)
-            .setBool('has_completed_onboarding', true);
-        if (!mounted) return;
-        ref.read(hasCompletedOnboardingProvider.notifier).state = true;
-      }
+      await ref.read(hasCompletedOnboardingProvider.notifier).completeRestore(
+            finishOnboarding: widget.finishOnboarding,
+          );
+      if (!mounted) return;
       AppFeedback.showSuccess(
           context, 'Đã khôi phục. Bản dữ liệu trước đó vẫn được giữ trên máy.');
       resetAppRootSession(ref);

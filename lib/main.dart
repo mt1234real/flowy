@@ -29,6 +29,7 @@ import 'package:path_provider/path_provider.dart';
 import 'services/backup_capsule.dart';
 import 'data/database.dart';
 import 'data/database_seeder.dart';
+import 'features/onboarding/onboarding_completion.dart';
 import 'features/onboarding/screens/welcome_onboarding_screen.dart';
 import 'screens/main_scaffold.dart';
 import 'theme/app_theme.dart';
@@ -43,12 +44,6 @@ void resetAppRootSession(WidgetRef ref) {
   backupNavigatorKey = GlobalKey<NavigatorState>();
   ref.read(appSessionKeyProvider.notifier).state = UniqueKey();
 }
-
-/// Provider quản lý trạng thái đã hoàn tất Onboarding hay chưa
-final hasCompletedOnboardingProvider = StateProvider<bool>((ref) {
-  final prefs = ref.watch(sharedPreferencesProvider);
-  return prefs.getBool('has_completed_onboarding') ?? false;
-});
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();

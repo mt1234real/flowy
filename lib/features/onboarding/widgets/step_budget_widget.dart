@@ -104,10 +104,12 @@ class _StepBudgetWidgetState extends ConsumerState<StepBudgetWidget> {
     } else {
       if (now.day >= startDay) {
         cycleStart = DateTime(now.year, now.month, startDay);
-        cycleEnd = DateTime(now.year, now.month + 1, startDay).subtract(const Duration(days: 1));
+        cycleEnd = DateTime(now.year, now.month + 1, startDay)
+            .subtract(const Duration(days: 1));
       } else {
         cycleStart = DateTime(now.year, now.month - 1, startDay);
-        cycleEnd = DateTime(now.year, now.month, startDay).subtract(const Duration(days: 1));
+        cycleEnd = DateTime(now.year, now.month, startDay)
+            .subtract(const Duration(days: 1));
       }
     }
 
@@ -116,12 +118,17 @@ class _StepBudgetWidgetState extends ConsumerState<StepBudgetWidget> {
   }
 
   String _formatCurrency(double amount) {
-    return NumberFormat.currency(locale: 'vi_VN', symbol: '₫', decimalDigits: 0).format(amount);
+    return NumberFormat.currency(locale: 'vi_VN', symbol: '₫', decimalDigits: 0)
+        .format(amount);
   }
 
   void _finishAndLaunchApp() async {
     HapticFeedback.heavyImpact();
-    await ref.read(onboardingControllerProvider.notifier).completeOnboarding();
+    if (!await ref
+        .read(onboardingControllerProvider.notifier)
+        .completeOnboarding()) {
+      return;
+    }
     if (mounted) {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => const MainScaffold()),
@@ -136,7 +143,8 @@ class _StepBudgetWidgetState extends ConsumerState<StepBudgetWidget> {
     final accent = ref.watch(accentPresetProvider);
 
     final int cycleDays = _calculateDaysInCycle(state.cycleStartDay);
-    final double dailySafeSpend = state.monthlyBudget > 0 ? (state.monthlyBudget / cycleDays) : 0.0;
+    final double dailySafeSpend =
+        state.monthlyBudget > 0 ? (state.monthlyBudget / cycleDays) : 0.0;
 
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
@@ -149,9 +157,11 @@ class _StepBudgetWidgetState extends ConsumerState<StepBudgetWidget> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF10B981).withValues(alpha: isDark ? 0.25 : 0.12),
+                  color: const Color(0xFF10B981)
+                      .withValues(alpha: isDark ? 0.25 : 0.12),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: const Text(
@@ -204,7 +214,8 @@ class _StepBudgetWidgetState extends ConsumerState<StepBudgetWidget> {
             decoration: BoxDecoration(
               color: isDark ? AppTokens.darkCard : Colors.white,
               borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
+              border: Border.all(
+                  color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
@@ -224,7 +235,8 @@ class _StepBudgetWidgetState extends ConsumerState<StepBudgetWidget> {
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
-                        color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                        color:
+                            isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
                       ),
                     ),
                     Text(
@@ -256,7 +268,9 @@ class _StepBudgetWidgetState extends ConsumerState<StepBudgetWidget> {
                     hintStyle: TextStyle(
                       fontSize: 26,
                       fontWeight: FontWeight.w900,
-                      color: isDark ? AppTokens.darkMuted.withValues(alpha: 0.4) : AppTokens.lightMuted.withValues(alpha: 0.4),
+                      color: isDark
+                          ? AppTokens.darkMuted.withValues(alpha: 0.4)
+                          : AppTokens.lightMuted.withValues(alpha: 0.4),
                     ),
                     suffixText: '₫',
                     suffixStyle: TextStyle(
@@ -265,12 +279,19 @@ class _StepBudgetWidgetState extends ConsumerState<StepBudgetWidget> {
                       color: accent.primary,
                     ),
                     filled: true,
-                    fillColor: isDark ? AppTokens.darkCardSubtle : AppTokens.lightCardSubtle,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                    fillColor: isDark
+                        ? AppTokens.darkCardSubtle
+                        : AppTokens.lightCardSubtle,
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 14),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16)),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide(color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
+                      borderSide: BorderSide(
+                          color: isDark
+                              ? AppTokens.darkBorder
+                              : AppTokens.lightBorder),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
@@ -283,24 +304,34 @@ class _StepBudgetWidgetState extends ConsumerState<StepBudgetWidget> {
                 // Dải chip chọn nhanh hạn mức
                 Wrap(
                   spacing: 8,
-                  children: [5000000.0, 10000000.0, 15000000.0, 20000000.0].map((preset) {
+                  children: [5000000.0, 10000000.0, 15000000.0, 20000000.0]
+                      .map((preset) {
                     final isSelected = state.monthlyBudget == preset;
                     return GestureDetector(
                       onTap: () {
                         HapticFeedback.selectionClick();
-                        _budgetController.text = _formatter.format(preset.round());
-                        ref.read(onboardingControllerProvider.notifier).updateMonthlyBudget(preset);
+                        _budgetController.text =
+                            _formatter.format(preset.round());
+                        ref
+                            .read(onboardingControllerProvider.notifier)
+                            .updateMonthlyBudget(preset);
                       },
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 180),
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 6),
                         decoration: BoxDecoration(
                           color: isSelected
-                              ? accent.primary.withValues(alpha: isDark ? 0.25 : 0.15)
-                              : (isDark ? AppTokens.darkCardSubtle : AppTokens.lightCardSubtle),
+                              ? accent.primary
+                                  .withValues(alpha: isDark ? 0.25 : 0.15)
+                              : (isDark
+                                  ? AppTokens.darkCardSubtle
+                                  : AppTokens.lightCardSubtle),
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
-                            color: isSelected ? accent.primary : Colors.transparent,
+                            color: isSelected
+                                ? accent.primary
+                                : Colors.transparent,
                             width: 1.2,
                           ),
                         ),
@@ -308,10 +339,13 @@ class _StepBudgetWidgetState extends ConsumerState<StepBudgetWidget> {
                           '${(preset / 1000000).toStringAsFixed(0)} Triệu',
                           style: TextStyle(
                             fontSize: 11.5,
-                            fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                            fontWeight:
+                                isSelected ? FontWeight.w800 : FontWeight.w600,
                             color: isSelected
                                 ? accent.primary
-                                : (isDark ? AppTokens.darkText : AppTokens.lightText),
+                                : (isDark
+                                    ? AppTokens.darkText
+                                    : AppTokens.lightText),
                           ),
                         ),
                       ),
@@ -335,14 +369,16 @@ class _StepBudgetWidgetState extends ConsumerState<StepBudgetWidget> {
                   gradient: LinearGradient(
                     colors: [
                       accent.primary.withValues(alpha: isDark ? 0.18 : 0.08),
-                      const Color(0xFF10B981).withValues(alpha: isDark ? 0.12 : 0.05),
+                      const Color(0xFF10B981)
+                          .withValues(alpha: isDark ? 0.12 : 0.05),
                     ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
                   borderRadius: BorderRadius.circular(22),
                   border: Border.all(
-                    color: accent.primary.withValues(alpha: isDark ? 0.35 : 0.25),
+                    color:
+                        accent.primary.withValues(alpha: isDark ? 0.35 : 0.25),
                     width: 1.2,
                   ),
                 ),
@@ -357,7 +393,8 @@ class _StepBudgetWidgetState extends ConsumerState<StepBudgetWidget> {
                             color: accent.primary.withValues(alpha: 0.2),
                             shape: BoxShape.circle,
                           ),
-                          child: const Text('💡', style: TextStyle(fontSize: 16)),
+                          child:
+                              const Text('💡', style: TextStyle(fontSize: 16)),
                         ),
                         const SizedBox(width: 10),
                         Text(
@@ -365,7 +402,9 @@ class _StepBudgetWidgetState extends ConsumerState<StepBudgetWidget> {
                           style: TextStyle(
                             fontSize: 12.5,
                             fontWeight: FontWeight.w800,
-                            color: isDark ? AppTokens.darkText : AppTokens.lightText,
+                            color: isDark
+                                ? AppTokens.darkText
+                                : AppTokens.lightText,
                           ),
                         ),
                       ],
@@ -376,7 +415,8 @@ class _StepBudgetWidgetState extends ConsumerState<StepBudgetWidget> {
                       'Mỗi ngày bạn có khoảng:',
                       style: TextStyle(
                         fontSize: 12,
-                        color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                        color:
+                            isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -399,12 +439,14 @@ class _StepBudgetWidgetState extends ConsumerState<StepBudgetWidget> {
                       child: Text(
                         _formatCurrency(dailySafeSpend),
                         key: ValueKey<double>(dailySafeSpend),
-                        style: currencyTextStyle(context, const TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: -0.8,
-                          color: Color(0xFF10B981),
-                        )),
+                        style: currencyTextStyle(
+                            context,
+                            const TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: -0.8,
+                              color: Color(0xFF10B981),
+                            )),
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -415,7 +457,8 @@ class _StepBudgetWidgetState extends ConsumerState<StepBudgetWidget> {
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                         height: 1.4,
-                        color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                        color:
+                            isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
                       ),
                     ),
                   ],
@@ -435,7 +478,8 @@ class _StepBudgetWidgetState extends ConsumerState<StepBudgetWidget> {
                 foregroundColor: Colors.white,
                 elevation: 3,
                 shadowColor: accent.primary.withValues(alpha: 0.4),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(18)),
               ),
               onPressed: _finishAndLaunchApp,
               child: const Text(

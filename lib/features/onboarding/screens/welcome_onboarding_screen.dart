@@ -31,11 +31,16 @@ import '../controllers/onboarding_controller.dart';
 import '../../../widgets/sliding_segmented_bar.dart';
 import '../../../widgets/restore_diff_modal.dart';
 import '../../../services/cloud_backup_service.dart';
+
 class _FontItemDef {
   final String name;
   final String badge;
   final String description;
-  final TextStyle Function({TextStyle? textStyle, Color? color, FontWeight? fontWeight, double? fontSize}) fontBuilder;
+  final TextStyle Function(
+      {TextStyle? textStyle,
+      Color? color,
+      FontWeight? fontWeight,
+      double? fontSize}) fontBuilder;
 
   const _FontItemDef({
     required this.name,
@@ -49,10 +54,12 @@ class WelcomeOnboardingScreen extends ConsumerStatefulWidget {
   const WelcomeOnboardingScreen({super.key});
 
   @override
-  ConsumerState<WelcomeOnboardingScreen> createState() => _WelcomeOnboardingScreenState();
+  ConsumerState<WelcomeOnboardingScreen> createState() =>
+      _WelcomeOnboardingScreenState();
 }
 
-class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScreen> {
+class _WelcomeOnboardingScreenState
+    extends ConsumerState<WelcomeOnboardingScreen> {
   late final PageController _pageController;
 
   late final TextEditingController _nameController;
@@ -105,10 +112,14 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
       text: state.displayName == 'Bạn' ? '' : state.displayName,
     );
     _cashController = TextEditingController(
-      text: state.cashBalance > 0 ? _currencyFormatter.format(state.cashBalance.round()) : '',
+      text: state.cashBalance > 0
+          ? _currencyFormatter.format(state.cashBalance.round())
+          : '',
     );
     _bankController = TextEditingController(
-      text: state.bankBalance > 0 ? _currencyFormatter.format(state.bankBalance.round()) : '',
+      text: state.bankBalance > 0
+          ? _currencyFormatter.format(state.bankBalance.round())
+          : '',
     );
     _budgetController = TextEditingController(
       text: _currencyFormatter.format(state.monthlyBudget.round()),
@@ -136,10 +147,10 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
   }
 
   void _onAmountFieldChanged(
-      String val,
-      void Function(double) updateCallback,
-      TextEditingController controller,
-      ) {
+    String val,
+    void Function(double) updateCallback,
+    TextEditingController controller,
+  ) {
     final cleanDigits = val.replaceAll(RegExp(r'[^0-9]'), '');
     if (cleanDigits.isEmpty) {
       updateCallback(0.0);
@@ -163,7 +174,7 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
   Future<void> _finishAndNavigateHome() async {
     HapticFeedback.heavyImpact();
     final controller = ref.read(onboardingControllerProvider.notifier);
-    await controller.completeOnboarding();
+    if (!await controller.completeOnboarding()) return;
 
     if (mounted) {
       Navigator.of(context).pushReplacement(
@@ -184,10 +195,12 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
     } else {
       if (now.day >= startDay) {
         cycleStart = DateTime(now.year, now.month, startDay);
-        cycleEnd = DateTime(now.year, now.month + 1, startDay).subtract(const Duration(days: 1));
+        cycleEnd = DateTime(now.year, now.month + 1, startDay)
+            .subtract(const Duration(days: 1));
       } else {
         cycleStart = DateTime(now.year, now.month - 1, startDay);
-        cycleEnd = DateTime(now.year, now.month, startDay).subtract(const Duration(days: 1));
+        cycleEnd = DateTime(now.year, now.month, startDay)
+            .subtract(const Duration(days: 1));
       }
     }
 
@@ -196,7 +209,8 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
   }
 
   String _formatCurrency(double amount) {
-    return NumberFormat.currency(locale: 'vi_VN', symbol: '₫', decimalDigits: 0).format(amount);
+    return NumberFormat.currency(locale: 'vi_VN', symbol: '₫', decimalDigits: 0)
+        .format(amount);
   }
 
   /// 🌟 Widget hiển thị Logo nhận diện thương hiệu Flowy chuẩn mực
@@ -273,12 +287,15 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
     final state = ref.watch(onboardingControllerProvider);
     final themeMode = ref.watch(themeModeProvider);
     final isDark = themeMode == ThemeMode.dark ||
-        (themeMode == ThemeMode.system && MediaQuery.of(context).platformBrightness == Brightness.dark);
+        (themeMode == ThemeMode.system &&
+            MediaQuery.of(context).platformBrightness == Brightness.dark);
     final accent = ref.watch(accentPresetProvider);
 
     // Lắng nghe sự kiện tìm thấy bản sao lưu cũ trên Google Drive
     ref.listen<OnboardingState>(onboardingControllerProvider, (prev, next) {
-      if (!prev!.foundCloudBackup && next.foundCloudBackup && next.cloudBackupMetadata != null) {
+      if (!prev!.foundCloudBackup &&
+          next.foundCloudBackup &&
+          next.cloudBackupMetadata != null) {
         _showCloudBackupRestoreModal(context, next);
       }
     });
@@ -298,8 +315,10 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
                   controller: _pageController,
                   physics: const NeverScrollableScrollPhysics(),
                   children: [
-                    _buildStep0StyleAndWelcome(context, state, isDark, accent, themeMode),
-                    _buildStep1IdentityAndGoogle(context, state, isDark, accent),
+                    _buildStep0StyleAndWelcome(
+                        context, state, isDark, accent, themeMode),
+                    _buildStep1IdentityAndGoogle(
+                        context, state, isDark, accent),
                     _buildStep2Wallets(context, state, isDark, accent),
                     _buildStep3CycleAndBudget(context, state, isDark, accent),
                   ],
@@ -313,11 +332,11 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
   }
 
   Widget _buildTopNavigation(
-      BuildContext context,
-      OnboardingState state,
-      bool isDark,
-      AppAccentPreset accent,
-      ) {
+    BuildContext context,
+    OnboardingState state,
+    bool isDark,
+    AppAccentPreset accent,
+  ) {
     final bool showProgressBar = state.currentStep > 0;
 
     return Padding(
@@ -384,12 +403,12 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
   // 🌟 BƯỚC 0: CÁ NHÂN HÓA PHONG CÁCH TỨC THÌ (SETTINGS PARITY 100%) & LOGO
   // ==============================================================================
   Widget _buildStep0StyleAndWelcome(
-      BuildContext context,
-      OnboardingState state,
-      bool isDark,
-      AppAccentPreset accent,
-      ThemeMode currentThemeMode,
-      ) {
+    BuildContext context,
+    OnboardingState state,
+    bool isDark,
+    AppAccentPreset accent,
+    ThemeMode currentThemeMode,
+  ) {
     final currentFont = ref.watch(fontFamilyProvider);
 
     return SingleChildScrollView(
@@ -453,7 +472,8 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.palette_outlined, size: 16, color: accent.primary),
+                        Icon(Icons.palette_outlined,
+                            size: 16, color: accent.primary),
                         const SizedBox(width: 6),
                         Text(
                           'THIẾT KẾ KHÔNG GIAN CỦA BẠN',
@@ -471,7 +491,8 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
                       style: TextStyle(
                         fontSize: 10.5,
                         fontWeight: FontWeight.w600,
-                        color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                        color:
+                            isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
                       ),
                     ),
                   ],
@@ -487,12 +508,16 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
                   selectedValue: currentThemeMode == ThemeMode.dark
                       ? ThemeMode.dark
                       : ThemeMode.light,
-                  trackColor: isDark ? AppTokens.darkCardSubtle : AppTokens.lightCardSubtle,
-                  trackBorderColor: isDark ? AppTokens.darkBorder : AppTokens.lightBorder,
+                  trackColor: isDark
+                      ? AppTokens.darkCardSubtle
+                      : AppTokens.lightCardSubtle,
+                  trackBorderColor:
+                      isDark ? AppTokens.darkBorder : AppTokens.lightBorder,
                   indicatorColor: isDark ? AppTokens.darkCard : Colors.white,
                   indicatorBorderColor: accent.primary,
                   selectedTextColor: accent.primary,
-                  mutedTextColor: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                  mutedTextColor:
+                      isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
                   indicatorShadowColor: accent.primary.withValues(alpha: 0.18),
                   items: const [
                     SlidingSegmentedItem<ThemeMode>(
@@ -535,7 +560,9 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
                       isDark: isDark,
                       onTap: () {
                         HapticFeedback.selectionClick();
-                        ref.read(accentPresetProvider.notifier).setAccent(AppAccentPreset.grass);
+                        ref
+                            .read(accentPresetProvider.notifier)
+                            .setAccent(AppAccentPreset.grass);
                       },
                     ),
                     const SizedBox(width: 6),
@@ -548,7 +575,9 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
                       isDark: isDark,
                       onTap: () {
                         HapticFeedback.selectionClick();
-                        ref.read(accentPresetProvider.notifier).setAccent(AppAccentPreset.sun);
+                        ref
+                            .read(accentPresetProvider.notifier)
+                            .setAccent(AppAccentPreset.sun);
                       },
                     ),
                     const SizedBox(width: 6),
@@ -561,7 +590,9 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
                       isDark: isDark,
                       onTap: () {
                         HapticFeedback.selectionClick();
-                        ref.read(accentPresetProvider.notifier).setAccent(AppAccentPreset.sea);
+                        ref
+                            .read(accentPresetProvider.notifier)
+                            .setAccent(AppAccentPreset.sea);
                       },
                     ),
                     const SizedBox(width: 6),
@@ -574,7 +605,9 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
                       isDark: isDark,
                       onTap: () {
                         HapticFeedback.selectionClick();
-                        ref.read(accentPresetProvider.notifier).setAccent(AppAccentPreset.flower);
+                        ref
+                            .read(accentPresetProvider.notifier)
+                            .setAccent(AppAccentPreset.flower);
                       },
                     ),
                     const SizedBox(width: 6),
@@ -587,7 +620,9 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
                       isDark: isDark,
                       onTap: () {
                         HapticFeedback.selectionClick();
-                        ref.read(accentPresetProvider.notifier).setAccent(AppAccentPreset.night);
+                        ref
+                            .read(accentPresetProvider.notifier)
+                            .setAccent(AppAccentPreset.night);
                       },
                     ),
                   ],
@@ -604,14 +639,16 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
                         fontSize: 11,
                         fontWeight: FontWeight.w800,
                         letterSpacing: 0.8,
-                        color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                        color:
+                            isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
                       ),
                     ),
                     Text(
                       'Xem mẫu trực quan',
                       style: TextStyle(
                         fontSize: 10.5,
-                        color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                        color:
+                            isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
                       ),
                     ),
                   ],
@@ -643,7 +680,8 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
                 foregroundColor: Colors.white,
                 elevation: 3,
                 shadowColor: accent.primary.withValues(alpha: 0.4),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(18)),
               ),
               onPressed: () => _goToStep(1),
               child: const Text(
@@ -694,17 +732,19 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
                 : (isDark ? AppTokens.darkCard : Colors.white),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: isSelected ? color : (isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
+              color: isSelected
+                  ? color
+                  : (isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
               width: isSelected ? 1.8 : 1.0,
             ),
             boxShadow: isSelected
                 ? [
-              BoxShadow(
-                color: color.withValues(alpha: 0.25),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ]
+                    BoxShadow(
+                      color: color.withValues(alpha: 0.25),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
                 : null,
           ),
           child: Column(
@@ -716,7 +756,9 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                  color: isSelected ? color : (isDark ? AppTokens.darkText : AppTokens.lightText),
+                  color: isSelected
+                      ? color
+                      : (isDark ? AppTokens.darkText : AppTokens.lightText),
                 ),
               ),
               const SizedBox(height: 6),
@@ -746,32 +788,41 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
       children: [
         Row(
           children: [
-            Expanded(child: _buildSingleFontCard(fontDefs[0], currentFont, accent, isDark, onSelectFont)),
+            Expanded(
+                child: _buildSingleFontCard(
+                    fontDefs[0], currentFont, accent, isDark, onSelectFont)),
             const SizedBox(width: 8),
-            Expanded(child: _buildSingleFontCard(fontDefs[1], currentFont, accent, isDark, onSelectFont)),
+            Expanded(
+                child: _buildSingleFontCard(
+                    fontDefs[1], currentFont, accent, isDark, onSelectFont)),
           ],
         ),
         const SizedBox(height: 8),
         Row(
           children: [
-            Expanded(child: _buildSingleFontCard(fontDefs[2], currentFont, accent, isDark, onSelectFont)),
+            Expanded(
+                child: _buildSingleFontCard(
+                    fontDefs[2], currentFont, accent, isDark, onSelectFont)),
             const SizedBox(width: 8),
-            Expanded(child: _buildSingleFontCard(fontDefs[3], currentFont, accent, isDark, onSelectFont)),
+            Expanded(
+                child: _buildSingleFontCard(
+                    fontDefs[3], currentFont, accent, isDark, onSelectFont)),
           ],
         ),
         const SizedBox(height: 8),
-        _buildSingleFontCard(fontDefs[4], currentFont, accent, isDark, onSelectFont),
+        _buildSingleFontCard(
+            fontDefs[4], currentFont, accent, isDark, onSelectFont),
       ],
     );
   }
 
   Widget _buildSingleFontCard(
-      _FontItemDef font,
-      String currentFont,
-      AppAccentPreset accent,
-      bool isDark,
-      ValueChanged<String> onSelect,
-      ) {
+    _FontItemDef font,
+    String currentFont,
+    AppAccentPreset accent,
+    bool isDark,
+    ValueChanged<String> onSelect,
+  ) {
     final isSelected = currentFont == font.name;
 
     return InkWell(
@@ -786,17 +837,19 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
               : (isDark ? AppTokens.darkCard : Colors.white),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isSelected ? accent.primary : (isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
+            color: isSelected
+                ? accent.primary
+                : (isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
             width: isSelected ? 1.8 : 1.0,
           ),
           boxShadow: isSelected
               ? [
-            BoxShadow(
-              color: accent.primary.withValues(alpha: 0.18),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ]
+                  BoxShadow(
+                    color: accent.primary.withValues(alpha: 0.18),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
               : null,
         ),
         child: Column(
@@ -806,9 +859,12 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05),
+                    color: isDark
+                        ? Colors.white10
+                        : Colors.black.withValues(alpha: 0.05),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
@@ -816,7 +872,11 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
                     style: TextStyle(
                       fontSize: 9,
                       fontWeight: FontWeight.w700,
-                      color: isSelected ? accent.primary : (isDark ? AppTokens.darkMuted : AppTokens.lightMuted),
+                      color: isSelected
+                          ? accent.primary
+                          : (isDark
+                              ? AppTokens.darkMuted
+                              : AppTokens.lightMuted),
                     ),
                   ),
                 ),
@@ -827,12 +887,15 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
                     shape: BoxShape.circle,
                     color: isSelected ? accent.primary : Colors.transparent,
                     border: Border.all(
-                      color: isSelected ? accent.primary : (isDark ? Colors.white30 : Colors.black26),
+                      color: isSelected
+                          ? accent.primary
+                          : (isDark ? Colors.white30 : Colors.black26),
                       width: 1.5,
                     ),
                   ),
                   child: isSelected
-                      ? const Icon(Icons.check_rounded, size: 12, color: Colors.white)
+                      ? const Icon(Icons.check_rounded,
+                          size: 12, color: Colors.white)
                       : null,
                 ),
               ],
@@ -862,7 +925,9 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
               style: font.fontBuilder(
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
-                color: isSelected ? accent.primary : (isDark ? AppTokens.darkMuted : AppTokens.lightMuted),
+                color: isSelected
+                    ? accent.primary
+                    : (isDark ? AppTokens.darkMuted : AppTokens.lightMuted),
               ),
             ),
           ],
@@ -875,11 +940,11 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
   // 🌟 BƯỚC 1: DANH XƯNG & KẾT NỐI GOOGLE (TÌM BẢN SAO LƯU CŨ)
   // ==============================================================================
   Widget _buildStep1IdentityAndGoogle(
-      BuildContext context,
-      OnboardingState state,
-      bool isDark,
-      AppAccentPreset accent,
-      ) {
+    BuildContext context,
+    OnboardingState state,
+    bool isDark,
+    AppAccentPreset accent,
+  ) {
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(24, 10, 24, 24),
@@ -908,14 +973,18 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
           const SizedBox(height: 4),
           Text(
             'Nhập tên hoặc biệt danh để cá nhân hóa lời chào mỗi ngày.',
-            style: TextStyle(fontSize: 12, color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted),
+            style: TextStyle(
+                fontSize: 12,
+                color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted),
           ),
           const SizedBox(height: 20),
 
           // TextField Nhập Tên
           TextField(
             controller: _nameController,
-            onChanged: (val) => ref.read(onboardingControllerProvider.notifier).updateDisplayName(val),
+            onChanged: (val) => ref
+                .read(onboardingControllerProvider.notifier)
+                .updateDisplayName(val),
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w700,
@@ -924,13 +993,18 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
             decoration: InputDecoration(
               labelText: 'Tên của bạn',
               hintText: 'Ví dụ: mt, Alex, Minh Trí...',
-              prefixIcon: Icon(Icons.person_rounded, color: accent.primary, size: 20),
+              prefixIcon:
+                  Icon(Icons.person_rounded, color: accent.primary, size: 20),
               filled: true,
-              fillColor: isDark ? AppTokens.darkCard : AppTokens.lightCardSubtle,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+              fillColor:
+                  isDark ? AppTokens.darkCard : AppTokens.lightCardSubtle,
+              border:
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide(color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
+                borderSide: BorderSide(
+                    color:
+                        isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),
@@ -946,33 +1020,48 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
             height: 48,
             child: OutlinedButton.icon(
               style: OutlinedButton.styleFrom(
-                backgroundColor: isDark ? AppTokens.darkCard.withValues(alpha: 0.6) : Colors.white,
-                foregroundColor: isDark ? AppTokens.darkText : AppTokens.lightText,
-                side: BorderSide(color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                backgroundColor: isDark
+                    ? AppTokens.darkCard.withValues(alpha: 0.6)
+                    : Colors.white,
+                foregroundColor:
+                    isDark ? AppTokens.darkText : AppTokens.lightText,
+                side: BorderSide(
+                    color:
+                        isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16)),
               ),
               onPressed: state.isGoogleLoading
                   ? null
                   : () async {
-                HapticFeedback.mediumImpact();
-                final success = await ref
-                    .read(onboardingControllerProvider.notifier)
-                    .signInWithGoogleAndCheckBackup();
-                if (success && mounted) {
-                  final updatedName = ref.read(onboardingControllerProvider).displayName;
-                  _nameController.text = updatedName == 'Bạn' ? '' : updatedName;
-                }
-              },
+                      HapticFeedback.mediumImpact();
+                      final success = await ref
+                          .read(onboardingControllerProvider.notifier)
+                          .signInWithGoogleAndCheckBackup();
+                      if (success && mounted) {
+                        final updatedName =
+                            ref.read(onboardingControllerProvider).displayName;
+                        _nameController.text =
+                            updatedName == 'Bạn' ? '' : updatedName;
+                      }
+                    },
               icon: state.isGoogleLoading
                   ? SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(accent.primary)),
-              )
-                  : const Icon(Icons.cloud_sync_rounded, color: Color(0xFF0EA5E9), size: 18),
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(accent.primary)),
+                    )
+                  : const Icon(Icons.cloud_sync_rounded,
+                      color: Color(0xFF0EA5E9), size: 18),
               label: Text(
-                state.isGoogleLoading ? 'Đang kiểm tra sao lưu Google Drive...' : 'Tiếp tục với Google (Tìm sao lưu cũ)',
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                state.isGoogleLoading
+                    ? 'Đang kiểm tra sao lưu Google Drive...'
+                    : 'Tiếp tục với Google (Tìm sao lưu cũ)',
+                style:
+                    const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
               ),
             ),
           ),
@@ -985,10 +1074,12 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
               style: ElevatedButton.styleFrom(
                 backgroundColor: accent.primary,
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16)),
               ),
               onPressed: () => _goToStep(2),
-              child: const Text('Tiếp tục sang bước Ví ❯', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
+              child: const Text('Tiếp tục sang bước Ví ❯',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
             ),
           ),
         ],
@@ -1000,11 +1091,11 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
   // 🌟 BƯỚC 2: KHỞI TẠO NGUỒN TIỀN (TIỀN MẶT & NGÂN HÀNG)
   // ==============================================================================
   Widget _buildStep2Wallets(
-      BuildContext context,
-      OnboardingState state,
-      bool isDark,
-      AppAccentPreset accent,
-      ) {
+    BuildContext context,
+    OnboardingState state,
+    bool isDark,
+    AppAccentPreset accent,
+  ) {
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(24, 10, 24, 24),
@@ -1034,7 +1125,9 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
           const SizedBox(height: 4),
           Text(
             'Ước tính số tiền khả dụng ban đầu, có thể kiểm kê hoặc sửa lại bất cứ lúc nào.',
-            style: TextStyle(fontSize: 12, color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted),
+            style: TextStyle(
+                fontSize: 12,
+                color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted),
           ),
           const SizedBox(height: 18),
 
@@ -1050,7 +1143,9 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
             onChanged: (val) {
               _onAmountFieldChanged(
                 val,
-                    (amt) => ref.read(onboardingControllerProvider.notifier).updateCashBalance(amt),
+                (amt) => ref
+                    .read(onboardingControllerProvider.notifier)
+                    .updateCashBalance(amt),
                 _cashController,
               );
             },
@@ -1069,7 +1164,9 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
             onChanged: (val) {
               _onAmountFieldChanged(
                 val,
-                    (amt) => ref.read(onboardingControllerProvider.notifier).updateBankBalance(amt),
+                (amt) => ref
+                    .read(onboardingControllerProvider.notifier)
+                    .updateBankBalance(amt),
                 _bankController,
               );
             },
@@ -1083,10 +1180,12 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
               style: ElevatedButton.styleFrom(
                 backgroundColor: accent.primary,
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16)),
               ),
               onPressed: () => _goToStep(3),
-              child: const Text('Tiếp tục ❯', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
+              child: const Text('Tiếp tục ❯',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
             ),
           ),
           const SizedBox(height: 8),
@@ -1095,8 +1194,12 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
             child: TextButton(
               onPressed: () {
                 HapticFeedback.selectionClick();
-                ref.read(onboardingControllerProvider.notifier).updateCashBalance(0.0);
-                ref.read(onboardingControllerProvider.notifier).updateBankBalance(0.0);
+                ref
+                    .read(onboardingControllerProvider.notifier)
+                    .updateCashBalance(0.0);
+                ref
+                    .read(onboardingControllerProvider.notifier)
+                    .updateBankBalance(0.0);
                 _goToStep(3);
               },
               child: Text(
@@ -1129,7 +1232,8 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
       decoration: BoxDecoration(
         color: isDark ? AppTokens.darkCard : AppTokens.lightCard,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
+        border: Border.all(
+            color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
@@ -1150,7 +1254,9 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
                   color: iconColor.withValues(alpha: isDark ? 0.25 : 0.12),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Center(child: Text(iconEmoji, style: const TextStyle(fontSize: 20))),
+                child: Center(
+                    child:
+                        Text(iconEmoji, style: const TextStyle(fontSize: 20))),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -1162,14 +1268,16 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
                       style: TextStyle(
                         fontSize: 14.5,
                         fontWeight: FontWeight.w800,
-                        color: isDark ? AppTokens.darkText : AppTokens.lightText,
+                        color:
+                            isDark ? AppTokens.darkText : AppTokens.lightText,
                       ),
                     ),
                     Text(
                       subtitle,
                       style: TextStyle(
                         fontSize: 11.5,
-                        color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                        color:
+                            isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
                       ),
                     ),
                   ],
@@ -1178,7 +1286,6 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
             ],
           ),
           const SizedBox(height: 12),
-
           TextField(
             controller: controller,
             keyboardType: TextInputType.number,
@@ -1192,14 +1299,22 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
             decoration: InputDecoration(
               hintText: '0',
               suffixText: '₫',
-              suffixStyle: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: accent.primary),
+              suffixStyle: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: accent.primary),
               filled: true,
-              fillColor: isDark ? AppTokens.darkCardSubtle : AppTokens.lightCardSubtle,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+              fillColor:
+                  isDark ? AppTokens.darkCardSubtle : AppTokens.lightCardSubtle,
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              border:
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide(color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
+                borderSide: BorderSide(
+                    color:
+                        isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),
@@ -1216,13 +1331,14 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
   // 🌟 BƯỚC 3: CHU KỲ, HẠN MỨC CHI TIÊU & THẺ "AHA MOMENT" AN TOÀN MỖI NGÀY
   // ==============================================================================
   Widget _buildStep3CycleAndBudget(
-      BuildContext context,
-      OnboardingState state,
-      bool isDark,
-      AppAccentPreset accent,
-      ) {
+    BuildContext context,
+    OnboardingState state,
+    bool isDark,
+    AppAccentPreset accent,
+  ) {
     final int cycleDays = _calculateDaysInCycle(state.cycleStartDay);
-    final double dailySafeSpend = state.monthlyBudget > 0 ? (state.monthlyBudget / cycleDays) : 0.0;
+    final double dailySafeSpend =
+        state.monthlyBudget > 0 ? (state.monthlyBudget / cycleDays) : 0.0;
 
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
@@ -1252,7 +1368,9 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
           const SizedBox(height: 4),
           Text(
             'Thuật toán Flowy tự động tính toán số tiền an toàn mỗi ngày dựa trên mốc này.',
-            style: TextStyle(fontSize: 12, color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted),
+            style: TextStyle(
+                fontSize: 12,
+                color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted),
           ),
           const SizedBox(height: 16),
 
@@ -1270,7 +1388,10 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
               ),
               Text(
                 'Chu kỳ $cycleDays ngày',
-                style: TextStyle(fontSize: 11, color: accent.primary, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                    fontSize: 11,
+                    color: accent.primary,
+                    fontWeight: FontWeight.bold),
               ),
             ],
           ),
@@ -1289,7 +1410,9 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
               divisions: 30,
               label: 'Ngày ${state.cycleStartDay}',
               onChanged: (val) {
-                ref.read(onboardingControllerProvider.notifier).updateCycleStartDay(val.round());
+                ref
+                    .read(onboardingControllerProvider.notifier)
+                    .updateCycleStartDay(val.round());
               },
             ),
           ),
@@ -1313,7 +1436,9 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
             onChanged: (val) {
               _onAmountFieldChanged(
                 val,
-                    (amt) => ref.read(onboardingControllerProvider.notifier).updateMonthlyBudget(amt),
+                (amt) => ref
+                    .read(onboardingControllerProvider.notifier)
+                    .updateMonthlyBudget(amt),
                 _budgetController,
               );
             },
@@ -1325,13 +1450,18 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
             decoration: InputDecoration(
               hintText: '10.000.000',
               suffixText: '₫',
-              prefixIcon: Icon(Icons.savings_outlined, color: accent.primary, size: 20),
+              prefixIcon:
+                  Icon(Icons.savings_outlined, color: accent.primary, size: 20),
               filled: true,
-              fillColor: isDark ? AppTokens.darkCard : AppTokens.lightCardSubtle,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+              fillColor:
+                  isDark ? AppTokens.darkCard : AppTokens.lightCardSubtle,
+              border:
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide(color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
+                borderSide: BorderSide(
+                    color:
+                        isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),
@@ -1344,7 +1474,8 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
           // Quick Chips chọn hạn mức
           Wrap(
             spacing: 8,
-            children: [5000000.0, 10000000.0, 15000000.0, 20000000.0].map((preset) {
+            children:
+                [5000000.0, 10000000.0, 15000000.0, 20000000.0].map((preset) {
               final isSelected = state.monthlyBudget == preset;
               return ChoiceChip(
                 label: Text('${(preset / 1000000).toStringAsFixed(0)} Triệu'),
@@ -1353,12 +1484,17 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
                 labelStyle: TextStyle(
                   fontSize: 11.5,
                   fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                  color: isSelected ? accent.primary : (isDark ? AppTokens.darkText : AppTokens.lightText),
+                  color: isSelected
+                      ? accent.primary
+                      : (isDark ? AppTokens.darkText : AppTokens.lightText),
                 ),
                 onSelected: (_) {
                   HapticFeedback.selectionClick();
-                  _budgetController.text = _currencyFormatter.format(preset.round());
-                  ref.read(onboardingControllerProvider.notifier).updateMonthlyBudget(preset);
+                  _budgetController.text =
+                      _currencyFormatter.format(preset.round());
+                  ref
+                      .read(onboardingControllerProvider.notifier)
+                      .updateMonthlyBudget(preset);
                 },
               );
             }).toList(),
@@ -1377,14 +1513,16 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
                   gradient: LinearGradient(
                     colors: [
                       accent.primary.withValues(alpha: isDark ? 0.2 : 0.1),
-                      const Color(0xFF10B981).withValues(alpha: isDark ? 0.12 : 0.05),
+                      const Color(0xFF10B981)
+                          .withValues(alpha: isDark ? 0.12 : 0.05),
                     ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
                   borderRadius: BorderRadius.circular(22),
                   border: Border.all(
-                    color: accent.primary.withValues(alpha: isDark ? 0.35 : 0.25),
+                    color:
+                        accent.primary.withValues(alpha: isDark ? 0.35 : 0.25),
                     width: 1.2,
                   ),
                 ),
@@ -1399,7 +1537,8 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
                             color: accent.primary.withValues(alpha: 0.2),
                             shape: BoxShape.circle,
                           ),
-                          child: const Text('💡', style: TextStyle(fontSize: 15)),
+                          child:
+                              const Text('💡', style: TextStyle(fontSize: 15)),
                         ),
                         const SizedBox(width: 8),
                         Text(
@@ -1407,41 +1546,47 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
                           style: TextStyle(
                             fontSize: 12.5,
                             fontWeight: FontWeight.w800,
-                            color: isDark ? AppTokens.darkText : AppTokens.lightText,
+                            color: isDark
+                                ? AppTokens.darkText
+                                : AppTokens.lightText,
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 10),
-
                     Text(
                       'Mỗi ngày bạn có khoảng:',
-                      style: TextStyle(fontSize: 12, color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted),
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: isDark
+                              ? AppTokens.darkMuted
+                              : AppTokens.lightMuted),
                     ),
                     const SizedBox(height: 4),
-
                     AnimatedSwitcher(
                       duration: const Duration(milliseconds: 250),
                       child: Text(
                         _formatCurrency(dailySafeSpend),
                         key: ValueKey<double>(dailySafeSpend),
-                        style: currencyTextStyle(context, const TextStyle(
-                          fontSize: 26,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: -0.6,
-                          color: Color(0xFF10B981),
-                        )),
+                        style: currencyTextStyle(
+                            context,
+                            const TextStyle(
+                              fontSize: 26,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: -0.6,
+                              color: Color(0xFF10B981),
+                            )),
                       ),
                     ),
                     const SizedBox(height: 4),
-
                     Text(
                       'để chi tiêu thảnh thơi mà không bị cạn túi vào cuối tháng! 🎉',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                         height: 1.4,
-                        color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                        color:
+                            isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
                       ),
                     ),
                   ],
@@ -1461,22 +1606,26 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
                 foregroundColor: Colors.white,
                 elevation: 3,
                 shadowColor: accent.primary.withValues(alpha: 0.4),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(18)),
               ),
               onPressed: state.isCompleting ? null : _finishAndNavigateHome,
               child: state.isCompleting
                   ? const SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.5,
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                ),
-              )
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
                   : const Text(
-                'HOÀN TẤT & KHÁM PHÁ FLOWY 🚀',
-                style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w900, letterSpacing: 0.3),
-              ),
+                      'HOÀN TẤT & KHÁM PHÁ FLOWY 🚀',
+                      style: TextStyle(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.3),
+                    ),
             ),
           ),
         ],
@@ -1487,7 +1636,8 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
   // ==============================================================================
   // MODAL PHỤC HỒI KHI TÌM THẤY BẢN SAO LƯU TRÊN GOOGLE DRIVE
   // ==============================================================================
-  void _showCloudBackupRestoreModal(BuildContext context, OnboardingState state) {
+  void _showCloudBackupRestoreModal(
+      BuildContext context, OnboardingState state) {
     final meta = state.cloudBackupMetadata!;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -1503,9 +1653,13 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
           child: Container(
             padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
             decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF151C28).withValues(alpha: 0.98) : Colors.white.withValues(alpha: 0.98),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-              border: Border.all(color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
+              color: isDark
+                  ? const Color(0xFF151C28).withValues(alpha: 0.98)
+                  : Colors.white.withValues(alpha: 0.98),
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(28)),
+              border: Border.all(
+                  color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -1519,17 +1673,16 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
                   ),
                 ),
                 const SizedBox(height: 16),
-
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: const Color(0xFF0EA5E9).withValues(alpha: 0.15),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.cloud_done_rounded, color: Color(0xFF0EA5E9), size: 32),
+                  child: const Icon(Icons.cloud_done_rounded,
+                      color: Color(0xFF0EA5E9), size: 32),
                 ),
                 const SizedBox(height: 12),
-
                 Text(
                   'Mừng bạn quay lại!',
                   style: TextStyle(
@@ -1541,8 +1694,8 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
                 const SizedBox(height: 6),
                 Text(
                   'Flowy đã tìm thấy bản sao lưu cũ trên Google Drive của bạn:\n'
-                      '• Thời điểm: ${DateFormat('dd/MM/yyyy HH:mm').format(meta.updatedAt.toLocal())}\n'
-                      '• Quy mô: ${meta.transactionCount} giao dịch, ${meta.walletCount} nguồn ví.',
+                  '• Thời điểm: ${DateFormat('dd/MM/yyyy HH:mm').format(meta.updatedAt.toLocal())}\n'
+                  '• Quy mô: ${meta.transactionCount} giao dịch, ${meta.walletCount} nguồn ví.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 12.5,
@@ -1551,7 +1704,6 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
                   ),
                 ),
                 const SizedBox(height: 24),
-
                 SizedBox(
                   width: double.infinity,
                   height: 48,
@@ -1559,32 +1711,39 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF10B981),
                       foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16)),
                     ),
                     onPressed: () async {
                       Navigator.of(context).pop();
                       if (!mounted) return;
                       await RestoreDiffModal.show(this.context,
-                        finishOnboarding: true,
-                        backupItem: CloudBackupItem(fileId: meta.fileId, fileName: 'Bản sao lưu',
-                          sizeBytes: 0, createdTime: meta.updatedAt, properties: const {}));
+                          finishOnboarding: true,
+                          backupItem: CloudBackupItem(
+                              fileId: meta.fileId,
+                              fileName: 'Bản sao lưu',
+                              sizeBytes: 0,
+                              createdTime: meta.updatedAt,
+                              properties: const {}));
                     },
                     icon: const Icon(Icons.restore_rounded, size: 18),
                     label: const Text(
                       'Xem và đối soát bản sao lưu',
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+                      style:
+                          TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
                     ),
                   ),
                 ),
                 const SizedBox(height: 10),
-
                 SizedBox(
                   width: double.infinity,
                   height: 44,
                   child: TextButton(
                     onPressed: () {
                       Navigator.of(context).pop();
-                      ref.read(onboardingControllerProvider.notifier).dismissCloudPrompt();
+                      ref
+                          .read(onboardingControllerProvider.notifier)
+                          .dismissCloudPrompt();
                       _goToStep(1);
                     },
                     child: Text(
@@ -1592,7 +1751,8 @@ class _WelcomeOnboardingScreenState extends ConsumerState<WelcomeOnboardingScree
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                        color:
+                            isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
                       ),
                     ),
                   ),
