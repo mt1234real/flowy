@@ -288,6 +288,8 @@ class _RestoreDiffModalState extends ConsumerState<RestoreDiffModal> {
         }
         _decryptedTempFile =
             File(p.join(folder.path, 'pfm_local_vault.sqlite'));
+        _decryptedTempFile =
+            await backupService.prepareBackupForInspection(_decryptedTempFile!);
       } else {
         _decryptedTempFile = await backupService
             .downloadAndDecryptBackup(widget.backupItem!.fileId);

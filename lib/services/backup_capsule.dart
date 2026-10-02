@@ -220,12 +220,13 @@ void validateBackupDatabase(String path, int supportedSchema) {
   final db = sql.sqlite3.open(path, mode: sql.OpenMode.readOnly);
   try {
     final version = db.select('PRAGMA user_version').first.values.first as int;
+    if (version > supportedSchema) {
+      throw const FormatException('Bản sao lưu cần phiên bản Flowy mới hơn');
+    }
     if (version < 1 ||
-        version > supportedSchema ||
         db.select('PRAGMA quick_check').first.values.first != 'ok' ||
         db.select('PRAGMA foreign_key_check').isNotEmpty) {
-      throw const FormatException(
-          'Cơ sở dữ liệu không hợp lệ hoặc cần phiên bản Flowy mới hơn');
+      throw const FormatException('Cơ sở dữ liệu sao lưu không hợp lệ');
     }
     db.select('SELECT id FROM transactions LIMIT 1');
     db.select('SELECT id FROM wallets LIMIT 1');
@@ -233,6 +234,12 @@ void validateBackupDatabase(String path, int supportedSchema) {
     db.close();
   }
 }
+
+bool _isSavingsReconcileRow(Map<String, dynamic> row) =>
+    row['goal_id'] != null || row['envelope_type'] == 'savings';
+
+const _savingsReconcileBlockedReason =
+    'Không thể gộp riêng khoản nạp/rút tiết kiệm vì số dư ví và hũ cần được khôi phục cùng nhau.';
 
 Map<String, int> backupStatistics(String path) {
   final db = sql.sqlite3.open(path, mode: sql.OpenMode.readOnly);
@@ -321,9 +328,8 @@ BackupReconciliation inspectReconciliation(String localPath, String cloudPath) {
         }
         String? reason;
         if (!exists) reason = 'Bản Cloud cũ chưa hỗ trợ sổ nợ';
-        if (table == 'transactions' && row['envelope_type'] == 'savings') {
-          reason =
-              'Khoản nạp/rút két cần giữ cùng số dư hũ; được giữ trong bản dự phòng';
+        if (table == 'transactions' && _isSavingsReconcileRow(row)) {
+          reason = _savingsReconcileBlockedReason;
         }
         // Dependencies must have the same identity and meaning. Never guess a category/contact.
         final dependencies = table == 'transactions'
@@ -414,12 +420,18 @@ Future<void> recoverInterruptedRestore(
 /// All balance deltas and inserts are committed together; any failure rolls back.
 void reconcileBackup(String path, BackupReconciliation diff,
     Set<String> selected, Map<String, String> mapping) {
+  // Recheck the row itself: execution must not trust an earlier UI decision.
+  for (final entry in diff.entries.where((e) => selected.contains(e.key))) {
+    if (entry.table == 'transactions' && _isSavingsReconcileRow(entry.row)) {
+      throw StateError(_savingsReconcileBlockedReason);
+    }
+    if (entry.blockedReason != null) throw StateError(entry.blockedReason!);
+  }
   final db = sql.sqlite3.open(path);
   try {
     db.execute('PRAGMA foreign_keys=ON');
     db.execute('BEGIN IMMEDIATE');
     for (final entry in diff.entries.where((e) => selected.contains(e.key))) {
-      if (entry.blockedReason != null) throw StateError(entry.blockedReason!);
       for (final dependency in entry.dependencies) {
         final table = dependency['table'] as String;
         final data = dependency['row'] as Map<String, dynamic>;

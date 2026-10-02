@@ -41,6 +41,7 @@ import '../screens/ledger_screen.dart' show cycleStartDaysByMonthProvider;
 import 'auth_profile_service.dart';
 import 'vault_security_service.dart';
 import 'backup_capsule.dart';
+import 'backup_database_normalizer.dart' as backup_database;
 import 'backup_schedule.dart';
 
 /// Helper chuyển đổi và lọc sạch các trường properties nullable từ Google Drive API
@@ -619,7 +620,7 @@ class CloudBackupService {
         'key': keyBytes,
         'schema': _db.schemaVersion
       });
-      return File(extracted);
+      return await prepareBackupForInspection(File(extracted));
     } catch (e) {
       if (tempDir != null && await tempDir.exists()) {
         await tempDir.delete(recursive: true);
@@ -657,6 +658,9 @@ class CloudBackupService {
     return file;
   }
 
+  Future<File> prepareBackupForInspection(File source) async => File(
+      await compute(backup_database.prepareBackupForInspection, source.path));
+
   /// The prepared file is a validated staging copy; no live DB is overwritten
   /// until a durable local recovery set exists and Drift has fully closed.
   Future<void> restorePreparedBackup(File file,
@@ -676,7 +680,12 @@ class CloudBackupService {
     RandomAccessFile? restoreGuard;
     var closed = false;
     var replacing = false;
+    File? stagedFile;
     try {
+      stagedFile = await file.copy(p.join(file.parent.path,
+          'staged_${DateTime.now().microsecondsSinceEpoch}.sqlite'));
+      // Reject or migrate before reading security state (which may initialize it).
+      await compute(backup_database.normalizeStagedBackup, stagedFile.path);
       prefs = await SharedPreferences.getInstance();
       beforePrefs = await exportBackupPreferences(prefs);
       final securityService = _ref.read(vaultSecurityServiceProvider);
@@ -691,14 +700,11 @@ class CloudBackupService {
       restoreGuard = await File(p.join(folder.path, 'restore_access.lock'))
           .open(mode: FileMode.append);
       await restoreGuard.lock(FileLock.blockingExclusive);
-      validateBackupDatabase(file.path, _db.schemaVersion);
       if (reconciliation != null &&
           ledgerFingerprint(mainFile.path) != reconciliation.fingerprint) {
         throw StateError(
             'Dữ liệu trên máy đã thay đổi. Hãy mở lại bản sao lưu để đối soát.');
       }
-      final stagedFile =
-          await file.copy(p.join(file.parent.path, 'staged.sqlite'));
       if (reconciliation != null && selected.isNotEmpty) {
         await compute(_reconcileInBackground, {
           'path': stagedFile.path,
@@ -765,6 +771,12 @@ class CloudBackupService {
       }
       rethrow;
     } finally {
+      if (stagedFile != null) {
+        for (final suffix in ['', '-wal', '-shm', '-journal']) {
+          final artifact = File('${stagedFile.path}$suffix');
+          if (await artifact.exists()) await artifact.delete();
+        }
+      }
       if (restoreGuard != null) {
         try {
           await restoreGuard.unlock();
