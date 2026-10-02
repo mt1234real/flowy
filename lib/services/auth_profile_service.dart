@@ -24,6 +24,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'backup_schedule.dart';
 import 'avatar_storage.dart';
+import 'backup_account_key.dart';
 
 /// Các hình thức hiển thị Avatar người dùng
 enum UserAvatarType {
@@ -257,6 +258,7 @@ class AuthProfileService {
   /// Đăng xuất tài khoản Google và xóa token bảo mật
   /// (Dữ liệu SQLite cục bộ được giữ nguyên vẹn - Zero Account Lock-in)
   Future<UserProfile> signOut() async {
+    await clearBackupKeyCache();
     try {
       if (await _googleSignIn.isSignedIn()) {
         await _googleSignIn.signOut();

@@ -3,14 +3,14 @@
 // Architecture: Google Drive AppData Cloud Backup Engine with Pre-Signout Safety Gate
 // Stack: flutter_riverpod, googleapis, archive, encrypt, crypto, flutter_secure_storage, drift, shared_preferences
 // Features:
-// 1. Cross-Device Deterministic Key Derivation (Fix InvalidCipherTextException):
-//    - Master Key 256-bit (32 bytes) phái sinh qua HMAC-SHA256 từ Google ID/Email + static pepper salt.
+// 1. V2 account-scoped random master keys stored separately in Drive appData.
+//    Legacy deterministic V1 is supported only for decryption.
 // 2. Pre-Signout Safety Gate & Diff Inspection (Zero Silent Data Loss):
 //    - checkPreSignoutDiff(): So sánh metadata bản Cloud gần nhất với dữ liệu thực tế trong SQLite.
 //    - createEmergencyLocalSnapshot(): Tạo snapshot an toàn 'old_account_unsaved.bak' trong thư mục documents.
 //    - signOutAndClearSession(): Ngắt kết nối phiên Google Sign-In và reset trạng thái CSDL an toàn.
 // 3. Self-Contained Binary Payload:
-//    - [16 bytes IV] + [Ciphertext + Auth Tag GCM], giải mã an toàn chống crash.
+//    - Versioned authenticated V2 envelope around the unchanged inner capsule.
 // 4. Silent Auto-Detect & Rollback Snapshot:
 //    - checkForNewerBackup(), performRestoreFromCloud(), notifyDataChanged() (Debounce 3 phút).
 // ==============================================================================
@@ -20,7 +20,6 @@ import 'fiscal_day.dart';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:crypto/crypto.dart';
 import 'package:extension_google_sign_in_as_googleapis_auth/extension_google_sign_in_as_googleapis_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -44,6 +43,8 @@ import 'backup_capsule.dart';
 import 'backup_database_normalizer.dart' as backup_database;
 import 'backup_schedule.dart';
 import 'backup_state.dart';
+import 'backup_crypto.dart';
+import 'backup_account_key.dart';
 
 /// Helper chuyển đổi và lọc sạch các trường properties nullable từ Google Drive API
 Map<String, String> _sanitizeProperties(Map<String, String?>? raw) {
@@ -232,11 +233,11 @@ class BackupSyncState {
 
 class CloudBackupService {
   static const String _appDataFolderName = 'appDataFolder';
-  static const String _appFixedPepper = 'flowy_secure_vault_salt_2026_@#\$';
 
   final AppDatabase _db;
   final GoogleSignIn _googleSignIn;
   final Ref _ref;
+  final drive.DriveApi? _driveApiOverride;
 
   Timer? _debounceTimer;
   bool _silentAuth = false;
@@ -245,8 +246,10 @@ class CloudBackupService {
     required AppDatabase db,
     required Ref ref,
     GoogleSignIn? googleSignIn,
+    drive.DriveApi? driveApi,
   })  : _db = db,
         _ref = ref,
+        _driveApiOverride = driveApi,
         _googleSignIn = googleSignIn ??
             GoogleSignIn(
               scopes: [
@@ -262,7 +265,7 @@ class CloudBackupService {
   }
 
   /// Khởi tạo Google Drive API client có chứng thực
-  Future<drive.DriveApi> _getDriveApi() async {
+  Future<({drive.DriveApi api, String accountId})> _getDriveSession() async {
     GoogleSignInAccount? account = _googleSignIn.currentUser;
     account ??= await _googleSignIn.signInSilently();
     if (!_silentAuth) account ??= await _googleSignIn.signIn();
@@ -271,32 +274,25 @@ class CloudBackupService {
       throw const BackupAuthenticationFailure();
     }
 
-    final authClient = await _googleSignIn.authenticatedClient();
-    if (authClient == null) {
+    final accountId = account.id.trim();
+    if (_driveApiOverride != null) {
+      return (api: _driveApiOverride, accountId: accountId);
+    }
+    if (_googleSignIn.currentUser?.id.trim() != accountId) {
       throw const BackupAuthenticationFailure();
     }
 
-    return drive.DriveApi(authClient);
-  }
-
-  /// Khóa 256-bit (32 bytes) phái sinh thống nhất bằng HMAC-SHA256
-  Future<List<int>> _getOrCreateDeterministicKey() async {
-    GoogleSignInAccount? account = _googleSignIn.currentUser;
-    account ??= await _googleSignIn.signInSilently();
-
-    if (account == null) {
-      throw StateError('Cần đăng nhập Google để sử dụng bản sao lưu này');
+    final authClient = await _googleSignIn.authenticatedClient();
+    if (authClient == null ||
+        _googleSignIn.currentUser?.id.trim() != accountId) {
+      authClient?.close();
+      throw const BackupAuthenticationFailure();
     }
-    final userIdentifier = account.id.trim();
 
-    final pepperBytes = utf8.encode(_appFixedPepper);
-    final dataBytes = utf8.encode(userIdentifier);
-
-    final hmacSha256 = Hmac(sha256, pepperBytes);
-    final digest = hmacSha256.convert(dataBytes);
-
-    return digest.bytes;
+    return (api: drive.DriveApi(authClient), accountId: accountId);
   }
+
+  Future<drive.DriveApi> _getDriveApi() async => (await _getDriveSession()).api;
 
   /// 🌟 KIỂM TRA ĐỐI SOÁT TRƯỚC KHI ĐĂNG XUẤT (PRE-SIGNOUT DIFF)
   Future<BackupDiffReport> checkPreSignoutDiff() async {
@@ -379,6 +375,7 @@ class CloudBackupService {
   /// 🌟 NGẮT PHIÊN GOOGLE VÀ LÀM SẠCH KẾT NỐI (ZERO DATA LOCK-IN)
   Future<void> signOutAndClearSession() async {
     _debounceTimer?.cancel();
+    await clearBackupKeyCache();
     await _googleSignIn.signOut();
 
     const secureStorage = FlutterSecureStorage();
@@ -440,7 +437,8 @@ class CloudBackupService {
     progress.state = 'Đang chuẩn bị bản sao lưu…';
     Directory? tempDir;
     try {
-      final driveApi = await _getDriveApi();
+      final session = await _getDriveSession();
+      final driveApi = session.api;
       onProgress?.call(
           CloudBackupStatus.checkpointing, 'Đang đồng bộ sổ cái CSDL...', 0.15);
 
@@ -487,9 +485,15 @@ class CloudBackupService {
           'Đang nén và mã hóa AES-GCM 256-bit...', 0.40);
 
       progress.state = 'Đang nén và mã hóa bản sao lưu…';
-      final keyBytes = await _getOrCreateDeterministicKey();
-      final encryptedPath =
-          await compute(packBackup, {'folder': tempDir.path, 'key': keyBytes});
+      final accountId = session.accountId;
+      final master =
+          await AccountBackupKeys(accountId, DriveBackupKeyRemote(driveApi))
+              .forBackup();
+      final encryptedPath = await compute(packBackup, {
+        'folder': tempDir.path,
+        'master': master.bytes,
+        'accountId': accountId
+      });
       final finalEncryptedFile = File(encryptedPath);
       progress.state = 'Đang tải bản sao lưu lên Google Drive…';
 
@@ -508,6 +512,8 @@ class CloudBackupService {
         ..parents = [_appDataFolderName]
         ..description = 'PFM Vault Encrypted Backup'
         ..properties = {
+          'encryption_version': '2',
+          'encryption_key_id': master.id,
           'version': '4',
           'theme': prefs.getString(kPrefKeyAccentPreset) ?? 'grass',
           'font':
@@ -566,6 +572,7 @@ class CloudBackupService {
 
       final fileList = await driveApi.files.list(
         spaces: _appDataFolderName,
+        q: "name contains 'pfm_vault_backup_'",
         orderBy: 'createdTime desc',
         pageSize: 30,
         $fields: 'files(id, name, size, createdTime, properties)',
@@ -599,7 +606,14 @@ class CloudBackupService {
   Future<File> downloadAndDecryptBackup(String fileId) async {
     Directory? tempDir;
     try {
-      final driveApi = await _getDriveApi();
+      final session = await _getDriveSession();
+      final driveApi = session.api;
+      final fileMetadata =
+          await driveApi.files.get(fileId, $fields: 'properties') as drive.File;
+      final expectedVersion = fileMetadata.properties?['encryption_version'];
+      if (expectedVersion != null && expectedVersion != '2') {
+        throw const BackupCryptoFailure(BackupCryptoError.unsupported);
+      }
 
       final drive.Media media = await driveApi.files.get(
         fileId,
@@ -616,10 +630,26 @@ class CloudBackupService {
       await media.stream.pipe(sink);
       await sink.close();
 
-      final keyBytes = await _getOrCreateDeterministicKey();
+      final accountId = session.accountId;
+      final headerFile = await encFile.open();
+      final List<int> header;
+      try {
+        header = await headerFile.read(backupV2HeaderSize);
+      } finally {
+        await headerFile.close();
+      }
+      final keyId = backupEnvelopeKeyId(header);
+      if (expectedVersion == '2' && keyId == null) {
+        throw const BackupCryptoFailure(BackupCryptoError.malformed);
+      }
+      final master = keyId == null
+          ? null
+          : await AccountBackupKeys(accountId, DriveBackupKeyRemote(driveApi))
+              .forRestore(keyId);
       final extracted = await compute(unpackBackup, {
         'folder': tempDir.path,
-        'key': keyBytes,
+        'accountId': accountId,
+        if (master != null) 'master': master.bytes,
         'schema': _db.schemaVersion
       });
       return await prepareBackupForInspection(File(extracted));

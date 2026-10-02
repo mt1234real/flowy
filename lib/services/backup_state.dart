@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
+import 'backup_crypto.dart';
 
 const backupDirtyRevisionKey = 'pfm_backup_dirty_revision';
 const backupUploadedRevisionKey = 'pfm_backup_uploaded_revision';
@@ -94,10 +95,11 @@ class BackupStateStore {
   }
 }
 
-String backupFailureMessage(Object error) => error
-        is BackupAuthenticationFailure
-    ? 'Cần đăng nhập lại Google để tiếp tục sao lưu.'
-    : 'Chưa sao lưu được. Dữ liệu trên máy vẫn được giữ; Flowy sẽ thử lại theo lịch.';
+String backupFailureMessage(Object error) => error is BackupCryptoFailure
+    ? error.toString()
+    : error is BackupAuthenticationFailure
+        ? 'Cần đăng nhập lại Google để tiếp tục sao lưu.'
+        : 'Chưa sao lưu được. Dữ liệu trên máy vẫn được giữ; Flowy sẽ thử lại theo lịch.';
 
 Future<T> runBackupAttempt<T>(
     BackupStateStore store, Future<T> Function() upload,

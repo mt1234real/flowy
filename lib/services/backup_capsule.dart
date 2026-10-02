@@ -1,16 +1,14 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:math' as math;
-import 'dart:typed_data';
 import 'package:archive/archive_io.dart';
 import 'package:crypto/crypto.dart';
-import 'package:encrypt/encrypt.dart' as enc;
 import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqlite3/sqlite3.dart' as sql;
 import 'vault_security_service.dart';
 import 'avatar_storage.dart';
 import 'backup_schedule.dart';
+import 'backup_crypto.dart';
 
 const backupCadencePreferenceKeys = <String>{
   'pfm_backup_cadence_mode',
@@ -173,16 +171,12 @@ Future<String> packBackup(Map<String, dynamic> args) async {
   } finally {
     encoder.close();
   }
-  final iv = enc.IV(Uint8List.fromList(
-      List.generate(16, (_) => math.Random.secure().nextInt(256))));
-  final crypt = enc.Encrypter(enc.AES(
-      enc.Key(Uint8List.fromList(args['key'] as List<int>)),
-      mode: enc.AESMode.gcm));
-  final encrypted = crypt.encryptBytes(
+  final encrypted = encryptBackupV2(
       await File(p.join(folder, 'capsule.zip')).readAsBytes(),
-      iv: iv);
+      BackupMasterKey(args['master'] as List<int>),
+      args['accountId'] as String);
   final output = File(p.join(folder, 'capsule.enc'));
-  await output.writeAsBytes([...iv.bytes, ...encrypted.bytes], flush: true);
+  await output.writeAsBytes(encrypted, flush: true);
   return output.path;
 }
 
@@ -192,12 +186,11 @@ Future<String> unpackBackup(Map<String, dynamic> args) async {
   if (bytes.length < 32 || bytes.length > 256 * 1024 * 1024) {
     throw const FormatException('Kích thước bản sao lưu không hợp lệ');
   }
-  final crypt = enc.Encrypter(enc.AES(
-      enc.Key(Uint8List.fromList(args['key'] as List<int>)),
-      mode: enc.AESMode.gcm));
-  final zip = crypt.decryptBytes(
-      enc.Encrypted(Uint8List.sublistView(bytes, 16)),
-      iv: enc.IV(Uint8List.sublistView(bytes, 0, 16)));
+  final zip = decryptBackupEnvelope(bytes,
+      accountId: args['accountId'] as String,
+      master: args['master'] == null
+          ? null
+          : BackupMasterKey(args['master'] as List<int>));
   final archive = ZipDecoder().decodeBytes(zip, verify: true);
   final seen = <String>{};
   var total = 0;
