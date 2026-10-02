@@ -133,7 +133,7 @@ class _CloudCadenceModalState extends ConsumerState<CloudCadenceModal> {
     await prefs.setInt(_prefKeyCustomValue, val);
     await prefs.setBool(_prefKeyWifiOnly, _wifiOnly);
     await prefs.setBool(_prefKeyBatterySafe, _batterySafe);
-    await configureBackupSchedule(prefs);
+    await recoverPendingBackup(prefs);
   }
 
   String _getCadenceDescription() {

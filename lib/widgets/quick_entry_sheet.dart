@@ -15,7 +15,6 @@ import 'package:intl/intl.dart';
 import '../core/animation/app_animation_policy.dart';
 import '../core/feedback/app_feedback.dart';
 import '../data/database.dart';
-import '../services/cloud_backup_service.dart';
 import '../theme/app_icons.dart';
 import '../theme/app_theme.dart';
 import '../widgets/currency_text.dart';
@@ -757,8 +756,6 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
           .deleteTransactionWithBalanceReversal(widget.initialTransaction!.id);
       HapticFeedback.mediumImpact();
 
-      ref.read(cloudBackupServiceProvider).notifyDataChanged();
-
       if (!mounted) return;
 
       AppFeedback.showSuccess(
@@ -843,7 +840,6 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
         }
 
         ref.read(quickEntryDraftProvider.notifier).state = null;
-        ref.read(cloudBackupServiceProvider).notifyDataChanged();
 
         await _playSuccessMorphAnimation();
         if (!mounted) return;
@@ -937,7 +933,6 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
       }
 
       ref.read(quickEntryDraftProvider.notifier).state = null;
-      ref.read(cloudBackupServiceProvider).notifyDataChanged();
 
       final double? dailySafe = widget.prefilledDailySafe;
       final bool triggersOverrun = _activeTab == CategoryType.expense &&

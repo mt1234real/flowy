@@ -43,6 +43,7 @@ import '../services/cloud_backup_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/avatar_customization_sheet.dart';
 import '../widgets/cloud_cadence_modal.dart';
+import '../widgets/backup_status_details.dart';
 import '../widgets/restore_diff_modal.dart';
 import '../widgets/two_stage_overscroll_header.dart';
 import 'category_manager_screen.dart';
@@ -790,11 +791,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           child: const Icon(Icons.cloud_upload_outlined, color: Color(0xFF10B981), size: 20),
                         ),
                         title: const Text('Sao lưu lên Cloud ngay bây giờ', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
-                        subtitle: Text(
-                          latestBackup != null
-                              ? 'Bản gần nhất: ${latestBackup.formattedDate} (${latestBackup.formattedSize})'
-                              : 'Chưa có bản sao lưu trên đám mây',
-                          style: TextStyle(fontSize: 11, color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              latestBackup != null
+                                  ? 'Bản gần nhất: ${latestBackup.formattedDate} (${latestBackup.formattedSize})'
+                                  : 'Chưa có bản sao lưu trên đám mây',
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  color: isDark
+                                      ? AppTokens.darkMuted
+                                      : AppTokens.lightMuted),
+                            ),
+                            const BackupStatusDetails()
+                          ],
                         ),
                         trailing: (backupState.status == CloudBackupStatus.checkpointing ||
                             backupState.status == CloudBackupStatus.encrypting ||

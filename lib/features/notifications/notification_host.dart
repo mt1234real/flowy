@@ -2,7 +2,6 @@ import 'dart:async';
 import '../../services/fiscal_day.dart';
 import 'dart:convert';
 import '../../widgets/backup_progress_curtain.dart';
-import '../../services/cloud_backup_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/database.dart';
@@ -43,17 +42,8 @@ class _NotificationHostState extends ConsumerState<NotificationHost>
       db.select(db.budgets).watch(),
       db.select(db.debtContacts).watch()
     ]) {
-      var first = true;
       _subscriptions.add(stream.listen((_) {
         _queue();
-        if (!first && ref.read(backupOperationProvider) == null) {
-          unawaited(ref
-              .read(cloudBackupServiceProvider)
-              .notifyDataChanged()
-              .catchError(
-                  (Object e) => debugPrint('Backup scheduling failed: $e')));
-        }
-        first = false;
       }));
     }
     _subscriptions.add(NotificationPlatform.instance.taps.stream

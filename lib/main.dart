@@ -27,6 +27,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:path_provider/path_provider.dart';
 import 'services/backup_capsule.dart';
+import 'services/backup_change_observer.dart';
 import 'data/database.dart';
 import 'data/database_seeder.dart';
 import 'features/onboarding/onboarding_completion.dart';
@@ -122,6 +123,7 @@ class FlowyApp extends ConsumerWidget {
     final fontName = ref.watch(fontFamilyProvider);
     final currencyFont = ref.watch(currencyFontProvider);
     final hasCompletedOnboarding = ref.watch(hasCompletedOnboardingProvider);
+    ref.watch(backupChangeObserverProvider);
 
     return KeyedSubtree(
       key: sessionKey,

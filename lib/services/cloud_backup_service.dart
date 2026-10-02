@@ -43,6 +43,7 @@ import 'vault_security_service.dart';
 import 'backup_capsule.dart';
 import 'backup_database_normalizer.dart' as backup_database;
 import 'backup_schedule.dart';
+import 'backup_state.dart';
 
 /// Helper chuyển đổi và lọc sạch các trường properties nullable từ Google Drive API
 Map<String, String> _sanitizeProperties(Map<String, String?>? raw) {
@@ -257,11 +258,7 @@ class CloudBackupService {
   /// Kích hoạt bộ đếm debounce 3 phút sau mỗi lần ghi chép mới
   Future<void> notifyDataChanged() async {
     final prefs = await SharedPreferences.getInstance();
-    try {
-      await scheduleEntryBackup(prefs);
-    } catch (error) {
-      debugPrint('Backup scheduling unavailable: $error');
-    }
+    await markBackupDirty(prefs);
   }
 
   /// Khởi tạo Google Drive API client có chứng thực
@@ -271,12 +268,12 @@ class CloudBackupService {
     if (!_silentAuth) account ??= await _googleSignIn.signIn();
 
     if (account == null) {
-      throw Exception('Chưa đăng nhập Google hoặc người dùng hủy xác thực.');
+      throw const BackupAuthenticationFailure();
     }
 
     final authClient = await _googleSignIn.authenticatedClient();
     if (authClient == null) {
-      throw Exception('Không thể tạo HTTP Auth Client cho Google Drive.');
+      throw const BackupAuthenticationFailure();
     }
 
     return drive.DriveApi(authClient);
@@ -357,7 +354,9 @@ class CloudBackupService {
     }
 
     return BackupDiffReport(
-      hasUnsavedChanges: hasUnsaved,
+      hasUnsavedChanges: hasUnsaved ||
+          (await BackupStateStore(await SharedPreferences.getInstance()).read())
+              .dirty,
       localTxCount: totalLocalTxCount,
       cloudTxCount: cloudTx,
       localWalletCount: totalLocalWalletCount,
@@ -391,7 +390,7 @@ class CloudBackupService {
 
   /// Thực thi sao lưu và đồng bộ StateNotifier
   Future<CloudBackupItem> performBackup({bool silent = false}) async {
-    if (_busy) throw StateError('Một tác vụ sao lưu đang chạy');
+    if (_busy || _attempting) throw StateError('Một tác vụ sao lưu đang chạy');
     _silentAuth = silent;
     final notifier = _ref.read(cloudBackupNotifierProvider.notifier);
 
@@ -399,34 +398,37 @@ class CloudBackupService {
       notifier.updateStateForStart();
     }
 
+    _attempting = true;
     try {
-      final item = await createBackup(
-        onProgress: (status, message, progress) {
-          if (!silent) {
-            notifier.updateProgress(status, message, progress);
-          }
-        },
-      );
-
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(
-          'flowy_last_backup_at', item.createdTime.toIso8601String());
+      final store = BackupStateStore(await SharedPreferences.getInstance());
+      final item = await runBackupAttempt(
+          store,
+          () => createBackup(
+                onProgress: (status, message, progress) {
+                  if (!silent) {
+                    notifier.updateProgress(status, message, progress);
+                  }
+                },
+              ),
+          uploadedAt: (item) => item.createdTime);
       notifier.updateSuccess(item);
-      if (!silent) {
+      if (!silent && !(await store.read()).dirty) {
         _ref.read(backupSyncNotifierProvider.notifier).markAsUpToDate();
       }
       return item;
     } catch (e) {
       if (!silent) {
-        notifier.updateFailure(
-            'Lỗi sao lưu: ${e.toString().replaceAll('Exception: ', '')}');
+        notifier.updateFailure(backupFailureMessage(e));
       }
       rethrow;
+    } finally {
+      _attempting = false;
     }
   }
 
   /// Tạo bản sao lưu hoàn chỉnh lên Google Drive AppData
   static bool _busy = false;
+  static bool _attempting = false;
 
   Future<CloudBackupItem> createBackup({
     void Function(CloudBackupStatus status, String message, double progress)?

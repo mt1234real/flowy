@@ -20,6 +20,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'backup_schedule.dart';
 
 /// Các hình thức hiển thị Avatar người dùng
 enum UserAvatarType {
@@ -219,6 +220,7 @@ class AuthProfileService {
       );
 
       await _persistProfile(userProfile);
+      await recoverPendingBackup(await SharedPreferences.getInstance());
       return userProfile;
     } catch (e) {
       debugPrint('AuthProfileService: signInWithGoogle error: $e');
@@ -311,6 +313,7 @@ class AuthProfileService {
     await prefs.setString(_keyAvatarType, profile.avatarType.name);
     await prefs.setString(_keyAvatarValue, profile.avatarValue);
     await prefs.setString(_keyAvatarColorHex, profile.avatarColorHex);
+    await markBackupDirty(prefs);
   }
 }
 
