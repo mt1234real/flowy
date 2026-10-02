@@ -6,13 +6,23 @@ import 'package:archive/archive_io.dart';
 import 'package:crypto/crypto.dart';
 import 'package:encrypt/encrypt.dart' as enc;
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqlite3/sqlite3.dart' as sql;
 import 'vault_security_service.dart';
+import 'avatar_storage.dart';
+import 'backup_schedule.dart';
+
+const backupCadencePreferenceKeys = <String>{
+  'pfm_backup_cadence_mode',
+  'pfm_backup_custom_unit',
+  'pfm_backup_custom_value',
+  'pfm_backup_wifi_only',
+  'pfm_backup_battery_safe',
+};
 
 /// Explicit allowlist: never export authentication, encryption keys or eyes.
 const backupPreferenceKeys = <String>{
+  ...backupCadencePreferenceKeys,
   'flowy_theme_mode',
   'flowy_accent_preset',
   'flowy_font_family',
@@ -39,7 +49,7 @@ Future<Map<String, Object>> exportBackupPreferences(
   if (values['user_avatar_type'] == 'customImage') {
     final avatar = File(values['user_avatar_value'] as String? ?? '');
     if (await avatar.exists()) {
-      if (await avatar.length() > 2 * 1024 * 1024) {
+      if (await avatar.length() > maxAvatarBytes) {
         throw StateError(
             'Ảnh đại diện lớn hơn 2 MB. Hãy chọn ảnh nhỏ hơn trước khi sao lưu.');
       }
@@ -55,19 +65,24 @@ Future<Map<String, Object>> exportBackupPreferences(
 }
 
 Future<void> applyBackupPreferences(
-    SharedPreferences prefs, Map<String, dynamic> values) async {
+    SharedPreferences prefs, Map<String, dynamic> values,
+    {BackupWorkScheduler? scheduler}) async {
   validatePreferences(values);
   values = Map<String, dynamic>.from(values);
   if (values['user_avatar_image_base64'] is String) {
     final bytes = base64Decode(values['user_avatar_image_base64'] as String);
-    final folder = await getApplicationDocumentsDirectory();
-    // Content addressing preserves the current avatar if restore rolls back.
-    final image =
-        File(p.join(folder.path, 'avatar_${sha256.convert(bytes)}.img'));
-    await image.writeAsBytes(bytes, flush: true);
+    final image = await storeAvatarBytes(bytes);
     values['user_avatar_value'] = image.path;
+  } else if (values['user_avatar_type'] == 'customImage') {
+    // Legacy source-device paths cannot be used on the destination device.
+    values['user_avatar_type'] = 'initials';
+    values['user_avatar_value'] = '';
   }
   for (final key in backupPreferenceKeys) {
+    // Older backups predate these settings: retain local/default configuration.
+    if (backupCadencePreferenceKeys.contains(key) && !values.containsKey(key)) {
+      continue;
+    }
     final value = values[key];
     final bool saved;
     if (value == null) {
@@ -81,21 +96,33 @@ Future<void> applyBackupPreferences(
     }
     if (!saved) throw StateError('Không lưu được thiết lập $key');
   }
+  // Restore writes are configuration, not new user mutations.
+  await recoverPendingBackup(prefs, scheduler: scheduler);
 }
 
 void validatePreferences(Map<String, dynamic> values) {
   for (final entry in values.entries) {
     if ((!backupPreferenceKeys.contains(entry.key) &&
             entry.key != 'user_avatar_image_base64') ||
-        (entry.key == 'vault_biometrics_enabled'
+        (entry.key == 'vault_biometrics_enabled' ||
+                entry.key == 'pfm_backup_wifi_only' ||
+                entry.key == 'pfm_backup_battery_safe'
             ? entry.value is! bool
             : entry.key == 'flowy_cycle_start_day' ||
-                entry.key == 'flowy_day_cutoff_hour' ||
-                entry.key == 'flowy_day_cutoff_minute'
+                    entry.key == 'flowy_day_cutoff_hour' ||
+                    entry.key == 'flowy_day_cutoff_minute' ||
+                    entry.key == 'pfm_backup_cadence_mode' ||
+                    entry.key == 'pfm_backup_custom_value'
                 ? entry.value is! int
                 : entry.value is! String)) {
       throw const FormatException('Thiết lập sao lưu không hợp lệ');
     }
+  }
+  final cadence = values['pfm_backup_cadence_mode'] as int?;
+  final unit = values['pfm_backup_custom_unit'] as String?;
+  if ((cadence != null && (cadence < 0 || cadence > 4)) ||
+      (unit != null && !{'hours', 'days', 'weeks'}.contains(unit))) {
+    throw const FormatException('Thiết lập lịch sao lưu không hợp lệ');
   }
   final cutoffHour = values['flowy_day_cutoff_hour'] as int? ?? 0;
   final cutoffMinute = values['flowy_day_cutoff_minute'] as int? ?? 0;
@@ -104,7 +131,7 @@ void validatePreferences(Map<String, dynamic> values) {
   }
   if (values['user_avatar_image_base64'] != null &&
       base64Decode(values['user_avatar_image_base64'] as String).length >
-          2 * 1024 * 1024) {
+          maxAvatarBytes) {
     throw const FormatException('Ảnh đại diện vượt giới hạn');
   }
   for (final key in [

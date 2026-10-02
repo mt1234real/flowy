@@ -15,12 +15,15 @@
 //    - userProfileNotifierProvider exposes real-time state mutations across UI screens
 // ==============================================================================
 
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'backup_schedule.dart';
+import 'avatar_storage.dart';
 
 /// Các hình thức hiển thị Avatar người dùng
 enum UserAvatarType {
@@ -153,13 +156,36 @@ class AuthProfileService {
         orElse: () => UserAvatarType.initials,
       );
 
-      return UserProfile(
+      var profile = UserProfile(
         displayName: displayName ?? (email?.split('@').first ?? 'Khách'),
         email: email,
         avatarType: avatarType,
         avatarValue: avatarValue ?? (displayName?.isNotEmpty == true ? displayName![0].toUpperCase() : 'K'),
         avatarColorHex: avatarColorHex ?? '#10B981',
       );
+      if (profile.avatarType == UserAvatarType.customImage) {
+        final source = File(profile.avatarValue);
+        if (!await source.exists()) {
+          profile = profile.copyWith(
+            avatarType: UserAvatarType.initials,
+            avatarValue: profile.displayName.isNotEmpty
+                ? profile.displayName[0].toUpperCase()
+                : 'K',
+          );
+        } else {
+          try {
+            final owned = await importAvatar(source);
+            if (owned.path != source.path &&
+                await prefs.setString(_keyAvatarValue, owned.path)) {
+              profile = profile.copyWith(avatarValue: owned.path);
+              await markBackupDirty(prefs);
+            }
+          } catch (_) {
+            // Keep a readable legacy image if migration is temporarily unavailable.
+          }
+        }
+      }
+      return profile;
     } catch (e) {
       debugPrint('AuthProfileService: Error loading profile: $e');
       return UserProfile.guest();
@@ -274,11 +300,14 @@ class AuthProfileService {
 
   /// Cập nhật avatar tùy biến (Google / Ảnh máy / Emoji / Initials)
   Future<UserProfile> updateCustomAvatar(
-      UserProfile current, {
-        required UserAvatarType type,
-        required String value,
-        String? colorHex,
-      }) async {
+    UserProfile current, {
+    required UserAvatarType type,
+    required String value,
+    String? colorHex,
+  }) async {
+    if (type == UserAvatarType.customImage) {
+      value = (await importAvatar(File(value))).path;
+    }
     final updated = current.copyWith(
       avatarType: type,
       avatarValue: value,
