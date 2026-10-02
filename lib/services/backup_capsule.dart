@@ -431,7 +431,7 @@ Future<void> recoverInterruptedRestore(
   await File(p.join(folder, 'pfm_local_vault.sqlite')).copy(target);
   await applyBackupPreferences(
       prefs, readManifest(folder, 'preferences_manifest.json')!);
-  await VaultSecurityService.restoreManifest(
+  await VaultSecurityService.restorePersistedSnapshot(
       readManifest(folder, 'security_manifest.json')!);
   await marker.delete();
 }

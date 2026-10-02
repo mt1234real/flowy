@@ -716,12 +716,12 @@ class CloudBackupService {
     try {
       stagedFile = await file.copy(p.join(file.parent.path,
           'staged_${DateTime.now().microsecondsSinceEpoch}.sqlite'));
-      // Reject or migrate before reading security state (which may initialize it).
+      // Reject or migrate before taking read-only rollback snapshots.
       await compute(backup_database.normalizeStagedBackup, stagedFile.path);
       prefs = await SharedPreferences.getInstance();
       beforePrefs = await exportBackupPreferences(prefs);
       final securityService = _ref.read(vaultSecurityServiceProvider);
-      beforeSecurity = await securityService.exportManifest();
+      beforeSecurity = await securityService.snapshotPersistedState();
       final folder = await getApplicationDocumentsDirectory();
       mainFile = File(p.join(folder.path, 'pfm_local_vault.sqlite'));
       recovery = Directory(p.join(folder.path, 'restore_recovery'));
@@ -793,7 +793,7 @@ class CloudBackupService {
         await File(p.join(recovery.path, 'pfm_local_vault.sqlite'))
             .copy(mainFile.path);
         await applyBackupPreferences(prefs, beforePrefs);
-        await VaultSecurityService.restoreManifest(beforeSecurity);
+        await VaultSecurityService.restorePersistedSnapshot(beforeSecurity);
         final marker = File(p.join(recovery.path, 'pending'));
         if (await marker.exists()) await marker.delete();
       }

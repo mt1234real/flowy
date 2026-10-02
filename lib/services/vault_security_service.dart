@@ -139,6 +139,33 @@ class VaultSecurityService {
     return _config.toJson();
   }
 
+  /// Rollback snapshots must preserve absence without initializing a PIN or
+  /// migrating the legacy file. Preserve the stored bytes exactly.
+  Future<Map<String, dynamic>> snapshotPersistedState() async => {
+        'snapshotVersion': 1,
+        'secureStorageValue': await storage.read(key: storageKey),
+      };
+
+  static Future<void> restorePersistedSnapshot(
+      Map<String, dynamic> snapshot) async {
+    if (!snapshot.containsKey('snapshotVersion')) {
+      // Recovery journals written before read-only snapshots contain a manifest.
+      await restoreManifest(snapshot);
+      return;
+    }
+    final value = snapshot['secureStorageValue'];
+    if (snapshot['snapshotVersion'] != 1 ||
+        !snapshot.containsKey('secureStorageValue') ||
+        (value != null && value is! String)) {
+      throw const FormatException('Bản dự phòng bảo mật không hợp lệ');
+    }
+    if (value == null) {
+      await storage.delete(key: storageKey);
+    } else {
+      await storage.write(key: storageKey, value: value as String);
+    }
+  }
+
   static Future<void> restoreManifest(Map<String, dynamic> manifest) async {
     final config = VaultSecurityConfig.fromJson(manifest);
     await storage.write(key: storageKey, value: jsonEncode(config.toJson()));
