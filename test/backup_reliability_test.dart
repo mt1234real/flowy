@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:drift/drift.dart' hide Column, isNull, isNotNull;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -540,11 +542,17 @@ void main() {
   });
 
   group('real performBackup attempt wrapper', () {
+    late Directory accessDirectory;
+    const pathChannel = MethodChannel('plugins.flutter.io/path_provider');
     late AppDatabase db;
     late ProviderContainer container;
     late NoSilentAccount google;
     Future<CloudBackupItem> Function()? upload;
-    setUp(() {
+    setUp(() async {
+      accessDirectory = await Directory.systemTemp.createTemp('backup_access_');
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+              pathChannel, (_) async => accessDirectory.path);
       db = AppDatabase.forTesting(NativeDatabase.memory());
       google = NoSilentAccount();
       upload = null;
@@ -558,6 +566,9 @@ void main() {
     tearDown(() async {
       container.dispose();
       await db.close();
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(pathChannel, null);
+      await accessDirectory.delete(recursive: true);
     });
     test('silent authentication failure is visible and never opens login',
         () async {

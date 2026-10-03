@@ -1,3 +1,5 @@
+import 'manual_backup_action.dart';
+import 'backup_status_details.dart';
 import 'restore_diff_modal.dart';
 import '../services/backup_schedule.dart';
 import 'flowy_selection_picker.dart';
@@ -980,58 +982,39 @@ class _CloudCadenceModalState extends ConsumerState<CloudCadenceModal> {
                         SizedBox(
                           width: double.infinity,
                           height: 50,
-                          child: ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: accent.primary,
-                              foregroundColor: Colors.white,
-                              elevation: 1,
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16)),
-                            ),
-                            onPressed: (!userProfile.isSignedIn ||
-                                    backupState.status ==
-                                        CloudBackupStatus.checkpointing ||
-                                    backupState.status ==
-                                        CloudBackupStatus.encrypting ||
-                                    backupState.status ==
-                                        CloudBackupStatus.uploading)
-                                ? null
-                                : () async {
-                                    HapticFeedback.mediumImpact();
-                                    try {
-                                      await ref
-                                          .read(cloudBackupNotifierProvider
-                                              .notifier)
-                                          .performBackup();
-                                      if (context.mounted) {
-                                        AppFeedback.showSuccess(
-                                          context,
-                                          'Đã sao lưu lên Google Drive.',
-                                        );
-                                      }
-                                    } catch (e) {
-                                      if (context.mounted) {
-                                        AppFeedback.showError(
-                                          context,
-                                          'Lỗi sao lưu Google Drive: $e',
-                                        );
-                                      }
-                                    }
-                                  },
-                            icon: const Icon(Icons.cloud_upload_rounded,
-                                size: 18),
-                            label: const Text(
-                              'Sao lưu ngay bây giờ',
-                              style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: 0.3),
+                          child: ManualBackupAction(
+                            enabled: userProfile.isSignedIn &&
+                                backupState.status !=
+                                    CloudBackupStatus.checkpointing &&
+                                backupState.status !=
+                                    CloudBackupStatus.encrypting &&
+                                backupState.status !=
+                                    CloudBackupStatus.uploading,
+                            builder: (pending, enqueue) => ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: accent.primary,
+                                foregroundColor: Colors.white,
+                                elevation: 1,
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16)),
+                              ),
+                              onPressed: enqueue,
+                              icon: const Icon(Icons.cloud_upload_rounded,
+                                  size: 18),
+                              label: const Text(
+                                'Sao lưu ngay bây giờ',
+                                style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 0.3),
+                              ),
                             ),
                           ),
                         ),
                         const SizedBox(height: 10),
 
                         // Nút Khôi phục dữ liệu từ Cloud
+                        const BackupStatusDetails(),
                         SizedBox(
                           width: double.infinity,
                           height: 44,

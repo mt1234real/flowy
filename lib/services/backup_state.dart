@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
@@ -11,6 +12,47 @@ const backupLastAttemptKey = 'pfm_backup_last_attempt_at';
 const backupLastFailureKey = 'pfm_backup_last_failure_at';
 const backupLastFailureMessageKey = 'pfm_backup_last_failure_message';
 const backupLastSuccessKey = 'flowy_last_backup_at';
+const backupManualRequestKey = 'pfm_backup_manual_request_v1';
+
+enum ManualBackupPhase { queued, running, success, failure }
+
+class ManualBackupRequest {
+  final String id;
+  final ManualBackupPhase phase;
+  final DateTime queuedAt;
+  final DateTime? startedAt, finishedAt;
+  final String? message;
+  const ManualBackupRequest(
+      {required this.id,
+      required this.phase,
+      required this.queuedAt,
+      this.startedAt,
+      this.finishedAt,
+      this.message});
+  bool get pending =>
+      phase == ManualBackupPhase.queued || phase == ManualBackupPhase.running;
+  Map<String, dynamic> toJson() => {
+        'version': 1,
+        'id': id,
+        'phase': phase.name,
+        'queuedAt': queuedAt.toIso8601String(),
+        'startedAt': startedAt?.toIso8601String(),
+        'finishedAt': finishedAt?.toIso8601String(),
+        'message': message,
+      };
+  factory ManualBackupRequest.fromJson(Map<String, dynamic> json) {
+    if (json['version'] != 1) {
+      throw const FormatException('Invalid manual request');
+    }
+    return ManualBackupRequest(
+        id: json['id'] as String,
+        phase: ManualBackupPhase.values.byName(json['phase'] as String),
+        queuedAt: DateTime.parse(json['queuedAt'] as String),
+        startedAt: DateTime.tryParse(json['startedAt'] as String? ?? ''),
+        finishedAt: DateTime.tryParse(json['finishedAt'] as String? ?? ''),
+        message: json['message'] as String?);
+  }
+}
 
 class BackupAuthenticationFailure implements Exception {
   const BackupAuthenticationFailure();
@@ -21,6 +63,7 @@ class BackupAuthenticationFailure implements Exception {
 class BackupStatus {
   final String? revision, uploadedRevision, failureMessage;
   final DateTime? dirtySince, lastAttempt, lastFailure, lastSuccess;
+  final ManualBackupRequest? manualRequest;
   const BackupStatus(
       {this.revision,
       this.uploadedRevision,
@@ -28,7 +71,8 @@ class BackupStatus {
       this.lastAttempt,
       this.lastFailure,
       this.lastSuccess,
-      this.failureMessage});
+      this.failureMessage,
+      this.manualRequest});
   bool get dirty => revision != null && revision != uploadedRevision;
 }
 
@@ -51,7 +95,47 @@ class BackupStateStore {
       lastFailure: date(backupLastFailureKey),
       lastSuccess: date(backupLastSuccessKey),
       failureMessage: prefs.getString(backupLastFailureMessageKey),
+      manualRequest: await readManualRequest(),
     );
+  }
+
+  Future<ManualBackupRequest?> readManualRequest() async {
+    await prefs.reload();
+    final value = prefs.getString(backupManualRequestKey);
+    return value == null
+        ? null
+        : ManualBackupRequest.fromJson(
+            Map<String, dynamic>.from(jsonDecode(value) as Map));
+  }
+
+  // Callers serialize request changes with manual_backup_request.lock.
+  Future<void> writeManualRequest(ManualBackupRequest request) async {
+    await _write(backupManualRequestKey, jsonEncode(request.toJson()));
+    _changes.add(null);
+  }
+
+  Future<bool> transitionManualRequest(String id, ManualBackupPhase phase,
+      {String? message}) async {
+    final previous = await readManualRequest();
+    if (previous == null ||
+        previous.id != id ||
+        previous.phase == ManualBackupPhase.success) {
+      return false;
+    }
+    if (previous.phase == phase && previous.message == message) return true;
+    await writeManualRequest(ManualBackupRequest(
+        id: id,
+        phase: phase,
+        queuedAt: previous.queuedAt,
+        startedAt: phase == ManualBackupPhase.running
+            ? previous.startedAt ?? DateTime.now()
+            : previous.startedAt,
+        finishedAt: phase == ManualBackupPhase.success ||
+                phase == ManualBackupPhase.failure
+            ? DateTime.now()
+            : null,
+        message: message));
+    return true;
   }
 
   Future<void> _write(String key, String value) async {

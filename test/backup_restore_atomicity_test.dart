@@ -28,6 +28,11 @@ const _cloudPreferences = <String, Object>{
 };
 
 class _Scheduler implements BackupWorkScheduler {
+  @override
+  Future<void> manual(String requestId) async {
+    throw StateError('Restore must not enqueue manual backup');
+  }
+
   final pending = <String, Constraints>{};
   bool fail = false;
   @override

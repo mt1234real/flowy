@@ -13,6 +13,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workmanager/workmanager.dart';
 
 class _Scheduler implements BackupWorkScheduler {
+  @override
+  Future<void> manual(String requestId) async {
+    throw StateError('Restore must not enqueue manual backup');
+  }
+
   final Map<String, Constraints> pending = {};
   int registrations = 0;
   @override

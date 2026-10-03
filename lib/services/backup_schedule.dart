@@ -2,9 +2,17 @@ import 'dart:io';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workmanager/workmanager.dart';
 import 'backup_state.dart';
+import 'backup_access.dart';
+import 'package:uuid/uuid.dart';
 
 const cloudBackupTask = 'com.mt1234.flowy.cloudBackup';
 const cloudEntryBackupTask = 'com.mt1234.flowy.cloudEntryBackup';
+const cloudManualBackupTask = 'com.mt1234.flowy.cloudManualBackup';
+bool isAutomaticBackupTask(String task) =>
+    task == cloudBackupTask || task == cloudEntryBackupTask;
+bool isManualBackupTask(String task) => task == cloudManualBackupTask;
+bool isAnyBackupTask(String task) =>
+    isAutomaticBackupTask(task) || isManualBackupTask(task);
 
 Constraints _constraints(SharedPreferences prefs) => Constraints(
       networkType: (prefs.getBool('pfm_backup_wifi_only') ?? true)
@@ -17,9 +25,16 @@ abstract class BackupWorkScheduler {
   Future<void> cancel(String name);
   Future<void> entry(Constraints constraints);
   Future<void> periodic(Constraints constraints);
+  Future<void> manual(String requestId);
 }
 
 class WorkmanagerBackupScheduler implements BackupWorkScheduler {
+  @override
+  Future<void> manual(String requestId) => Workmanager().registerOneOffTask(
+      '$cloudManualBackupTask.$requestId', cloudManualBackupTask,
+      inputData: {'requestId': requestId},
+      constraints: Constraints(networkType: NetworkType.connected),
+      existingWorkPolicy: ExistingWorkPolicy.keep);
   @override
   Future<void> cancel(String name) => Workmanager().cancelByUniqueName(name);
   @override
@@ -34,6 +49,55 @@ class WorkmanagerBackupScheduler implements BackupWorkScheduler {
           frequency: const Duration(hours: 1),
           constraints: constraints,
           existingWorkPolicy: ExistingPeriodicWorkPolicy.update);
+}
+
+Future<ManualBackupRequest> enqueueManualBackup(SharedPreferences prefs,
+    {required String directory, BackupWorkScheduler? scheduler}) async {
+  final work = _scheduler(scheduler);
+  if (work == null) {
+    throw UnsupportedError('Background manual backup requires Android');
+  }
+  return withBackupAccess(directory, () async {
+    final store = BackupStateStore(prefs);
+    final previous = await store.readManualRequest();
+    final request = previous?.pending == true
+        ? previous!
+        : ManualBackupRequest(
+            id: const Uuid().v4(),
+            phase: ManualBackupPhase.queued,
+            queuedAt: DateTime.now());
+    if (request != previous) await store.writeManualRequest(request);
+    try {
+      await work.manual(request.id);
+    } catch (_) {
+      await store.transitionManualRequest(request.id, ManualBackupPhase.failure,
+          message: 'Chưa đưa được yêu cầu sao lưu vào hàng đợi. Hãy thử lại.');
+      rethrow;
+    }
+    return request;
+  }, name: 'manual_backup_request.lock');
+}
+
+Future<void> recoverManualBackup(SharedPreferences prefs,
+    {required String directory, BackupWorkScheduler? scheduler}) async {
+  final work = _scheduler(scheduler);
+  if (work == null) return;
+  await withBackupAccess(directory, () async {
+    // Do not turn a just-completed request into a new user intent at startup.
+    final store = BackupStateStore(prefs);
+    final request = await store.readManualRequest();
+    if (request?.pending == true) {
+      try {
+        await work.manual(request!.id);
+      } catch (_) {
+        await store.transitionManualRequest(
+            request!.id, ManualBackupPhase.failure,
+            message:
+                'Chưa khôi phục được lịch sao lưu theo yêu cầu. Hãy thử lại.');
+        rethrow;
+      }
+    }
+  }, name: 'manual_backup_request.lock');
 }
 
 BackupWorkScheduler? _scheduler(BackupWorkScheduler? override) =>

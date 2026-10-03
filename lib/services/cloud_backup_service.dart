@@ -42,6 +42,7 @@ import 'vault_security_service.dart';
 import 'backup_capsule.dart';
 import 'backup_database_normalizer.dart' as backup_database;
 import 'backup_schedule.dart';
+import 'backup_access.dart';
 import 'backup_state.dart';
 import 'backup_crypto.dart';
 import 'backup_account_key.dart';
@@ -387,6 +388,23 @@ class CloudBackupService {
 
   /// Thực thi sao lưu và đồng bộ StateNotifier
   Future<CloudBackupItem> performBackup({bool silent = false}) async {
+    // Silent workers already hold this guard. Foreground safety backups use
+    // exactly the same coordination with restore and background workers.
+    if (!silent) {
+      final directory = await getApplicationDocumentsDirectory();
+      return withBackupAccess(directory.path, () async {
+        if (await File(p.join(directory.path, 'restore_recovery', 'pending'))
+            .exists()) {
+          throw StateError(
+              'Đang khôi phục dữ liệu. Hãy mở lại ứng dụng trước khi sao lưu.');
+        }
+        return _performBackup(silent: false);
+      });
+    }
+    return _performBackup(silent: true);
+  }
+
+  Future<CloudBackupItem> _performBackup({required bool silent}) async {
     if (_busy || _attempting) throw StateError('Một tác vụ sao lưu đang chạy');
     _silentAuth = silent;
     final notifier = _ref.read(cloudBackupNotifierProvider.notifier);
@@ -433,8 +451,9 @@ class CloudBackupService {
   }) async {
     if (_busy) throw StateError('Một tác vụ sao lưu đang chạy');
     _busy = true;
-    final progress = _ref.read(backupOperationProvider.notifier);
-    progress.state = 'Đang chuẩn bị bản sao lưu…';
+    final progress =
+        _silentAuth ? null : _ref.read(backupOperationProvider.notifier);
+    progress?.state = 'Đang chuẩn bị bản sao lưu…';
     Directory? tempDir;
     try {
       final session = await _getDriveSession();
@@ -484,21 +503,21 @@ class CloudBackupService {
       onProgress?.call(
           CloudBackupStatus.encrypting, 'Đang xác minh khóa sao lưu…', 0.35);
 
-      progress.state = 'Đang xác minh khóa sao lưu…';
+      progress?.state = 'Đang xác minh khóa sao lưu…';
       final accountId = session.accountId;
       final master =
           await AccountBackupKeys(accountId, DriveBackupKeyRemote(driveApi))
               .forBackup();
       onProgress?.call(CloudBackupStatus.encrypting,
           'Đang nén và mã hóa bản sao lưu…', 0.40);
-      progress.state = 'Đang nén và mã hóa bản sao lưu…';
+      progress?.state = 'Đang nén và mã hóa bản sao lưu…';
       final encryptedPath = await compute(packBackup, {
         'folder': tempDir.path,
         'master': master.bytes,
         'accountId': accountId
       });
       final finalEncryptedFile = File(encryptedPath);
-      progress.state = 'Đang tổng hợp thông tin bản sao lưu…';
+      progress?.state = 'Đang tổng hợp thông tin bản sao lưu…';
       onProgress?.call(CloudBackupStatus.encrypting,
           'Đang tổng hợp thông tin bản sao lưu…', 0.60);
 
@@ -535,7 +554,7 @@ class CloudBackupService {
         await finalEncryptedFile.length(),
       );
 
-      progress.state = 'Đang tải bản sao lưu lên Google Drive…';
+      progress?.state = 'Đang tải bản sao lưu lên Google Drive…';
       onProgress?.call(CloudBackupStatus.uploading,
           'Đang tải lên thư mục an toàn Google Drive...', 0.70);
       final uploadedFile = await driveApi.files.create(
@@ -561,7 +580,7 @@ class CloudBackupService {
       rethrow;
     } finally {
       _busy = false;
-      progress.state = null;
+      progress?.state = null;
       if (tempDir != null && tempDir.existsSync()) {
         try {
           tempDir.deleteSync(recursive: true);
@@ -714,7 +733,7 @@ class CloudBackupService {
     late Map<String, dynamic> beforeSecurity;
     late File mainFile;
     late Directory recovery;
-    RandomAccessFile? restoreGuard;
+    BackupAccessGuard? restoreGuard;
     var closed = false;
     var replacing = false;
     File? stagedFile;
@@ -734,9 +753,7 @@ class CloudBackupService {
         throw StateError(
             'Có lần khôi phục chưa hoàn tất. Hãy mở lại ứng dụng để phục hồi trước.');
       }
-      restoreGuard = await File(p.join(folder.path, 'restore_access.lock'))
-          .open(mode: FileMode.append);
-      await restoreGuard.lock(FileLock.blockingExclusive);
+      restoreGuard = await acquireBackupAccess(folder.path);
       if (reconciliation != null &&
           ledgerFingerprint(mainFile.path) != reconciliation.fingerprint) {
         throw StateError(

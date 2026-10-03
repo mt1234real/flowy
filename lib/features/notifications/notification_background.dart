@@ -6,6 +6,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../services/backup_schedule.dart';
 import '../../services/backup_state.dart';
+import '../../services/backup_access.dart';
+import '../../services/backup_worker.dart';
 import '../../services/cloud_backup_service.dart';
 import '../../theme/app_theme.dart';
 import 'package:flutter/widgets.dart';
@@ -22,52 +24,46 @@ void notificationBackgroundDispatcher() {
     WidgetsFlutterBinding.ensureInitialized();
     final prefs = await SharedPreferences.getInstance();
     await prefs.reload();
-    final backupTask = task == cloudBackupTask || task == cloudEntryBackupTask;
-    if (backupTask &&
-        !isBackupDue(prefs, entryTask: task == cloudEntryBackupTask)) {
-      return true;
-    }
-    try {
-      if (backupTask) await BackupStateStore(prefs).beginAttempt();
-      if (!(prefs.getBool('has_completed_onboarding') ?? false)) {
-        await NotificationPlatform.instance.initialize();
-        if (NotificationPlatform.instance.ready) {
-          await NotificationPlatform.instance.plugin.cancelAll();
-        }
-        return true;
-      }
-      final documents = await getApplicationDocumentsDirectory();
-      final guard = await File(p.join(documents.path, 'restore_access.lock'))
-          .open(mode: FileMode.append);
-      await guard.lock(FileLock.blockingExclusive);
-      if (await File(p.join(documents.path, 'restore_recovery', 'pending'))
-          .exists()) {
-        await guard.unlock();
-        await guard.close();
-        if (backupTask) {
-          final store = BackupStateStore(prefs);
-          await store.beginAttempt();
-          await store
-              .failure('Đang khôi phục dữ liệu. Sao lưu sẽ thử lại sau.');
-        }
-        return false;
-      }
-      final db = AppDatabase();
-      try {
-        if (backupTask) {
+    final documents = await getApplicationDocumentsDirectory();
+    Future<bool> restorePending() =>
+        File(p.join(documents.path, 'restore_recovery', 'pending')).exists();
+    if (isAnyBackupTask(task)) {
+      return runCloudBackupTask(
+        task: task,
+        requestId: input?['requestId'] as String?,
+        prefs: prefs,
+        withAccess: (action) => withBackupAccess(documents.path, action),
+        withRequestAccess: (action) => withBackupAccess(documents.path, action,
+            name: 'manual_backup_request.lock'),
+        restorePending: restorePending,
+        performBackup: ({required bool silent}) async {
+          final db = AppDatabase();
           final container = ProviderContainer(overrides: [
             sharedPreferencesProvider.overrideWithValue(prefs),
-            databaseProvider.overrideWithValue(db)
+            databaseProvider.overrideWithValue(db),
           ]);
           try {
             await container
                 .read(cloudBackupServiceProvider)
-                .performBackup(silent: true);
-            return true;
+                .performBackup(silent: silent);
           } finally {
             container.dispose();
+            await db.close();
           }
-        }
+        },
+      );
+    }
+    if (!(prefs.getBool('has_completed_onboarding') ?? false)) {
+      await NotificationPlatform.instance.initialize();
+      if (NotificationPlatform.instance.ready) {
+        await NotificationPlatform.instance.plugin.cancelAll();
+      }
+      return true;
+    }
+    return withBackupAccess(documents.path, () async {
+      if (await restorePending()) return false;
+      final db = AppDatabase();
+      try {
         final settings = NotificationPreferences(Map<String, dynamic>.from(
             jsonDecode(prefs.getString('notification_preferences_v1') ?? '{}')
                 as Map));
@@ -77,24 +73,13 @@ void notificationBackgroundDispatcher() {
         await NotificationCoordinator(db).refresh(settings, cycles,
             boundary: FiscalDayBoundary.fromPreferences(prefs));
         return true;
-      } catch (e) {
-        if (backupTask) {
-          await BackupStateStore(prefs).failure(backupFailureMessage(e));
-        }
-        debugPrint('Notification background refresh failed: $e');
+      } catch (_) {
+        debugPrint('Notification background refresh failed');
         return false;
       } finally {
         await db.close();
-        await guard.unlock();
-        await guard.close();
       }
-    } catch (error) {
-      if (backupTask) {
-        await BackupStateStore(prefs).failure(backupFailureMessage(error));
-        return false;
-      }
-      rethrow;
-    }
+    });
   });
 }
 
@@ -112,6 +97,15 @@ Future<void> startNotificationBackgroundRefresh() async {
     rethrow;
   }
   await recoverPendingBackup(prefs);
+  if (Platform.isAndroid) {
+    final documents = await getApplicationDocumentsDirectory();
+    try {
+      await recoverManualBackup(prefs, directory: documents.path);
+    } catch (_) {
+      await BackupStateStore(prefs).failure(
+          'Chưa khôi phục được lịch sao lưu theo yêu cầu. Hãy thử lại.');
+    }
+  }
   await Workmanager().registerPeriodicTask(
       notificationRefreshTask, notificationRefreshTask,
       frequency: const Duration(hours: 6),

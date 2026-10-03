@@ -44,6 +44,7 @@ import '../theme/app_theme.dart';
 import '../widgets/avatar_customization_sheet.dart';
 import '../widgets/cloud_cadence_modal.dart';
 import '../widgets/backup_status_details.dart';
+import '../widgets/manual_backup_action.dart';
 import '../widgets/restore_diff_modal.dart';
 import '../widgets/two_stage_overscroll_header.dart';
 import 'category_manager_screen.dart';
@@ -780,69 +781,56 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
                       Divider(height: 1, indent: 16, endIndent: 16, color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
 
-                      ListTile(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                        leading: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF10B981).withValues(alpha: 0.14),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Icon(Icons.cloud_upload_outlined, color: Color(0xFF10B981), size: 20),
-                        ),
-                        title: const Text('Sao lưu lên Cloud ngay bây giờ', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              latestBackup != null
-                                  ? 'Bản gần nhất: ${latestBackup.formattedDate} (${latestBackup.formattedSize})'
-                                  : 'Chưa có bản sao lưu trên đám mây',
-                              style: TextStyle(
-                                  fontSize: 11,
-                                  color: isDark
-                                      ? AppTokens.darkMuted
-                                      : AppTokens.lightMuted),
+                      ManualBackupAction(
+                        enabled: userProfile.isSignedIn &&
+                            backupState.status !=
+                                CloudBackupStatus.checkpointing &&
+                            backupState.status !=
+                                CloudBackupStatus.encrypting &&
+                            backupState.status != CloudBackupStatus.uploading,
+                        builder: (pending, enqueue) => ListTile(
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 4),
+                          leading: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF10B981)
+                                  .withValues(alpha: 0.14),
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                            const BackupStatusDetails()
-                          ],
+                            child: const Icon(Icons.cloud_upload_outlined,
+                                color: Color(0xFF10B981), size: 20),
+                          ),
+                          title: const Text('Sao lưu lên Cloud ngay bây giờ',
+                              style: TextStyle(
+                                  fontSize: 13, fontWeight: FontWeight.w700)),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                latestBackup != null
+                                    ? 'Bản gần nhất: ${latestBackup.formattedDate} (${latestBackup.formattedSize})'
+                                    : 'Chưa có bản sao lưu trên đám mây',
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    color: isDark
+                                        ? AppTokens.darkMuted
+                                        : AppTokens.lightMuted),
+                              ),
+                              const BackupStatusDetails()
+                            ],
+                          ),
+                          trailing: pending
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child:
+                                      CircularProgressIndicator(strokeWidth: 2))
+                              : const Icon(Icons.play_circle_outline_rounded),
+                          onTap: enqueue,
                         ),
-                        trailing: (backupState.status == CloudBackupStatus.checkpointing ||
-                            backupState.status == CloudBackupStatus.encrypting ||
-                            backupState.status == CloudBackupStatus.uploading)
-                            ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                            : const Icon(Icons.play_circle_outline_rounded),
-                        onTap: (!userProfile.isSignedIn ||
-                            backupState.status == CloudBackupStatus.checkpointing ||
-                            backupState.status == CloudBackupStatus.encrypting ||
-                            backupState.status == CloudBackupStatus.uploading)
-                            ? null
-                            : () async {
-                          HapticFeedback.mediumImpact();
-                          try {
-                            await ref.read(cloudBackupNotifierProvider.notifier).performBackup();
-                            if (context.mounted) {
-                              AppFeedback.showSuccess(
-                                context,
-                                '✓ Đã sao lưu mã hóa AES-GCM lên Google Drive thành công!',
-                              );
-                            }
-                          } catch (e) {
-                            if (context.mounted) {
-                              AppFeedback.showError(
-                                context,
-                                'Lỗi sao lưu Google Drive: $e',
-                              );
-                            }
-                          }
-                        },
                       ),
-
                       Divider(height: 1, indent: 16, endIndent: 16, color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
 
                       ListTile(

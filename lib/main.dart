@@ -27,6 +27,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:path_provider/path_provider.dart';
 import 'services/backup_capsule.dart';
+import 'services/backup_access.dart';
 import 'services/backup_change_observer.dart';
 import 'data/database.dart';
 import 'data/database_seeder.dart';
@@ -71,10 +72,7 @@ Future<void> main() async {
   final documents = await getApplicationDocumentsDirectory();
   if (await File(p.join(documents.path, 'restore_recovery', 'pending'))
       .exists()) {
-    final recoveryGuard =
-        await File(p.join(documents.path, 'restore_access.lock'))
-            .open(mode: FileMode.append);
-    await recoveryGuard.lock(FileLock.blockingExclusive);
+    final recoveryGuard = await acquireBackupAccess(documents.path);
     try {
       await recoverInterruptedRestore(documents.path, prefs);
     } finally {
