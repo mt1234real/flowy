@@ -44,13 +44,39 @@ class _Remote implements BackupKeyRemote {
   final records = <String, String>{};
   final referenced = <String>{};
   int creates = 0;
+  int lists = 0, reads = 0, historyScans = 0;
+  final readIds = <String>[];
+  bool failRead = false;
   bool competingCreation = false;
   @override
-  Future<List<String>> listRecords() async => records.keys.toList();
+  Future<List<String>> listRecords() async {
+    lists++;
+    return records.keys.toList();
+  }
+
   @override
-  Future<String> readRecord(String fileId) async => records[fileId]!;
+  Future<String> readRecord(String fileId) async {
+    reads++;
+    readIds.add(fileId);
+    if (failRead) throw StateError('Network unavailable');
+    final record = records[fileId];
+    if (record == null) {
+      throw const BackupCryptoFailure(BackupCryptoError.missingKey);
+    }
+    return record;
+  }
+
   @override
-  Future<Set<String>> referencedKeyIds() async => referenced;
+  Future<Set<String>> referencedKeyIds() async {
+    historyScans++;
+    return referenced;
+  }
+
+  void resetCounts() {
+    lists = reads = historyScans = creates = 0;
+    readIds.clear();
+  }
+
   @override
   Future<String> createRecord(BackupMasterKey key) async {
     creates++;
@@ -112,6 +138,13 @@ class _Files implements drive.FilesResource {
   final contents = <String, List<int>>{};
   bool failBackupUpload = false;
   int serial = 0;
+  int keyLists = 0, historyLists = 0, keyGets = 0, backupGets = 0;
+  final mediaIds = <String>[];
+  void resetCounts() {
+    keyLists = historyLists = keyGets = backupGets = 0;
+    mediaIds.clear();
+  }
+
   String add(String name, List<int> bytes, {Map<String, String>? properties}) {
     final id = 'file-${serial++}';
     metadata[id] = drive.File()
@@ -136,6 +169,11 @@ class _Files implements drive.FilesResource {
     expect(call.namedArguments[#spaces], 'appDataFolder');
     final query = call.namedArguments[#q] as String;
     final keyQuery = query.contains('flowy_backup_key_');
+    if (keyQuery) {
+      keyLists++;
+    } else {
+      historyLists++;
+    }
     final matches = metadata.values
         .where((f) => f.name!
             .startsWith(keyQuery ? 'flowy_backup_key_' : 'pfm_vault_backup_'))
@@ -150,9 +188,19 @@ class _Files implements drive.FilesResource {
 
   Future<Object> _get(Invocation call) async {
     final id = call.positionalArguments.single as String;
+    final meta = metadata[id];
+    if (meta == null) {
+      throw drive.DetailedApiRequestError(404, 'File not found');
+    }
     if (call.namedArguments[#downloadOptions] !=
         drive.DownloadOptions.fullMedia) {
-      return metadata[id]!;
+      return meta;
+    }
+    mediaIds.add(id);
+    if (meta.name!.startsWith('flowy_backup_key_')) {
+      keyGets++;
+    } else {
+      backupGets++;
     }
     final bytes = contents[id]!;
     return drive.Media(Stream.value(bytes), bytes.length);
@@ -376,6 +424,264 @@ void main() {
     });
   });
 
+  group('Steady-state key resolution', () {
+    const secure = FlutterSecureStorage();
+    String activeSlot(String account) =>
+        'flowy_backup_v2_key_${sha256.convert(utf8.encode(account))}_active';
+    Future<Map<String, dynamic>> activeData(String account) async =>
+        jsonDecode((await secure.read(key: activeSlot(account)))!)
+            as Map<String, dynamic>;
+    late _Remote remote;
+    setUp(() => remote = _Remote());
+
+    test('existingKey_firstInitialization_canUseDiscoveryPath', () async {
+      final key = BackupMasterKey.generate();
+      remote.records['immutable-file'] = key.encodeRecord();
+      remote.referenced.add(key.id);
+      expect((await AccountBackupKeys('A', remote).forBackup()).id, key.id);
+      expect(remote.lists, 1);
+      expect(remote.reads, 1);
+      expect(remote.historyScans, 1);
+      expect(remote.creates, 0);
+      final cached = await activeData('A');
+      expect(cached['fileId'], 'immutable-file');
+      expect(cached['generation'], key.id);
+      expect(
+          BackupMasterKey.decodeRecord(cached['record'] as String).id, key.id);
+    });
+
+    test('existingKey_secondBackup_remoteCallsAreO1_withoutHistoricalScan',
+        () async {
+      final first = await AccountBackupKeys('A', remote).forBackup();
+      remote.resetCounts();
+      // A new resolver instance models the absence of a completed in-memory cache.
+      final second = await AccountBackupKeys('A', remote).forBackup();
+      expect(second.id, first.id);
+      expect(remote.readIds, [first.id]);
+      expect(remote.reads, 1);
+      expect(remote.lists, 0);
+      expect(remote.historyScans, 0);
+      expect(remote.creates, 0);
+    });
+
+    test('cachedKey_wrongAccount_isNeverUsed', () async {
+      final a = await AccountBackupKeys('A', remote).forBackup();
+      final other = _Remote();
+      // Even an A entry misplaced under B's slot must not address A's locator.
+      await secure.write(
+          key: activeSlot('B'), value: await secure.read(key: activeSlot('A')));
+      final b = await AccountBackupKeys('B', other).forBackup();
+      expect(b.id, isNot(a.id));
+      expect(other.readIds, isNot(contains(a.id)));
+      expect(other.historyScans, 1);
+      remote.resetCounts();
+      expect((await AccountBackupKeys('A', remote).forBackup()).id, a.id);
+      expect(remote.reads, 1);
+      expect(remote.historyScans, 0);
+    });
+
+    for (final corruption in ['json', 'locator', 'generation', 'record']) {
+      test('invalid local $corruption cache uses full safe discovery',
+          () async {
+        final key = await AccountBackupKeys('A', remote).forBackup();
+        final cached = await activeData('A');
+        if (corruption == 'locator') cached.remove('fileId');
+        if (corruption == 'generation') cached['generation'] = 'wrong';
+        if (corruption == 'record') cached['record'] = 'invalid';
+        await secure.write(
+            key: activeSlot('A'),
+            value: corruption == 'json' ? 'invalid' : jsonEncode(cached));
+        remote.resetCounts();
+        expect((await AccountBackupKeys('A', remote).forBackup()).id, key.id);
+        expect(remote.lists, 1);
+        expect(remote.historyScans, 1);
+        expect(remote.creates, 0);
+      });
+    }
+
+    test('old generation-only secure cache upgrades through safe discovery',
+        () async {
+      final key = BackupMasterKey.generate();
+      remote.records['old-file'] = key.encodeRecord();
+      await secure.write(
+          key:
+              'flowy_backup_v2_key_${sha256.convert(utf8.encode('A'))}_${key.id}',
+          value: key.encodeRecord());
+      expect((await AccountBackupKeys('A', remote).forBackup()).id, key.id);
+      expect(remote.historyScans, 1);
+      expect((await activeData('A'))['fileId'], 'old-file');
+    });
+
+    test('currentGenerationMissing_neverSilentlyCreatesOrSelectsReplacement',
+        () async {
+      final key = await AccountBackupKeys('A', remote).forBackup();
+      remote.records.remove(key.id);
+      final other = BackupMasterKey.generate();
+      remote.records['other-file'] = other.encodeRecord();
+      remote.referenced.add(key.id);
+      remote.resetCounts();
+      await expectLater(AccountBackupKeys('A', remote).forBackup(),
+          throwsA(_error(BackupCryptoError.missingKey)));
+      expect(remote.readIds, [key.id]);
+      expect(remote.lists, 0);
+      expect(remote.historyScans, 0);
+      expect(remote.creates, 0);
+      expect((await activeData('A'))['generation'], key.id);
+    });
+
+    for (final corruption in ['malformed', 'different generation']) {
+      test('cachedRemoteRecord $corruption fails without fallback', () async {
+        final key = await AccountBackupKeys('A', remote).forBackup();
+        remote.records[key.id] = corruption == 'malformed'
+            ? 'not json'
+            : BackupMasterKey.generate().encodeRecord();
+        remote.resetCounts();
+        await expectLater(AccountBackupKeys('A', remote).forBackup(),
+            throwsA(_error(BackupCryptoError.corruptKey)));
+        expect(remote.reads, 1);
+        expect(remote.lists, 0);
+        expect(remote.historyScans, 0);
+        expect(remote.creates, 0);
+      });
+    }
+
+    test(
+        'remote network failure cannot use cached bytes or acknowledge revision',
+        () async {
+      await AccountBackupKeys('A', remote).forBackup();
+      remote.failRead = true;
+      final prefs = await SharedPreferences.getInstance();
+      final store = BackupStateStore(prefs);
+      await store.markDirty();
+      await prefs.setString(backupUploadedRevisionKey, 'previous-receipt');
+      await prefs.setString(backupLastSuccessKey, '2026-09-01T00:00:00.000');
+      final before = await store.read();
+      var uploaded = false;
+      await expectLater(
+          runBackupAttempt(store, () async {
+            await AccountBackupKeys('A', remote).forBackup();
+            uploaded = true;
+            return DateTime.now();
+          }, uploadedAt: (value) => value),
+          throwsStateError);
+      final after = await store.read();
+      expect(uploaded, isFalse);
+      expect(after.revision, before.revision);
+      expect(after.uploadedRevision, before.uploadedRevision);
+      expect(after.lastSuccess, before.lastSuccess);
+      expect(after.dirty, isTrue);
+      expect(after.lastAttempt, isNotNull);
+      expect(after.lastFailure, isNotNull);
+    });
+
+    test('freshAccount_noKey_noV2References_createsAndVerifiesOnce', () async {
+      final key = await AccountBackupKeys('A', remote).forBackup();
+      expect(remote.historyScans, 1);
+      expect(remote.creates, 1);
+      expect(remote.readIds, [key.id, key.id]);
+      expect((await activeData('A'))['generation'], key.id);
+    });
+
+    test('freshAccount_existingV2MissingKey_failsClosed', () async {
+      remote.referenced.add(BackupMasterKey.generate().id);
+      await expectLater(AccountBackupKeys('A', remote).forBackup(),
+          throwsA(_error(BackupCryptoError.missingKey)));
+      expect(remote.historyScans, 1);
+      expect(remote.creates, 0);
+      expect(await secure.read(key: activeSlot('A')), isNull);
+    });
+
+    test('restore_exactGeneration_doesNotChangeActiveWriteGeneration',
+        () async {
+      final active = await AccountBackupKeys('A', remote).forBackup();
+      final older = BackupMasterKey.generate();
+      remote.records['older-file'] = older.encodeRecord();
+      expect((await AccountBackupKeys('A', remote).forRestore(older.id)).id,
+          older.id);
+      remote.resetCounts();
+      expect((await AccountBackupKeys('A', remote).forBackup()).id, active.id);
+      expect(remote.readIds, [active.id]);
+      remote.records.remove('older-file');
+      await expectLater(AccountBackupKeys('A', remote).forRestore(older.id),
+          throwsA(_error(BackupCryptoError.missingKey)));
+    });
+
+    test('nonCurrentMissingGeneration_checkedDuringDiscovery_notOrdinaryWrite',
+        () async {
+      final active = await AccountBackupKeys('A', remote).forBackup();
+      remote.referenced.add(BackupMasterKey.generate().id);
+      remote.resetCounts();
+      expect((await AccountBackupKeys('A', remote).forBackup()).id, active.id);
+      expect(remote.reads, 1);
+      expect(remote.historyScans, 0);
+      await clearBackupKeyCache();
+      await expectLater(AccountBackupKeys('A', remote).forBackup(),
+          throwsA(_error(BackupCryptoError.missingKey)));
+      expect(remote.historyScans, 1);
+      expect(remote.creates, 0);
+    });
+
+    test('concurrentFastPath_sharesOneVerification_noNewGeneration', () async {
+      final first = await AccountBackupKeys('A', remote).forBackup();
+      remote.resetCounts();
+      final keys = await Future.wait(
+          List.generate(12, (_) => AccountBackupKeys('A', remote).forBackup()));
+      expect(keys.map((k) => k.id).toSet(), {first.id});
+      expect(remote.reads, 1);
+      expect(remote.lists, 0);
+      expect(remote.historyScans, 0);
+      expect(remote.creates, 0);
+    });
+
+    for (final legacyCount in [0, 4, 40]) {
+      test(
+          'Drive adapter: $legacyCount legacy backups do not increase warm calls',
+          () async {
+        final api = _Drive();
+        final remote = DriveBackupKeyRemote(api);
+        for (var i = 0; i < legacyCount; i++) {
+          api.files.add(
+              'pfm_vault_backup_legacy_$i.enc', _legacyFixture([1, 2], 'A'));
+        }
+        final key = await AccountBackupKeys('A', remote).forBackup();
+        expect(api.files.backupGets, legacyCount);
+        final cached = await activeData('A');
+        // Extra generations also must not increase steady-state enumeration.
+        for (var i = 0; i < 3; i++) {
+          final other = BackupMasterKey.generate();
+          api.files.add('flowy_backup_key_v1_${other.id}.json',
+              utf8.encode(other.encodeRecord()));
+        }
+        api.files.resetCounts();
+        expect((await AccountBackupKeys('A', remote).forBackup()).id, key.id);
+        expect(api.files.mediaIds, [cached['fileId']]);
+        expect(api.files.keyGets, 1);
+        expect(api.files.keyLists, 0);
+        expect(api.files.historyLists, 0);
+        expect(api.files.backupGets, 0);
+      });
+    }
+
+    test('Drive adapter: cached locator 404 fails even if other keys exist',
+        () async {
+      final api = _Drive();
+      final remote = DriveBackupKeyRemote(api);
+      await AccountBackupKeys('A', remote).forBackup();
+      final cached = await activeData('A');
+      api.files.metadata.remove(cached['fileId']);
+      final other = BackupMasterKey.generate();
+      api.files.add('flowy_backup_key_v1_${other.id}.json',
+          utf8.encode(other.encodeRecord()));
+      final before = api.files.metadata.length;
+      api.files.resetCounts();
+      await expectLater(AccountBackupKeys('A', remote).forBackup(),
+          throwsA(_error(BackupCryptoError.missingKey)));
+      expect(api.files.keyLists, 0);
+      expect(api.files.historyLists, 0);
+      expect(api.files.metadata.length, before);
+    });
+  });
+
   group('Production backup/restore integration', () {
     late Directory root, docs, cache;
     late File live;
@@ -499,6 +805,76 @@ void main() {
         expect(api.files.metadata, hasLength(2));
       });
     }
+    for (final failure in ['missing', 'corrupt', 'mismatch']) {
+      test('warm $failure key failure cannot upload or acknowledge changes',
+          () async {
+        final service = container.read(cloudBackupServiceProvider);
+        final store = BackupStateStore(prefs);
+        await store.markDirty();
+        await service.performBackup(silent: true);
+        final keyFile = api.files.metadata.values
+            .singleWhere((f) => f.name!.startsWith('flowy_backup_key_'));
+        if (failure == 'missing') {
+          api.files.metadata.remove(keyFile.id);
+        } else {
+          api.files.contents[keyFile.id!] = failure == 'corrupt'
+              ? utf8.encode('invalid')
+              : utf8.encode(BackupMasterKey.generate().encodeRecord());
+        }
+        await store.markDirty();
+        final before = await store.read();
+        final filesBefore = api.files.metadata.length;
+        api.files.resetCounts();
+        await expectLater(service.performBackup(silent: true),
+            throwsA(isA<BackupCryptoFailure>()));
+        final after = await store.read();
+        expect(after.revision, before.revision);
+        expect(after.uploadedRevision, before.uploadedRevision);
+        expect(after.lastSuccess, before.lastSuccess);
+        expect(after.dirty, isTrue);
+        expect(after.lastAttempt, isNotNull);
+        expect(after.lastFailure, isNotNull);
+        expect(api.files.metadata.length, filesBefore);
+        expect(api.files.keyLists, 0);
+        expect(api.files.historyLists, 0);
+        expect(await cache.list().length, 0);
+      });
+    }
+
+    test('progress verifies remote key before packing and labels upload last',
+        () async {
+      final stages = <String>[];
+      await container.read(cloudBackupServiceProvider).createBackup(
+          onProgress: (status, message, _) {
+        stages.add(message);
+        if (message == 'Đang xác minh khóa sao lưu…') {
+          expect(api.files.keyGets, 0);
+        }
+        if (message == 'Đang nén và mã hóa bản sao lưu…') {
+          expect(api.files.keyGets, greaterThan(0));
+          expect(
+              api.files.metadata.values
+                  .where((f) => f.name!.startsWith('pfm_vault_backup_')),
+              isEmpty);
+        }
+        if (status == CloudBackupStatus.uploading) {
+          expect(stages.last, 'Đang tải lên thư mục an toàn Google Drive...');
+          expect(
+              api.files.metadata.values
+                  .where((f) => f.name!.startsWith('pfm_vault_backup_')),
+              isEmpty);
+        }
+      });
+      expect(stages, [
+        'Đang đồng bộ sổ cái CSDL...',
+        'Đang xác minh khóa sao lưu…',
+        'Đang nén và mã hóa bản sao lưu…',
+        'Đang tổng hợp thông tin bản sao lưu…',
+        'Đang tải lên thư mục an toàn Google Drive...',
+        'Sao lưu thành công lên Google Drive!',
+      ]);
+    });
+
     test(
         'background key failure keeps dirty, attempt/failure visible, success unchanged',
         () async {

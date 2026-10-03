@@ -13,6 +13,8 @@ const _storage = FlutterSecureStorage(
     aOptions: AndroidOptions(encryptedSharedPreferences: true),
     iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock));
 
+typedef _LocatedBackupKey = ({BackupMasterKey key, String fileId});
+
 Future<void> clearBackupKeyCache() async {
   for (final key in (await _storage.readAll()).keys.toList()) {
     if (key.startsWith(_cachePrefix)) await _storage.delete(key: key);
@@ -36,35 +38,69 @@ class AccountBackupKeys {
   static final Map<String, Future<BackupMasterKey>> _initializing = {};
   AccountBackupKeys(this.accountId, this.remote, {this.storage = _storage});
 
-  Future<Map<String, BackupMasterKey>> _records() async {
-    final result = <String, BackupMasterKey>{};
+  String get _namespace =>
+      sha256.convert(utf8.encode(accountId.trim())).toString();
+  String get _activeCacheKey => '$_cachePrefix${_namespace}_active';
+
+  Future<Map<String, _LocatedBackupKey>> _records() async {
+    final result = <String, _LocatedBackupKey>{};
     for (final file in await remote.listRecords()) {
       final key = BackupMasterKey.decodeRecord(await remote.readRecord(file));
-      result[key.id] = key;
+      result[key.id] = (key: key, fileId: file);
     }
     return result;
   }
 
   Future<BackupMasterKey> _cache(BackupMasterKey key) async {
-    final namespace = sha256.convert(utf8.encode(accountId.trim()));
     await storage.write(
-        key: '$_cachePrefix${namespace}_${key.id}', value: key.encodeRecord());
+        key: '$_cachePrefix${_namespace}_${key.id}', value: key.encodeRecord());
     return key;
   }
 
+  Future<BackupMasterKey> _cacheActive(_LocatedBackupKey located) async {
+    await storage.write(
+        key: _activeCacheKey,
+        value: jsonEncode({
+          'version': 1,
+          'namespace': _namespace,
+          'generation': located.key.id,
+          'fileId': located.fileId,
+          'record': located.key.encodeRecord(),
+        }));
+    return located.key;
+  }
+
+  Future<_LocatedBackupKey?> _readActive() async {
+    final stored = await storage.read(key: _activeCacheKey);
+    if (stored == null) return null;
+    // Old generation-only caches, malformed entries and wrong-account entries
+    // require full safe discovery. Never use unverified local key material.
+    try {
+      if (stored.length > 8192) return null;
+      final data = jsonDecode(stored) as Map<String, dynamic>;
+      if (data['version'] != 1 || data['namespace'] != _namespace) return null;
+      final key = BackupMasterKey.decodeRecord(data['record'] as String);
+      final fileId = data['fileId'] as String;
+      if (key.id != data['generation'] || fileId.trim().isEmpty) return null;
+      return (key: key, fileId: fileId);
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<BackupMasterKey> forRestore(String id) async {
-    final key = (await _records())[id];
-    if (key == null) {
+    final located = (await _records())[id];
+    if (located == null) {
       throw const BackupCryptoFailure(BackupCryptoError.missingKey);
     }
     // Always verify portable material, even if this device has a cached copy.
-    return _cache(key);
+    return _cache(located.key);
   }
 
   Future<BackupMasterKey> forBackup() async {
     final existing = _initializing[accountId];
     if (existing != null) return existing;
-    final future = _initialize();
+    final future = _resolveForBackup();
     _initializing[accountId] = future;
     try {
       return await future;
@@ -75,7 +111,23 @@ class AccountBackupKeys {
     }
   }
 
-  Future<BackupMasterKey> _initialize() async {
+  Future<BackupMasterKey> _resolveForBackup() async {
+    final active = await _readActive();
+    if (active == null) return _discoverWithHistoricalIntegrity();
+
+    // One exact remote GET per ordinary backup. A missing/corrupt/mismatched
+    // current record must fail, not select another generation or create a key.
+    final verified =
+        BackupMasterKey.decodeRecord(await remote.readRecord(active.fileId));
+    if (verified.id != active.key.id) {
+      throw const BackupCryptoFailure(BackupCryptoError.corruptKey);
+    }
+    return verified;
+  }
+
+  // Full historical integrity is retained for cache misses/recovery and before
+  // first creation. Steady-state writes verify only the generation they use.
+  Future<BackupMasterKey> _discoverWithHistoricalIntegrity() async {
     var keys = await _records();
     final required = await remote.referencedKeyIds();
     if (required.any((id) => !keys.containsKey(id))) {
@@ -95,7 +147,7 @@ class AccountBackupKeys {
       }
     }
     final ids = keys.keys.toList()..sort();
-    return _cache(keys[ids.first]!);
+    return _cacheActive(keys[ids.first]!);
   }
 }
 
@@ -127,8 +179,16 @@ class DriveBackupKeyRemote implements BackupKeyRemote {
 
   @override
   Future<String> readRecord(String fileId) async {
-    final media = await api.files.get(fileId,
-        downloadOptions: drive.DownloadOptions.fullMedia) as drive.Media;
+    final drive.Media media;
+    try {
+      media = await api.files.get(fileId,
+          downloadOptions: drive.DownloadOptions.fullMedia) as drive.Media;
+    } on drive.DetailedApiRequestError catch (error) {
+      if (error.status == 404) {
+        throw const BackupCryptoFailure(BackupCryptoError.missingKey);
+      }
+      rethrow;
+    }
     final bytes = <int>[];
     await for (final chunk in media.stream) {
       if (bytes.length + chunk.length > 4096) {

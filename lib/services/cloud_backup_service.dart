@@ -481,24 +481,26 @@ class CloudBackupService {
             .writeAsString(jsonEncode(entry.value), flush: true);
       }
 
-      onProgress?.call(CloudBackupStatus.encrypting,
-          'Đang nén và mã hóa AES-GCM 256-bit...', 0.40);
+      onProgress?.call(
+          CloudBackupStatus.encrypting, 'Đang xác minh khóa sao lưu…', 0.35);
 
-      progress.state = 'Đang nén và mã hóa bản sao lưu…';
+      progress.state = 'Đang xác minh khóa sao lưu…';
       final accountId = session.accountId;
       final master =
           await AccountBackupKeys(accountId, DriveBackupKeyRemote(driveApi))
               .forBackup();
+      onProgress?.call(CloudBackupStatus.encrypting,
+          'Đang nén và mã hóa bản sao lưu…', 0.40);
+      progress.state = 'Đang nén và mã hóa bản sao lưu…';
       final encryptedPath = await compute(packBackup, {
         'folder': tempDir.path,
         'master': master.bytes,
         'accountId': accountId
       });
       final finalEncryptedFile = File(encryptedPath);
-      progress.state = 'Đang tải bản sao lưu lên Google Drive…';
-
-      onProgress?.call(CloudBackupStatus.uploading,
-          'Đang tải lên thư mục an toàn Google Drive...', 0.70);
+      progress.state = 'Đang tổng hợp thông tin bản sao lưu…';
+      onProgress?.call(CloudBackupStatus.encrypting,
+          'Đang tổng hợp thông tin bản sao lưu…', 0.60);
 
       // 3. Tải lên Google Drive AppData
       final statistics = await compute(backupStatistics, tempDbCopy.path);
@@ -533,6 +535,9 @@ class CloudBackupService {
         await finalEncryptedFile.length(),
       );
 
+      progress.state = 'Đang tải bản sao lưu lên Google Drive…';
+      onProgress?.call(CloudBackupStatus.uploading,
+          'Đang tải lên thư mục an toàn Google Drive...', 0.70);
       final uploadedFile = await driveApi.files.create(
         driveFile,
         uploadMedia: media,
