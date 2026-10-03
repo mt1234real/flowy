@@ -161,6 +161,7 @@ class _NumpadKeyState extends State<_NumpadKey>
 
 class QuickEntrySheet extends ConsumerStatefulWidget {
   final Transaction? initialTransaction;
+  final DebtTransaction? initialDebtTransaction;
   final DateTime? initialContextDate;
   final DebtContact? prefilledDebtContact;
   final double? prefilledAmount;
@@ -171,6 +172,7 @@ class QuickEntrySheet extends ConsumerStatefulWidget {
   const QuickEntrySheet._({
     super.key,
     this.initialTransaction,
+    this.initialDebtTransaction,
     this.initialContextDate,
     this.prefilledDebtContact,
     this.prefilledAmount,
@@ -182,12 +184,16 @@ class QuickEntrySheet extends ConsumerStatefulWidget {
   static Future<void> show(
       BuildContext context, {
         Transaction? initialTransaction,
+        DebtTransaction? initialDebtTransaction,
         DateTime? initialContextDate,
         DebtContact? prefilledDebtContact,
         double? prefilledAmount,
         String? prefilledDebtType,
         double? prefilledDailySafe,
       }) {
+    if (initialTransaction != null && initialDebtTransaction != null) {
+      throw ArgumentError('Chỉ có thể chỉnh sửa một giao dịch mỗi lần');
+    }
     HapticFeedback.selectionClick();
     return AppAnimationPolicy.showFluidSheet(
       context: context,
@@ -196,6 +202,7 @@ class QuickEntrySheet extends ConsumerStatefulWidget {
       isDismissible: true,
       builder: (sheetContext, scrollController) => QuickEntrySheet._(
         initialTransaction: initialTransaction,
+        initialDebtTransaction: initialDebtTransaction,
         initialContextDate: initialContextDate,
         prefilledDebtContact: prefilledDebtContact,
         prefilledAmount: prefilledAmount,
@@ -221,6 +228,8 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
   Category? _selectedCategory;
   Wallet? _selectedWallet;
   bool _isSubmitting = false;
+  bool _isLoadingInitialEntities = false;
+  bool _initialDebtLoadFailed = false;
 
   String _debtActionType = 'LEND';
   DebtContact? _selectedDebtContact;
@@ -248,16 +257,27 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
   late final Animation<double> _checkScaleAnimation;
   bool _isSuccessMorphed = false;
 
-  bool get _isEditMode => widget.initialTransaction != null;
+  bool get _isEditMode =>
+      widget.initialTransaction != null || widget.initialDebtTransaction != null;
 
   @override
   void initState() {
     super.initState();
     final tx = widget.initialTransaction;
+    final debtTx = widget.initialDebtTransaction;
 
     _contactSearchController = TextEditingController();
 
-    if (tx != null) {
+    if (debtTx != null) {
+      _activeTab = CategoryType.debt;
+      _debtActionType = debtTx.type;
+      _expression = debtTx.amount.toStringAsFixed(0);
+      _noteController = TextEditingController(text: debtTx.note ?? '');
+      _selectedDate = debtTx.date;
+      _debtDueDate = debtTx.dueDate;
+      _isLoadingInitialEntities = true;
+      _loadInitialDebtEntities(debtTx);
+    } else if (tx != null) {
       _activeTab = tx.type;
       _expression = tx.amount.toStringAsFixed(0);
       _noteController =
@@ -265,7 +285,8 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
       _selectedDate = tx.date;
       _isAmortized = tx.note?.contains('#amortized') ?? false;
       _loadInitialEntities(tx);
-    } else if (widget.prefilledDebtContact != null) {
+    } else if (widget.prefilledDebtContact != null ||
+        widget.prefilledDebtType != null) {
       _activeTab = CategoryType.debt;
       _selectedDebtContact = widget.prefilledDebtContact;
       _debtActionType = widget.prefilledDebtType ?? 'LEND';
@@ -378,6 +399,36 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
         .get();
     if (wallets.isNotEmpty && mounted) {
       setState(() => _selectedWallet = wallets.first);
+    }
+  }
+
+  Future<void> _loadInitialDebtEntities(DebtTransaction tx) async {
+    final db = ref.read(databaseProvider);
+    try {
+      final contact = await (db.select(
+        db.debtContacts,
+      )..where((c) => c.id.equals(tx.contactId))).getSingleOrNull();
+      final wallet = await (db.select(
+        db.wallets,
+      )..where((w) => w.id.equals(tx.walletId))).getSingleOrNull();
+      if (contact == null || wallet == null) {
+        throw StateError('Không tìm thấy ví hoặc đối tác của khoản nợ');
+      }
+      if (!mounted) return;
+      setState(() {
+        _selectedDebtContact = contact;
+        _selectedWallet = wallet;
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(() => _initialDebtLoadFailed = true);
+        AppFeedback.showInfo(
+          context,
+          'Chưa tải được khoản nợ. Hãy mở lại giao dịch.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoadingInitialEntities = false);
     }
   }
 
@@ -728,41 +779,66 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
   }
 
   Future<void> _confirmDeleteTransaction() async {
-    final confirmed = await AppAnimationPolicy.showPreservedDialog<bool>(
-      context: context,
-      barrierDismissible: true,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Xác nhận xóa'),
-        content: const Text(
-          'Bạn có chắc chắn muốn xóa giao dịch này? Số dư ví sẽ được hoàn lại tương ứng.',
+    if (_isSubmitting || _isLoadingInitialEntities || _isSuccessMorphed ||
+        _initialDebtLoadFailed) {
+      return;
+    }
+    setState(() => _isSubmitting = true);
+    try {
+      final confirmed = await AppAnimationPolicy.showPreservedDialog<bool>(
+        context: context,
+        barrierDismissible: true,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Xác nhận xóa'),
+          content: Text(
+            widget.initialDebtTransaction != null
+                ? 'Bạn có chắc chắn muốn xóa giao dịch này? Số dư ví và dư nợ đối tác sẽ được hoàn lại tương ứng.'
+                : 'Bạn có chắc chắn muốn xóa giao dịch này? Số dư ví sẽ được hoàn lại tương ứng.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('HỦY BỎ'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTokens.expense,
+              ),
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('XÓA', style: TextStyle(color: Colors.white)),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('HỦY BỎ'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppTokens.expense),
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('XÓA', style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true && mounted) {
-      final db = ref.read(databaseProvider);
-      await db
-          .deleteTransactionWithBalanceReversal(widget.initialTransaction!.id);
-      HapticFeedback.mediumImpact();
-
-      if (!mounted) return;
-
-      AppFeedback.showSuccess(
-        context,
-        'Đã xóa giao dịch thành công',
       );
-      Navigator.of(context).pop();
+
+      if (confirmed == true && mounted) {
+        final db = ref.read(databaseProvider);
+        final debtTx = widget.initialDebtTransaction;
+        if (debtTx != null) {
+          await db.deleteDebtTransactionWithSafetyCheck(debtTx.id);
+        } else {
+          await db.deleteTransactionWithBalanceReversal(
+            widget.initialTransaction!.id,
+          );
+        }
+        HapticFeedback.mediumImpact();
+
+        if (!mounted) return;
+
+        AppFeedback.showSuccess(context, 'Đã xóa giao dịch thành công');
+        Navigator.of(context).pop();
+      }
+    } catch (e) {
+      if (mounted) {
+        AppFeedback.showInfo(
+          context,
+          e is StateError
+              ? e.message.toString()
+              : 'Không thể xóa giao dịch. Vui lòng thử lại.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
     }
   }
 
@@ -777,16 +853,37 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
   }
 
   Future<void> _submitTransaction() async {
-    if (_isSubmitting || _isSuccessMorphed) return;
+    if (_isSubmitting ||
+        _isSuccessMorphed ||
+        _isLoadingInitialEntities ||
+        _initialDebtLoadFailed) {
+      return;
+    }
+    setState(() => _isSubmitting = true);
+    try {
+      await _persistTransaction();
+    } catch (_) {
+      if (mounted) {
+        AppFeedback.showError(
+          context,
+          'Không thể tải dữ liệu để lưu giao dịch. Vui lòng thử lại.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
 
+  Future<void> _persistTransaction() async {
     final double amount = _evaluateExpression();
-    if (amount <= 0) return;
+    if (!amount.isFinite || amount <= 0) return;
 
     final db = ref.read(databaseProvider);
     final activeWallets = await (db.select(db.wallets)
       ..where((w) => w.isArchived.equals(false)))
         .get();
-    if (activeWallets.isEmpty) {
+    if (!mounted) return;
+    if (activeWallets.isEmpty && _selectedWallet == null) {
       if (!mounted) return;
       AppFeedback.showInfo(
         context,
@@ -810,7 +907,22 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
       setState(() => _isSubmitting = true);
 
       try {
-        if (_isEditMode) {
+        final debtTx = widget.initialDebtTransaction;
+        if (debtTx != null) {
+          await db.updateDebtTransaction(
+            newTx: debtTx.copyWith(
+              contactId: _selectedDebtContact!.id,
+              walletId: targetWalletId,
+              type: _debtActionType,
+              amount: amount,
+              date: _selectedDate,
+              dueDate: drift.Value(_debtDueDate),
+              note: drift.Value(_noteController.text.trim().isEmpty
+                  ? null
+                  : _noteController.text.trim()),
+            ),
+          );
+        } else if (_isEditMode) {
           await db.convertTransactionToDebtAtomically(
             transactionId: widget.initialTransaction!.id,
             contactId: _selectedDebtContact!.id,
@@ -839,6 +951,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
           );
         }
 
+        if (!mounted) return;
         ref.read(quickEntryDraftProvider.notifier).state = null;
 
         await _playSuccessMorphAnimation();
@@ -862,9 +975,11 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
 
         AppFeedback.showSuccess(
           context,
-          _isEditMode
-              ? 'Đã chuyển giao dịch sang Vay / Nợ: ${_formatCurrency(amount)}'
-              : 'Đã ghi nhận $actionDesc: ${_formatCurrency(amount)}',
+          widget.initialDebtTransaction != null
+              ? 'Đã cập nhật giao dịch vay / nợ: ${_formatCurrency(amount)}'
+              : _isEditMode
+                  ? 'Đã chuyển giao dịch sang Vay / Nợ: ${_formatCurrency(amount)}'
+                  : 'Đã ghi nhận $actionDesc: ${_formatCurrency(amount)}',
         );
         Navigator.of(context).pop();
       } catch (e, st) {
@@ -904,7 +1019,17 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
           ? null
           : noteString.replaceAll('#amortized', '').trim());
 
-      if (_isEditMode) {
+      if (widget.initialDebtTransaction != null) {
+        await db.convertDebtToTransactionAtomically(
+          debtTransactionId: widget.initialDebtTransaction!.id,
+          walletId: targetWalletId,
+          categoryId: catId,
+          amount: amount,
+          type: _activeTab,
+          date: _selectedDate,
+          note: finalNote,
+        );
+      } else if (_isEditMode) {
         final oldTx = widget.initialTransaction!;
         await db.updateTransactionAtomically(
           transactionId: oldTx.id,
@@ -977,9 +1102,11 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
       if (!mounted) return;
       AppFeedback.showError(
         context,
-        _isEditMode
-            ? 'Không thể thay đổi loại giao dịch. Vui lòng thử lại.'
-            : 'Không thể lưu giao dịch. Vui lòng thử lại.',
+        e is StateError
+            ? e.message.toString()
+            : (_isEditMode
+                ? 'Không thể thay đổi loại giao dịch. Vui lòng thử lại.'
+                : 'Không thể lưu giao dịch. Vui lòng thử lại.'),
       );
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
@@ -1042,7 +1169,8 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
 
     final bool hasDraftData =
         _expression != '0' || _noteController.text.trim().isNotEmpty;
-    final bool canSubmit = calculatedAmount > 0 && !_isSubmitting;
+    final bool canSubmit = calculatedAmount > 0 &&
+        !_isSubmitting && !_isLoadingInitialEntities && !_initialDebtLoadFailed;
     final bool requiredSelectionReady = _activeTab == CategoryType.debt
         ? _selectedDebtContact != null
         : _selectedCategory != null && _selectedCategory!.type == _activeTab;
@@ -1121,7 +1249,11 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
                                 IconButton(
                                   icon: const Icon(Icons.delete_outline_rounded,
                                       color: AppTokens.expense, size: 22),
-                                  onPressed: _confirmDeleteTransaction,
+                                  onPressed: _isSubmitting ||
+                                          _isLoadingInitialEntities ||
+                                          _initialDebtLoadFailed
+                                      ? null
+                                      : _confirmDeleteTransaction,
                                 ),
                               ],
                             ),
@@ -1918,11 +2050,20 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
                           padding: const EdgeInsets.symmetric(horizontal: 16.0),
                           child: walletsAsync.when(
                             data: (wallets) {
-                              if (wallets.isEmpty) return const SizedBox();
+                              if (wallets.isEmpty && _selectedWallet == null) {
+                                return const SizedBox();
+                              }
 
+                              if (_isLoadingInitialEntities) {
+                                return const SizedBox(
+                                  height: 52,
+                                  child: Center(child: CircularProgressIndicator()),
+                                );
+                              }
                               _selectedWallet = wallets
                                   .where((w) => w.id == _selectedWallet?.id)
                                   .firstOrNull ??
+                                  (_isEditMode ? _selectedWallet : null) ??
                                   wallets.firstWhere(
                                         (w) => w.isDefault,
                                     orElse: () => wallets.first,
@@ -2426,14 +2567,13 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
                                             .symmetric(
                                             horizontal: 16.0),
                                         child: Text(
-                                          _activeTab ==
-                                              CategoryType.debt
-                                              ? '✓ XÁC NHẬN GIAO DỊCH VAY NỢ'
-                                              : (_isAmortized
-                                              ? '✓ LƯU & DÀN ĐỀU CẢ KỲ'
-                                              : (_isEditMode
+                                          _isEditMode
                                               ? '✓ CẬP NHẬT GIAO DỊCH'
-                                              : 'LƯU GIAO DỊCH')),
+                                              : (_activeTab == CategoryType.debt
+                                                  ? '✓ XÁC NHẬN GIAO DỊCH VAY NỢ'
+                                                  : (_isAmortized
+                                                      ? '✓ LƯU & DÀN ĐỀU CẢ KỲ'
+                                                      : 'LƯU GIAO DỊCH')),
                                           maxLines: 1,
                                           style: const TextStyle(
                                             fontSize: 15,

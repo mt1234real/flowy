@@ -5,7 +5,6 @@ import '../../data/database.dart';
 import '../../core/animation/app_animation_policy.dart';
 import '../../core/feedback/app_feedback.dart';
 import '../../widgets/quick_entry_sheet.dart';
-import '../../widgets/debt_transaction_detail_sheet.dart';
 import '../../screens/contact_ledger_screen.dart';
 import '../../screens/recycle_bin_screen.dart';
 import '../insights/spending_insights_screen.dart';
@@ -38,11 +37,7 @@ Future<bool> openNotification(
               .getSingleOrNull();
       if (!context.mounted) return false;
       if (debt != null) {
-        final route = AppAnimationPolicy.showFluidSheet<void>(
-            context: context,
-            mode: FluidSheetMode.nestedScrollable,
-            builder: (_, __) =>
-                DebtTransactionDetailSheet(debtTransaction: debt));
+        final route = QuickEntrySheet.show(context, initialDebtTransaction: debt);
         await db.markAsRead(item.id);
         await route;
         return true;

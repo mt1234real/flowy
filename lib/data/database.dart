@@ -801,6 +801,132 @@ class AppDatabase extends _$AppDatabase {
     });
   }
 
+  /// Moves a debt row to the regular ledger without exposing a partial balance.
+  Future<void> convertDebtToTransactionAtomically({
+    required String debtTransactionId,
+    required String walletId,
+    required String categoryId,
+    required double amount,
+    required CategoryType type,
+    required DateTime date,
+    String? note,
+  }) async {
+    if (!amount.isFinite ||
+        amount <= 0 ||
+        (type != CategoryType.expense && type != CategoryType.income)) {
+      throw ArgumentError('Khoản chi / khoản thu không hợp lệ');
+    }
+    await transaction(() async {
+      final persisted = await (select(
+        debtTransactions,
+      )..where((t) => t.id.equals(debtTransactionId))).getSingleOrNull();
+      if (persisted == null || persisted.deletedAt != null) {
+        throw StateError('Khoản nợ không còn khả dụng để chuyển đổi');
+      }
+      if (!const {
+        'LEND',
+        'COLLECT',
+        'BORROW',
+        'REPAY',
+      }.contains(persisted.type)) {
+        throw StateError('Loại giao dịch vay nợ không hợp lệ');
+      }
+      final linked =
+          await (select(debtTransactions)..where(
+                (t) =>
+                    t.deletedAt.isNull() &
+                    t.note.contains('#ref:$debtTransactionId'),
+              ))
+              .get();
+      if (linked.isNotEmpty || persisted.note?.contains('#ref:') == true) {
+        throw StateError(
+          'Khoản nợ có liên kết thu / trả nợ. Hãy xử lý các giao dịch liên quan trước khi chuyển loại.',
+        );
+      }
+      final category = await (select(
+        categories,
+      )..where((c) => c.id.equals(categoryId))).getSingleOrNull();
+      final targetWallet = await (select(
+        wallets,
+      )..where((w) => w.id.equals(walletId))).getSingleOrNull();
+      final sourceWallet = await (select(
+        wallets,
+      )..where((w) => w.id.equals(persisted.walletId))).getSingleOrNull();
+      final contact = await (select(
+        debtContacts,
+      )..where((c) => c.id.equals(persisted.contactId))).getSingleOrNull();
+      if (category == null ||
+          category.type != type ||
+          targetWallet == null ||
+          sourceWallet == null ||
+          contact == null) {
+        throw StateError(
+          'Không tìm thấy đầy đủ ví, danh mục và đối tác liên quan',
+        );
+      }
+
+      // Both directions move the same identity between the two ledger tables.
+      // Insert first so an ID conflict fails before any accounting writes.
+      await into(transactions).insert(
+        TransactionsCompanion(
+          id: Value(persisted.id),
+          walletId: Value(walletId),
+          categoryId: Value(categoryId),
+          amount: Value(amount),
+          type: Value(type),
+          envelopeType: const Value('needs'),
+          date: Value(date),
+          note: Value(note),
+          createdAt: Value(persisted.createdAt),
+        ),
+      );
+      final reversal = (persisted.type == 'LEND' || persisted.type == 'REPAY')
+          ? persisted.amount
+          : -persisted.amount;
+      final walletRows =
+          await (update(
+            wallets,
+          )..where((w) => w.id.equals(persisted.walletId))).write(
+            WalletsCompanion(
+              balance: Value(sourceWallet.balance + reversal),
+              updatedAt: Value(DateTime.now()),
+            ),
+          );
+      final contactRows =
+          await (update(
+            debtContacts,
+          )..where((c) => c.id.equals(persisted.contactId))).write(
+            DebtContactsCompanion(
+              netBalance: Value(contact.netBalance - reversal),
+              updatedAt: Value(DateTime.now()),
+            ),
+          );
+      final refreshedWallet = await (select(
+        wallets,
+      )..where((w) => w.id.equals(walletId))).getSingle();
+      final appliedRows =
+          await (update(wallets)..where((w) => w.id.equals(walletId))).write(
+            WalletsCompanion(
+              balance: Value(
+                refreshedWallet.balance +
+                    (type == CategoryType.income ? amount : -amount),
+              ),
+              updatedAt: Value(DateTime.now()),
+            ),
+          );
+      await revokeNotificationByEntityId(persisted.id);
+      final removed = await (delete(
+        debtTransactions,
+      )..where((t) => t.id.equals(persisted.id))).go();
+      if (walletRows != 1 ||
+          contactRows != 1 ||
+          appliedRows != 1 ||
+          removed != 1) {
+        throw StateError('Không thể hoàn tất chuyển đổi khoản nợ');
+      }
+    });
+  }
+
   // ==========================================
   // 🌟 SOFT-DELETE & RECYCLE BIN ENGINE (TRANSACTIONS)
   // ==========================================

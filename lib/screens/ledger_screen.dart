@@ -28,7 +28,6 @@ import '../theme/app_theme.dart';
 import '../widgets/ambient_canvas.dart';
 import '../widgets/category_icon_badge.dart';
 import '../widgets/currency_text.dart';
-import '../widgets/debt_transaction_detail_sheet.dart';
 import '../widgets/preserved_sleek_dismissible.dart';
 import '../widgets/quick_entry_sheet.dart';
 import '../widgets/sliding_segmented_bar.dart';
@@ -787,17 +786,7 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> with TickerProvider
   }
 
   void _openDebtTransactionDetailSheet(BuildContext context, DebtTransaction tx) {
-    HapticFeedback.selectionClick();
-    AppAnimationPolicy.showFluidSheet(
-      context: context,
-      mode: FluidSheetMode.fixed,
-      useRootNavigator: true,
-      isDismissible: true,
-      duration: LedgerMotion.sheetIn,
-      builder: (sheetContext, _) => DebtTransactionDetailSheet(
-        debtTransaction: tx,
-      ),
-    );
+    QuickEntrySheet.show(context, initialDebtTransaction: tx);
   }
 
   void _openFilterMatrixModal(BuildContext context, bool isDark, AppAccentPreset accent) {

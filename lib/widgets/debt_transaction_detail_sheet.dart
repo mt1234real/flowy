@@ -40,6 +40,9 @@ final _detailWalletsStreamProvider =
   return db.select(db.wallets).watch();
 });
 
+// Deprecated compatibility widget: production debt entry points now use
+// QuickEntrySheet.show(initialDebtTransaction: ...). Retained for existing
+// legacy widget coverage; do not add new navigation callers.
 class DebtTransactionDetailSheet extends ConsumerStatefulWidget {
   final DebtTransaction debtTransaction;
 

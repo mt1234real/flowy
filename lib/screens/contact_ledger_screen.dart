@@ -18,7 +18,7 @@
 //    - Thẻ tổng quan nợ ròng thời gian thực (DebtContact live state).
 //    - Hai nút thao tác nhanh: "Phát sinh" và "Tất toán" (mở QuickEntrySheet qua launcher tĩnh).
 //    - Tấm thiệp nhắc nợ tinh tế (_DebtReminderModal) kèm sao chép vào Clipboard.
-//    - Chạm vào thẻ dòng lịch sử để mở DebtTransactionDetailSheet xem chi tiết và sửa nợ toàn diện.
+//    - Chạm vào dòng lịch sử để chỉnh sửa nợ trong QuickEntrySheet.
 // ==============================================================================
 
 import 'dart:ui';
@@ -33,7 +33,6 @@ import '../data/daos/debt_dao.dart';
 import '../data/database.dart';
 import '../theme/app_theme.dart';
 import '../widgets/currency_text.dart';
-import '../widgets/debt_transaction_detail_sheet.dart';
 import '../widgets/preserved_sleek_dismissible.dart';
 import '../widgets/quick_entry_sheet.dart';
 
@@ -108,15 +107,9 @@ class _ContactLedgerScreenState extends ConsumerState<ContactLedgerScreen> {
     );
   }
 
-  // Mở BottomSheet xem chi tiết và chỉnh sửa khoản nợ
+  // Chỉnh sửa khoản nợ qua launcher dùng chung.
   void _openTransactionDetail(BuildContext context, DebtTransaction tx) {
-    HapticFeedback.selectionClick();
-    AppAnimationPolicy.showFluidSheet(
-      context: context,
-      mode: FluidSheetMode.nestedScrollable,
-      backgroundColor: Colors.transparent,
-      builder: (_, __) => DebtTransactionDetailSheet(debtTransaction: tx),
-    );
+    QuickEntrySheet.show(context, initialDebtTransaction: tx);
   }
 
   // 🌟 HÀM XÓA MỀM & HOÀN TÁC NGUYÊN TỬ CHO SỔ NỢ (GỌI SAU KHI DÒNG ĐÃ CO VỀ 0)
