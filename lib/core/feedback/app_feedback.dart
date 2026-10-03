@@ -17,6 +17,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../theme/app_theme.dart';
+import '../animation/app_animation_policy.dart';
 
 // ==============================================================================
 // 1. TOKENS
@@ -93,6 +94,25 @@ enum AppTopFeedbackTone {
   info,
   success,
   error,
+}
+
+/// One latest live status, separate from the single transient feedback slot.
+@immutable
+class AppLiveFeedback {
+  final String id, message;
+  final IconData icon;
+  final AppTopFeedbackTone tone;
+  final bool terminal, spinning, reduceMotion;
+  final VoidCallback? onPresented;
+  const AppLiveFeedback(
+      {required this.id,
+      required this.message,
+      required this.icon,
+      this.tone = AppTopFeedbackTone.info,
+      this.terminal = false,
+      this.spinning = false,
+      this.reduceMotion = false,
+      this.onPresented});
 }
 
 class AppValidationFeedbackController extends ChangeNotifier {
@@ -263,9 +283,94 @@ class _AppValidationFeedbackState extends State<AppValidationFeedback>
 // 4. GLOBAL FEEDBACK SERVICE
 // ==============================================================================
 
+// Insertion and mounting are different OverlayEntry lifecycle states.
+// Only this owner removes/disposes a successfully inserted Channel 1 entry.
+class _TopPillOwnership {
+  _TopPillOwnership(this.overlay, this.entry, this.key);
+
+  final OverlayState overlay;
+  final OverlayEntry entry;
+  final GlobalKey<_TopBannerOverlayState> key;
+  bool inserted = false;
+
+  void remove() {
+    if (!inserted) return;
+    key.currentState?.cancelImmediately();
+    entry.remove();
+    inserted = false;
+    entry.dispose();
+  }
+}
+
 abstract final class AppFeedback {
-  static OverlayEntry? _topEntry;
-  static GlobalKey<_TopBannerOverlayState>? _topKey;
+  static _TopPillOwnership? _topOwner;
+  static OverlayEntry? get _topEntry => _topOwner?.entry;
+  static GlobalKey<_TopBannerOverlayState>? get _topKey => _topOwner?.key;
+
+  static AppLiveFeedback? _live;
+  static bool _topIsLive = false;
+  static bool _livePresented = false;
+  static bool _transientPending = false;
+
+  static void showLive(AppLiveFeedback feedback) {
+    final previous = _live;
+    if (previous?.id == feedback.id &&
+        previous?.message == feedback.message &&
+        previous?.spinning == feedback.spinning &&
+        previous?.reduceMotion == feedback.reduceMotion &&
+        previous?.terminal == feedback.terminal) {
+      _resumeLive();
+      return;
+    }
+    if (previous?.id != feedback.id ||
+        previous?.message != feedback.message ||
+        previous?.terminal != feedback.terminal) {
+      _livePresented = false;
+    }
+    _live = feedback;
+    if (_topIsLive && _topKey?.currentState != null) {
+      _topKey!.currentState!.updateLive(feedback);
+    } else {
+      _topEntry?.markNeedsBuild();
+      _resumeLive();
+    }
+  }
+
+  static void _presentLive(AppLiveFeedback feedback) {
+    if (_livePresented ||
+        _live?.id != feedback.id ||
+        _live?.message != feedback.message ||
+        _live?.terminal != true) {
+      return;
+    }
+    _livePresented = true;
+    HapticFeedback.lightImpact();
+    feedback.onPresented?.call();
+  }
+
+  static void dismissLive(String id) {
+    if (_live?.id != id) return;
+    _live = null;
+    if (_topIsLive) unawaited(_dismissTop(immediate: true));
+  }
+
+  static void _resumeLive() {
+    final owner = _topOwner;
+    if (owner != null && !owner.overlay.mounted) {
+      _removeTop(owner);
+    }
+    final live = _live;
+    final overlay = _resolveCachedOverlay();
+    if (live == null ||
+        overlay == null ||
+        _topEntry != null ||
+        _transientPending ||
+        _undoEntry != null) {
+      return;
+    }
+    _insertTop(overlay,
+        message: live.message, tone: live.tone, icon: live.icon, live: live);
+  }
 
   static OverlayEntry? _undoEntry;
   static GlobalKey<_UndoDockOverlayState>? _undoKey;
@@ -505,16 +610,20 @@ abstract final class AppFeedback {
   static void dismissCurrent(BuildContext context) {
     capture(context);
     _requestEpoch += 1;
-    unawaited(_dismissActiveOverlays());
+    _transientPending = false;
+    unawaited(_dismissForInteraction());
   }
 
   static void dismissCurrentWithMessenger(ScaffoldMessengerState messenger) {
     _resolveOverlayFromMessenger(messenger);
     _requestEpoch += 1;
-    unawaited(_dismissActiveOverlays());
+    _transientPending = false;
+    unawaited(_dismissForInteraction());
   }
 
   static void dismissImmediately() {
+    _live = null;
+    _transientPending = false;
     _requestEpoch += 1;
     unawaited(_dismissActiveOverlays(immediate: true));
   }
@@ -523,97 +632,130 @@ abstract final class AppFeedback {
   // Internal Helpers
   // ---------------------------------------------------------------------------
 
+  static Future<void> _dismissForInteraction() async {
+    final top = _topIsLive ? Future<void>.value() : _dismissTop();
+    await Future.wait([top, _dismissUndo()]);
+    _resumeLive();
+  }
+
   static void _showTopFromContext(
-      BuildContext context, {
-        required String message,
-        required AppTopFeedbackTone tone,
-        required IconData icon,
-        required bool emitHaptic,
-      }) {
+    BuildContext context, {
+    required String message,
+    required AppTopFeedbackTone tone,
+    required IconData icon,
+    required bool emitHaptic,
+  }) {
     capture(context);
     final overlay = _resolveOverlay(context);
     if (overlay == null) return;
 
-    _scheduleTop(overlay, message: message, tone: tone, icon: icon, emitHaptic: emitHaptic);
+    _scheduleTop(overlay,
+        message: message, tone: tone, icon: icon, emitHaptic: emitHaptic);
   }
 
   static void _showTopFromCachedOverlay(
-      ScaffoldMessengerState messenger, {
-        required String message,
-        required AppTopFeedbackTone tone,
-        required IconData icon,
-        required bool emitHaptic,
-      }) {
+    ScaffoldMessengerState messenger, {
+    required String message,
+    required AppTopFeedbackTone tone,
+    required IconData icon,
+    required bool emitHaptic,
+  }) {
     final overlay = _resolveOverlayFromMessenger(messenger);
     if (overlay == null) return;
 
-    _scheduleTop(overlay, message: message, tone: tone, icon: icon, emitHaptic: emitHaptic);
+    _scheduleTop(overlay,
+        message: message, tone: tone, icon: icon, emitHaptic: emitHaptic);
   }
 
   static void _scheduleTop(
-      OverlayState overlay, {
-        required String message,
-        required AppTopFeedbackTone tone,
-        required IconData icon,
-        required bool emitHaptic,
-      }) {
+    OverlayState overlay, {
+    required String message,
+    required AppTopFeedbackTone tone,
+    required IconData icon,
+    required bool emitHaptic,
+  }) {
     if (emitHaptic) {
       HapticFeedback.lightImpact();
     }
 
     final request = ++_requestEpoch;
+    _transientPending = true;
     unawaited(() async {
       await _dismissActiveOverlays();
-      if (request != _requestEpoch || !overlay.mounted) return;
+      if (request != _requestEpoch) return;
+      _transientPending = false;
+      if (!overlay.mounted) return;
       _insertTop(overlay, message: message, tone: tone, icon: icon);
     }());
   }
 
-  static void _insertTop(
-      OverlayState overlay, {
-        required String message,
-        required AppTopFeedbackTone tone,
-        required IconData icon,
-      }) {
-    final key = GlobalKey<_TopBannerOverlayState>();
-    late final OverlayEntry entry;
+  static void _removeTop(_TopPillOwnership owner) {
+    owner.remove();
+    if (!identical(_topOwner, owner)) return;
+    _topOwner = null;
+    _topIsLive = false;
+  }
 
-    entry = OverlayEntry(
+  static void _insertTop(
+    OverlayState overlay, {
+    required String message,
+    required AppTopFeedbackTone tone,
+    required IconData icon,
+    AppLiveFeedback? live,
+  }) {
+    if (!overlay.mounted) return;
+    final key = GlobalKey<_TopBannerOverlayState>();
+    late final _TopPillOwnership owner;
+    final entry = OverlayEntry(
       builder: (_) => _TopBannerOverlay(
         key: key,
         message: message,
         tone: tone,
         icon: icon,
+        live: live == null ? null : _live,
         onClosed: () {
-          if (entry.mounted) entry.remove();
-          if (identical(_topEntry, entry)) {
-            _topEntry = null;
-            _topKey = null;
-          }
+          // A replaced entry must never clear/resume the current entry's state.
+          if (!identical(_topOwner, owner) || !owner.inserted) return;
+          final completedLive = live != null &&
+              _live?.terminal == true &&
+              identical(_live, key.currentState?._live) &&
+              key.currentState?.completedHold == true;
+          _removeTop(owner);
+          if (completedLive) _live = null;
+          _resumeLive();
         },
       ),
     );
-
-    _topEntry = entry;
-    _topKey = key;
-    overlay.insert(entry);
+    owner = _TopPillOwnership(overlay, entry, key);
+    // Publish ownership only after insert succeeds. An unavailable overlay or
+    // failed insertion must not lead to remove() on an uninserted entry.
+    try {
+      overlay.insert(entry);
+    } on FlutterError {
+      return;
+    }
+    owner.inserted = true;
+    _topOwner = owner;
+    _topIsLive = live != null;
   }
 
   static void _scheduleUndo(
-      OverlayState overlay, {
-        required String message,
-        required FutureOr<void> Function() onUndo,
-        required Color? actionColor,
-        required double bottomObstruction,
-        required BuildContext? anchorContext,
-        required ModalRoute<dynamic>? anchorRoute,
-        required bool sourceHasPrimaryNavigation,
-      }) {
+    OverlayState overlay, {
+    required String message,
+    required FutureOr<void> Function() onUndo,
+    required Color? actionColor,
+    required double bottomObstruction,
+    required BuildContext? anchorContext,
+    required ModalRoute<dynamic>? anchorRoute,
+    required bool sourceHasPrimaryNavigation,
+  }) {
     final request = ++_requestEpoch;
+    _transientPending = true;
 
     unawaited(() async {
       await _dismissActiveOverlays(immediate: true);
       if (request != _requestEpoch || !overlay.mounted) return;
+      _transientPending = false;
 
       _insertUndo(
         overlay,
@@ -629,15 +771,15 @@ abstract final class AppFeedback {
   }
 
   static void _insertUndo(
-      OverlayState overlay, {
-        required String message,
-        required FutureOr<void> Function() onUndo,
-        required Color? actionColor,
-        required double bottomObstruction,
-        required BuildContext? anchorContext,
-        required ModalRoute<dynamic>? anchorRoute,
-        required bool sourceHasPrimaryNavigation,
-      }) {
+    OverlayState overlay, {
+    required String message,
+    required FutureOr<void> Function() onUndo,
+    required Color? actionColor,
+    required double bottomObstruction,
+    required BuildContext? anchorContext,
+    required ModalRoute<dynamic>? anchorRoute,
+    required bool sourceHasPrimaryNavigation,
+  }) {
     final key = GlobalKey<_UndoDockOverlayState>();
     late final OverlayEntry entry;
 
@@ -656,6 +798,7 @@ abstract final class AppFeedback {
           if (identical(_undoEntry, entry)) {
             _undoEntry = null;
             _undoKey = null;
+            _resumeLive();
           }
         },
       ),
@@ -673,16 +816,11 @@ abstract final class AppFeedback {
   }
 
   static Future<void> _dismissTop({bool immediate = false}) async {
-    final entry = _topEntry;
-    final state = _topKey?.currentState;
-    if (entry == null) return;
-
+    final owner = _topOwner;
+    if (owner == null) return;
+    final state = owner.key.currentState;
     if (immediate || state == null) {
-      if (entry.mounted) entry.remove();
-      if (identical(_topEntry, entry)) {
-        _topEntry = null;
-        _topKey = null;
-      }
+      _removeTop(owner);
       return;
     }
     await state.dismiss();
@@ -858,6 +996,7 @@ class _TopBannerOverlay extends StatefulWidget {
   final AppTopFeedbackTone tone;
   final IconData icon;
   final VoidCallback onClosed;
+  final AppLiveFeedback? live;
 
   const _TopBannerOverlay({
     super.key,
@@ -865,6 +1004,7 @@ class _TopBannerOverlay extends StatefulWidget {
     required this.tone,
     required this.icon,
     required this.onClosed,
+    this.live,
   });
 
   @override
@@ -872,8 +1012,67 @@ class _TopBannerOverlay extends StatefulWidget {
 }
 
 class _TopBannerOverlayState extends State<_TopBannerOverlay>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
+    with TickerProviderStateMixin {
+  late final AnimationController _controller, _rotation;
+  AppLiveFeedback? _live;
+  Timer? _holdTimer, _terminalTimer;
+  final Stopwatch _visible = Stopwatch();
+  bool completedHold = false;
+  String? get liveId => _live?.id;
+  String get _message => _live?.message ?? widget.message;
+  IconData get _icon => _live?.icon ?? widget.icon;
+  AppTopFeedbackTone get _tone => _live?.tone ?? widget.tone;
+  bool get _reduced => _live?.reduceMotion ?? false;
+
+  void updateLive(AppLiveFeedback value) {
+    if (_closing || _closed) return;
+    if (_live?.id != value.id) _visible.reset();
+    _terminalTimer?.cancel();
+    if (value.terminal &&
+        !(_live?.terminal ?? false) &&
+        _visible.elapsedMilliseconds < 800) {
+      _terminalTimer =
+          Timer(Duration(milliseconds: 800 - _visible.elapsedMilliseconds), () {
+        if (mounted && !_closing) _applyLive(value);
+      });
+    } else {
+      _applyLive(value);
+    }
+  }
+
+  void _applyLive(AppLiveFeedback value) {
+    if (!mounted || _closing || _closed) return;
+    final terminalChanged = value.terminal &&
+        (_live?.terminal != true ||
+            _live?.id != value.id ||
+            _live?.message != value.message);
+    setState(() => _live = value);
+    if (terminalChanged) _presentTerminal();
+    _syncRotation();
+    _holdTimer?.cancel();
+    if (value.terminal) _startHold();
+  }
+
+  void _presentTerminal() {
+    if (!_closed && _live != null) AppFeedback._presentLive(_live!);
+  }
+
+  void _syncRotation() {
+    if (_live?.spinning == true && !_reduced) {
+      if (!_rotation.isAnimating) _rotation.repeat();
+    } else {
+      _rotation.stop();
+      _rotation.value = 0;
+    }
+  }
+
+  void _startHold() {
+    _holdTimer?.cancel();
+    _holdTimer = Timer(AppFeedbackTokens.topBannerHoldDuration, () {
+      completedHold = true;
+      unawaited(dismiss());
+    });
+  }
 
   bool _closing = false;
   bool _exiting = false;
@@ -887,13 +1086,20 @@ class _TopBannerOverlayState extends State<_TopBannerOverlay>
   void initState() {
     super.initState();
 
-    _controller = AnimationController(
+    _controller = AppAnimationPolicy.createController(
       vsync: this,
       duration: AppFeedbackTokens.topBannerEnterDuration,
-      animationBehavior: AnimationBehavior.preserve,
       debugLabel: 'AppFeedback.topBanner',
     );
 
+    _rotation = AppAnimationPolicy.createController(
+        vsync: this,
+        duration: const Duration(milliseconds: 1000),
+        debugLabel: 'AppFeedback.liveSync');
+    _live = widget.live;
+    if (_live?.terminal == true) _presentTerminal();
+    _visible.start();
+    _syncRotation();
     unawaited(_runLifecycle());
   }
 
@@ -905,9 +1111,7 @@ class _TopBannerOverlayState extends State<_TopBannerOverlay>
     );
 
     if (!mounted || _closing) return;
-    await Future<void>.delayed(AppFeedbackTokens.topBannerHoldDuration);
-    if (!mounted || _closing) return;
-    await dismiss();
+    if (_live == null || _live!.terminal) _startHold();
   }
 
   Future<void> dismiss() {
@@ -920,6 +1124,8 @@ class _TopBannerOverlayState extends State<_TopBannerOverlay>
     _dismissCompleter = completer;
 
     final enterT = _controller.value.clamp(0.0, 1.0);
+    _holdTimer?.cancel();
+    _terminalTimer?.cancel();
     _closing = true;
     _exiting = true;
 
@@ -950,8 +1156,22 @@ class _TopBannerOverlayState extends State<_TopBannerOverlay>
     return completer.future;
   }
 
+  // Immediate replacement revokes timers and tickers before the next frame
+  // unmounts the entry. Complete waiters without calling onClosed again.
+  void cancelImmediately() {
+    _closed = true;
+    _closing = true;
+    _holdTimer?.cancel();
+    _terminalTimer?.cancel();
+    _rotation.stop();
+    _controller.stop();
+    if (!(_dismissCompleter?.isCompleted ?? true)) {
+      _dismissCompleter?.complete();
+    }
+  }
+
   Color get _iconColor {
-    switch (widget.tone) {
+    switch (_tone) {
       case AppTopFeedbackTone.success:
         return AppTokens.income;
       case AppTopFeedbackTone.error:
@@ -963,9 +1183,8 @@ class _TopBannerOverlayState extends State<_TopBannerOverlay>
 
   @override
   void dispose() {
-    if (!(_dismissCompleter?.isCompleted ?? true)) {
-      _dismissCompleter?.complete();
-    }
+    cancelImmediately();
+    _rotation.dispose();
     _controller.dispose();
     super.dispose();
   }
@@ -986,26 +1205,30 @@ class _TopBannerOverlayState extends State<_TopBannerOverlay>
 
     // Chuẩn hóa typography: height 1.2 tránh xén dấu tiếng Việt
     final inheritedTextStyle = theme.textTheme.bodyMedium?.copyWith(
-      fontSize: 13,
-      height: 1.2,
-      fontWeight: FontWeight.w700,
-      color: Colors.white,
-      decoration: TextDecoration.none,
-    ) ?? const TextStyle(
-      fontSize: 13,
-      height: 1.2,
-      fontWeight: FontWeight.w700,
-      color: Colors.white,
-      decoration: TextDecoration.none,
-    );
+          fontSize: 13,
+          height: 1.2,
+          fontWeight: FontWeight.w700,
+          color: Colors.white,
+          decoration: TextDecoration.none,
+        ) ??
+        const TextStyle(
+          fontSize: 13,
+          height: 1.2,
+          fontWeight: FontWeight.w700,
+          color: Colors.white,
+          decoration: TextDecoration.none,
+        );
 
-    final maxWidth = math.max(
-      0.0,
-      math.min(
-        AppFeedbackTokens.topBannerMaxWidth,
-        media.size.width - (AppFeedbackTokens.topBannerHorizontalScreenMargin * 2),
-      ),
-    ).toDouble();
+    final maxWidth = math
+        .max(
+          0.0,
+          math.min(
+            AppFeedbackTokens.topBannerMaxWidth,
+            media.size.width -
+                (AppFeedbackTokens.topBannerHorizontalScreenMargin * 2),
+          ),
+        )
+        .toDouble();
 
     return Positioned(
       top: safeTop + AppFeedbackTokens.topBannerSafeGap,
@@ -1018,9 +1241,13 @@ class _TopBannerOverlayState extends State<_TopBannerOverlay>
             animation: _controller,
             builder: (context, _) {
               final t = _controller.value.clamp(0.0, 1.0);
-              final opacity = _exiting ? (_exitStartOpacity * (1.0 - t)).clamp(0.0, 1.0) : t;
+              final opacity = _exiting
+                  ? (_exitStartOpacity * (1.0 - t)).clamp(0.0, 1.0)
+                  : t;
               final dy = _exiting
-                  ? lerpDouble(_exitStartDy, -AppFeedbackTokens.topBannerExitTravel, t) ?? 0.0
+                  ? lerpDouble(_exitStartDy,
+                          -AppFeedbackTokens.topBannerExitTravel, t) ??
+                      0.0
                   : -AppFeedbackTokens.topBannerEnterTravel * (1.0 - t);
 
               return Opacity(
@@ -1034,7 +1261,8 @@ class _TopBannerOverlayState extends State<_TopBannerOverlay>
                       child: DefaultTextStyle.merge(
                         style: inheritedTextStyle,
                         child: ClipRRect(
-                          borderRadius: BorderRadius.circular(AppFeedbackTokens.topBannerRadius),
+                          borderRadius: BorderRadius.circular(
+                              AppFeedbackTokens.topBannerRadius),
                           child: BackdropFilter(
                             filter: ImageFilter.blur(
                               sigmaX: AppFeedbackTokens.topBannerBlurSigma,
@@ -1042,17 +1270,20 @@ class _TopBannerOverlayState extends State<_TopBannerOverlay>
                             ),
                             child: Container(
                               height: AppFeedbackTokens.topBannerHeight,
-                              padding: const EdgeInsets.symmetric(horizontal: 14),
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 14),
                               decoration: BoxDecoration(
                                 color: backgroundColor,
-                                borderRadius: BorderRadius.circular(AppFeedbackTokens.topBannerRadius),
+                                borderRadius: BorderRadius.circular(
+                                    AppFeedbackTokens.topBannerRadius),
                                 border: Border.all(
                                   color: borderColor,
                                   width: AppFeedbackTokens.topBannerBorderWidth,
                                 ),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withValues(alpha: isDark ? 0.28 : 0.18),
+                                    color: Colors.black.withValues(
+                                        alpha: isDark ? 0.28 : 0.18),
                                     blurRadius: 18,
                                     offset: const Offset(0, 6),
                                   ),
@@ -1062,20 +1293,38 @@ class _TopBannerOverlayState extends State<_TopBannerOverlay>
                                 mainAxisSize: MainAxisSize.min,
                                 crossAxisAlignment: CrossAxisAlignment.center,
                                 children: [
-                                  Icon(
-                                    widget.icon,
-                                    size: 16,
-                                    color: widget.tone == AppTopFeedbackTone.info
-                                        ? theme.colorScheme.primary
-                                        : _iconColor,
-                                  ),
+                                  ExcludeSemantics(
+                                      child: AnimatedSwitcher(
+                                    duration: _reduced
+                                        ? Duration.zero
+                                        : const Duration(milliseconds: 160),
+                                    child: RotationTransition(
+                                      key: ValueKey(_icon),
+                                      turns: _rotation,
+                                      child: Icon(_icon,
+                                          size: 16,
+                                          color:
+                                              _tone == AppTopFeedbackTone.info
+                                                  ? theme.colorScheme.primary
+                                                  : _iconColor),
+                                    ),
+                                  )),
                                   const SizedBox(width: 8),
                                   Flexible(
-                                    child: Text(
-                                      widget.message,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: inheritedTextStyle,
+                                    child: Semantics(
+                                      liveRegion: true,
+                                      label: _message,
+                                      child: ExcludeSemantics(
+                                          child: AnimatedSwitcher(
+                                        duration: _reduced
+                                            ? Duration.zero
+                                            : const Duration(milliseconds: 160),
+                                        child: Text(_message,
+                                            key: ValueKey(_message),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: inheritedTextStyle),
+                                      )),
                                     ),
                                   ),
                                 ],

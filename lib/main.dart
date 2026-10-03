@@ -36,6 +36,7 @@ import 'features/onboarding/screens/welcome_onboarding_screen.dart';
 import 'screens/main_scaffold.dart';
 import 'theme/app_theme.dart';
 import 'widgets/backup_progress_curtain.dart';
+import 'widgets/backup_live_feedback_host.dart';
 
 /// 🌟 ROOT SESSION KEY PROVIDER (ROOT PURGE ARCHITECTURE)
 /// Gán UniqueKey mới để dọn sạch toàn bộ state trong bộ nhớ và ép dựng lại cây Widget.
@@ -133,11 +134,16 @@ class FlowyApp extends ConsumerWidget {
         // 🌟 GHI ĐÈ THIẾT LẬP TRỢ NĂNG TOÀN CỤC: BẢO VỆ MỌI ANIMATION TRÊN HYPEROS / ANDROID
         builder: (context, child) {
           final mediaQueryData = MediaQuery.of(context);
-          return MediaQuery(
-            data: mediaQueryData.copyWith(
-              disableAnimations: false,
+          return BackupLiveFeedbackHost(
+            navigatorKey: backupNavigatorKey,
+            reduceMotion: mediaQueryData.disableAnimations ||
+                mediaQueryData.accessibleNavigation,
+            child: MediaQuery(
+              data: mediaQueryData.copyWith(
+                disableAnimations: false,
+              ),
+              child: BackupProgressHost(child: child!),
             ),
-            child: BackupProgressHost(child: child!),
           );
         },
 
