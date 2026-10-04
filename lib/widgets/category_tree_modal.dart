@@ -30,6 +30,7 @@ class CategoryTreeModal extends ConsumerStatefulWidget {
   final bool allowSelectParent; // true cho Thiết lập Ngân Sách, false cho Ghi Chép Giao Dịch
   final String? title;
   final ScrollController? scrollController;
+  final String? parentCategoryId;
 
   const CategoryTreeModal({
     super.key,
@@ -38,28 +39,32 @@ class CategoryTreeModal extends ConsumerStatefulWidget {
     this.allowSelectParent = false,
     this.title,
     this.scrollController,
+    this.parentCategoryId,
   });
 
   /// 🌟 MỞ MODAL QUA FLUID SHEET ENGINE TOÀN CỤC
   static Future<Category?> show(
-      BuildContext context, {
-        required CategoryType initialType,
-        String? selectedCategoryId,
-        bool allowSelectParent = false,
-        String? title,
-      }) {
+    BuildContext context, {
+    required CategoryType initialType,
+    String? selectedCategoryId,
+    bool allowSelectParent = false,
+    String? title,
+    String? parentCategoryId,
+  }) {
     HapticFeedback.selectionClick();
     return AppAnimationPolicy.showFluidSheet<Category>(
       context: context,
       mode: FluidSheetMode.scrollable,
       useRootNavigator: true,
       isDismissible: true,
+      enableBlur: parentCategoryId == null,
       builder: (sheetContext, scrollController) => CategoryTreeModal(
         initialType: initialType,
         selectedCategoryId: selectedCategoryId,
         allowSelectParent: allowSelectParent,
         title: title,
         scrollController: scrollController,
+        parentCategoryId: parentCategoryId,
       ),
     );
   }
@@ -78,6 +83,9 @@ class _CategoryTreeModalState extends ConsumerState<CategoryTreeModal> {
   void initState() {
     super.initState();
     _activeType = widget.initialType;
+    if (widget.parentCategoryId != null) {
+      _expandedParentIds.add(widget.parentCategoryId!);
+    }
   }
 
   @override
@@ -152,7 +160,8 @@ class _CategoryTreeModalState extends ConsumerState<CategoryTreeModal> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Column(
+                    Expanded(
+                        child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
@@ -176,7 +185,7 @@ class _CategoryTreeModalState extends ConsumerState<CategoryTreeModal> {
                           ),
                         ),
                       ],
-                    ),
+                    )),
                     IconButton(
                       visualDensity: VisualDensity.compact,
                       icon: Icon(
@@ -195,42 +204,48 @@ class _CategoryTreeModalState extends ConsumerState<CategoryTreeModal> {
               ),
 
               // 2. Segmented Tab Switcher: Khoản chi | Khoản thu | Vay nợ
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
-                child: SlidingSegmentedBar<CategoryType>(
-                  height: 40,
-                  duration: const Duration(milliseconds: 185),
-                  overshootPx: 1.8,
-                  debugLabel: 'CategoryTree.typeTabs',
-                  selectedValue: _activeType,
-                  trackColor: isDark ? AppTokens.darkCard : AppTokens.lightCardSubtle,
-                  trackBorderColor: isDark ? AppTokens.darkBorder : AppTokens.lightBorder,
-                  indicatorColor: isDark ? AppTokens.darkCardSubtle : Colors.white,
-                  indicatorBorderColor: Colors.transparent,
-                  mutedTextColor: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
-                  indicatorShadowColor: Colors.black.withValues(alpha: 0.05),
-                  items: const [
-                    SlidingSegmentedItem<CategoryType>(
-                      value: CategoryType.expense,
-                      label: 'Khoản chi',
-                      activeColor: AppTokens.expense,
-                    ),
-                    SlidingSegmentedItem<CategoryType>(
-                      value: CategoryType.income,
-                      label: 'Khoản thu',
-                      activeColor: AppTokens.income,
-                    ),
-                    SlidingSegmentedItem<CategoryType>(
-                      value: CategoryType.debt,
-                      label: 'Vay / Nợ',
-                      activeColor: AppTokens.debt,
-                    ),
-                  ],
-                  onValueChanged: (type) {
-                    setState(() => _activeType = type);
-                  },
+              if (widget.parentCategoryId == null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16.0, vertical: 4.0),
+                  child: SlidingSegmentedBar<CategoryType>(
+                    height: 40,
+                    duration: const Duration(milliseconds: 185),
+                    overshootPx: 1.8,
+                    debugLabel: 'CategoryTree.typeTabs',
+                    selectedValue: _activeType,
+                    trackColor:
+                        isDark ? AppTokens.darkCard : AppTokens.lightCardSubtle,
+                    trackBorderColor:
+                        isDark ? AppTokens.darkBorder : AppTokens.lightBorder,
+                    indicatorColor:
+                        isDark ? AppTokens.darkCardSubtle : Colors.white,
+                    indicatorBorderColor: Colors.transparent,
+                    mutedTextColor:
+                        isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                    indicatorShadowColor: Colors.black.withValues(alpha: 0.05),
+                    items: const [
+                      SlidingSegmentedItem<CategoryType>(
+                        value: CategoryType.expense,
+                        label: 'Khoản chi',
+                        activeColor: AppTokens.expense,
+                      ),
+                      SlidingSegmentedItem<CategoryType>(
+                        value: CategoryType.income,
+                        label: 'Khoản thu',
+                        activeColor: AppTokens.income,
+                      ),
+                      SlidingSegmentedItem<CategoryType>(
+                        value: CategoryType.debt,
+                        label: 'Vay / Nợ',
+                        activeColor: AppTokens.debt,
+                      ),
+                    ],
+                    onValueChanged: (type) {
+                      setState(() => _activeType = type);
+                    },
+                  ),
                 ),
-              ),
 
               // 3. Search Filter Field
               Padding(
@@ -282,7 +297,10 @@ class _CategoryTreeModalState extends ConsumerState<CategoryTreeModal> {
                     allCategories.where((c) => c.type == _activeType).toList();
 
                     final parentGroups = typedCategories
-                        .where((c) => c.parentId == null || c.parentId!.isEmpty)
+                        .where((c) =>
+                            (c.parentId == null || c.parentId!.isEmpty) &&
+                            (widget.parentCategoryId == null ||
+                                c.id == widget.parentCategoryId))
                         .toList();
 
                     final Map<String, List<Category>> childrenMap = {};
@@ -372,7 +390,7 @@ class _CategoryTreeModalState extends ConsumerState<CategoryTreeModal> {
                               // PARENT GROUP TILE
                               InkWell(
                                 onTap: () {
-                                  if (widget.allowSelectParent) {
+                                  if (widget.allowSelectParent && widget.parentCategoryId == null) {
                                     HapticFeedback.selectionClick();
                                     Navigator.of(context).pop(parent);
                                   } else {

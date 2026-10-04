@@ -125,6 +125,156 @@ ResolvedBudgetWindow resolveBudgetWindow(Budget budget, Map<String, int> cycleSt
   );
 }
 
+class RecurringBudgetChild {
+  const RecurringBudgetChild(this.category, this.budget, this.spent);
+  final Category category;
+  final Budget budget;
+  final double spent;
+}
+
+class RecurringBudgetParentGroup {
+  const RecurringBudgetParentGroup({
+    required this.id,
+    required this.category,
+    required this.parentBudget,
+    required this.children,
+    required this.directParentSpent,
+    required this.totalSpent,
+    required this.canAddChild,
+  });
+  final String id;
+  final Category? category;
+  final Budget? parentBudget;
+  final List<RecurringBudgetChild> children;
+  final double directParentSpent, totalSpent;
+  final bool canAddChild;
+  double get parentOwnLimit => parentBudget?.amount ?? 0;
+  double get totalLimit =>
+      parentOwnLimit +
+      children.fold(0.0, (sum, child) => sum + child.budget.amount);
+  double get remaining => totalLimit - totalSpent;
+  double get ratio =>
+      totalLimit > 0 ? (totalSpent / totalLimit).clamp(0.0, 1.0).toDouble() : 0;
+}
+
+class RecurringBudgetSnapshot {
+  const RecurringBudgetSnapshot(this.budgets, this.groups, this.totalSpent);
+  final List<Budget> budgets;
+  final List<RecurringBudgetParentGroup> groups;
+  final double totalSpent;
+  double get totalLimit =>
+      budgets.fold(0.0, (sum, budget) => sum + budget.amount);
+}
+
+/// Preserve the recurring screen's fiscal window, Savings exclusion and
+/// project-ID/tag exclusions. Bucket expenses once, never parent-inclusive
+/// spending plus child spending. Stream order determines stable card order.
+RecurringBudgetSnapshot deriveRecurringBudgetGroups({
+  required List<Budget> budgets,
+  required List<Category> categories,
+  required List<Transaction> expenses,
+  required List<ProjectBudget> projects,
+  required DateTime anchorMonth,
+  required DateTime startInclusive,
+  required DateTime endExclusive,
+}) {
+  final categoryById = {
+    for (final category in categories) category.id: category
+  };
+  final childrenByParent = <String, List<Category>>{};
+  for (final category in categories) {
+    final parentId = category.parentId;
+    if (parentId != null && parentId.isNotEmpty) {
+      childrenByParent.putIfAbsent(parentId, () => []).add(category);
+    }
+  }
+  final activeTags = projects
+      .where((p) => p.status != 'ARCHIVED')
+      .map((p) => p.tag.toLowerCase().trim())
+      .toSet();
+  final spentByCategory = <String, double>{};
+  for (final tx in expenses) {
+    if (tx.type != CategoryType.expense ||
+        tx.deletedAt != null ||
+        tx.goalId != null ||
+        tx.envelopeType == 'savings' ||
+        (tx.projectBudgetId != null && tx.projectBudgetId!.isNotEmpty) ||
+        tx.date.isBefore(startInclusive) ||
+        !tx.date.isBefore(endExclusive)) {
+      continue;
+    }
+    final note = tx.note?.toLowerCase() ?? '';
+    final merchant = tx.merchant?.toLowerCase() ?? '';
+    if (activeTags.any((tag) => note.contains(tag) || merchant.contains(tag))) {
+      continue;
+    }
+    spentByCategory.update(tx.categoryId, (value) => value + tx.amount,
+        ifAbsent: () => tx.amount);
+  }
+  final monthly = budgets
+      .where((b) =>
+          !b.id.startsWith('event_') &&
+          b.periodMonth.year == anchorMonth.year &&
+          b.periodMonth.month == anchorMonth.month)
+      .toList();
+  final roots = <String, Category?>{};
+  final ownBudgets = <String, Budget>{};
+  final childBudgets = <String, List<RecurringBudgetChild>>{};
+  final fallbacks = <String>{};
+  for (final budget in monthly) {
+    final category = categoryById[budget.categoryId];
+    final parent = categoryById[category?.parentId];
+    final isRoot = category != null &&
+        (category.parentId == null || category.parentId!.isEmpty);
+    final isDirectChild = category != null &&
+        parent != null &&
+        parent.type == category.type &&
+        (parent.parentId == null || parent.parentId!.isEmpty);
+    if (isRoot && !ownBudgets.containsKey(category.id)) {
+      roots.putIfAbsent(category.id, () => category);
+      ownBudgets[category.id] = budget;
+    } else if (isDirectChild) {
+      roots.putIfAbsent(parent.id, () => parent);
+      childBudgets.putIfAbsent(parent.id, () => []).add(RecurringBudgetChild(
+          category, budget, spentByCategory[category.id] ?? 0));
+    } else {
+      // Malformed/deeper references and duplicate root rows stay visible as
+      // standalone exact-category cards, without fabricating persisted rows.
+      final key = 'budget:${budget.id}';
+      roots[key] = category;
+      ownBudgets[key] = budget;
+      fallbacks.add(key);
+    }
+  }
+  final accountedCategories = <String>{};
+  final groups = <RecurringBudgetParentGroup>[];
+  for (final entry in roots.entries) {
+    final own = ownBudgets[entry.key];
+    final categoryId = entry.value?.id ?? own!.categoryId;
+    final spendingIds = <String>{categoryId};
+    if (!fallbacks.contains(entry.key)) {
+      spendingIds.addAll(
+          (childrenByParent[categoryId] ?? []).map((category) => category.id));
+    }
+    accountedCategories.addAll(spendingIds);
+    groups.add(RecurringBudgetParentGroup(
+      id: entry.key,
+      category: entry.value,
+      parentBudget: own,
+      children: List.unmodifiable(childBudgets[entry.key] ?? []),
+      directParentSpent: spentByCategory[categoryId] ?? 0,
+      totalSpent:
+          spendingIds.fold(0.0, (sum, id) => sum + (spentByCategory[id] ?? 0)),
+      canAddChild: !fallbacks.contains(entry.key),
+    ));
+  }
+  return RecurringBudgetSnapshot(
+      List.unmodifiable(monthly),
+      List.unmodifiable(groups),
+      accountedCategories.fold(
+          0.0, (sum, id) => sum + (spentByCategory[id] ?? 0)));
+}
+
 abstract final class BudgetPeriodMotion {
   static const Duration timeline = Duration(milliseconds: 220);
   static const Duration textExit = Duration(milliseconds: 80);
@@ -157,6 +307,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen>
   bool _isPeriodTransitioning = false;
   bool _periodContentSwapped = false;
   bool _isHorizontalPeriodDragActive = false;
+  final Set<String> _expandedParentCategoryIds = {};
 
   @override
   void initState() {
@@ -501,13 +652,21 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen>
     }
   }
 
-  void _openBudgetSetupSheet(BuildContext context, {Budget? editBudget}) {
+  void _openBudgetSetupSheet(
+    BuildContext context, {
+    Budget? editBudget,
+    Category? initialCategory,
+    Category? childParent,
+  }) {
     HapticFeedback.selectionClick();
     AppAnimationPolicy.showFluidSheet(
       context: context,
       mode: FluidSheetMode.nestedScrollable,
       backgroundColor: Colors.transparent,
-      builder: (_, __) => _BudgetSetupSheet(editBudget: editBudget),
+      builder: (_, __) => _BudgetSetupSheet(
+          editBudget: editBudget,
+          initialCategory: initialCategory,
+          childParent: childParent),
     );
   }
 
@@ -600,6 +759,16 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen>
     final expensesAsync = ref.watch(expenseTransactionsStreamProvider);
     final projectBudgetsAsync = ref.watch(projectBudgetsStreamProvider);
 
+    final recurring = deriveRecurringBudgetGroups(
+      budgets: budgetsAsync.valueOrNull ?? [],
+      categories: categoriesAsync.valueOrNull ?? [],
+      expenses: expensesAsync.valueOrNull ?? [],
+      projects: projectBudgetsAsync.valueOrNull ?? [],
+      anchorMonth: anchorMonth,
+      startInclusive: boundary.start(cycleRange.startDate),
+      endExclusive: boundary.end(cycleRange.endDate),
+    );
+
     return AppFeedbackDismissRegion(
       child: AmbientCanvas(child: Scaffold(
         backgroundColor: Colors.transparent,
@@ -621,61 +790,81 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Icon(Icons.pie_chart_outline_rounded, size: 14, color: accent.primary),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      'PHÂN BỔ HẠN MỨC',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w800,
-                                        letterSpacing: 0.6,
-                                        color: accent.primary,
-                                      ),
+                        LayoutBuilder(builder: (context, constraints) {
+                          final title = Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(Icons.pie_chart_outline_rounded,
+                                      size: 14, color: accent.primary),
+                                  const SizedBox(width: 4),
+                                  Flexible(
+                                      child: Text(
+                                    'PHÂN BỔ HẠN MỨC',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 0.6,
+                                      color: accent.primary,
                                     ),
-                                  ],
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  'Kế Hoạch Tài Chính',
-                                  style: TextStyle(
+                                  )),
+                                ],
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Kế Hoạch Tài Chính',
+                                style: TextStyle(
                                     fontSize: 20,
                                     fontWeight: FontWeight.w800,
-                                    color: isDark ? AppTokens.darkText : AppTokens.lightText,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            ElevatedButton.icon(
-                              onPressed: () {
-                                if (currentTopTab == BudgetTopTab.recurring) {
-                                  _openBudgetSetupSheet(context);
-                                } else {
-                                  _openProjectBudgetModal(context);
-                                }
-                              },
-                              icon: const Icon(Icons.add_rounded, size: 16),
-                              label: Text(
-                                currentTopTab == BudgetTopTab.recurring ? 'Đặt hạn mức' : 'Tạo sự kiện',
-                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+                                    color: isDark
+                                        ? AppTokens.darkText
+                                        : AppTokens.lightText),
                               ),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: accent.primary,
-                                foregroundColor: Colors.white,
-                                elevation: 1,
-                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                              ),
+                            ],
+                          );
+                          final action = ElevatedButton.icon(
+                            onPressed: () {
+                              if (currentTopTab == BudgetTopTab.recurring) {
+                                _openBudgetSetupSheet(context);
+                              } else {
+                                _openProjectBudgetModal(context);
+                              }
+                            },
+                            icon: const Icon(Icons.add_rounded, size: 16),
+                            label: Text(
+                              currentTopTab == BudgetTopTab.recurring
+                                  ? 'Đặt hạn mức'
+                                  : 'Tạo sự kiện',
+                              style: const TextStyle(
+                                  fontSize: 12, fontWeight: FontWeight.w800),
                             ),
-                          ],
-                        ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: accent.primary,
+                              foregroundColor: Colors.white,
+                              elevation: 1,
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 10),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14)),
+                            ),
+                          );
+                          if (constraints.maxWidth < 360 ||
+                              MediaQuery.textScalerOf(context).scale(1) > 1.3) {
+                            return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  title,
+                                  const SizedBox(height: 8),
+                                  action,
+                                ]);
+                          }
+                          return Row(children: [
+                            Expanded(child: title),
+                            const SizedBox(width: 8),
+                            action
+                          ]);
+                        }),
                         const SizedBox(height: 12),
 
                         SlidingSegmentedBar<BudgetTopTab>(
@@ -726,50 +915,14 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen>
 
                   budgetsAsync.when(
                     data: (budgets) {
-                      final allCategories = categoriesAsync.valueOrNull ?? <Category>[];
-                      final allExpenses = expensesAsync.valueOrNull ?? <Transaction>[];
-                      final allProjects = projectBudgetsAsync.valueOrNull ?? <ProjectBudget>[];
-                      final catMap = {for (final c in allCategories) c.id: c};
-
-                      final activeProjectTags = allProjects
-                          .where((p) => p.status != 'ARCHIVED')
-                          .map((p) => p.tag.toLowerCase().trim())
-                          .toSet();
-
-                      final recurringBudgetsForThisMonth = budgets.where((b) {
-                        if (b.id.startsWith('event_')) return false;
-                        return b.periodMonth.year == anchorMonth.year && b.periodMonth.month == anchorMonth.month;
-                      }).toList();
-
-                      final totalBudgetAmount = recurringBudgetsForThisMonth.fold(0.0, (sum, b) => sum + b.amount);
-
-                      double totalSpent = 0.0;
-                      for (final b in recurringBudgetsForThisMonth) {
-                        final targetCat = catMap[b.categoryId];
-                        final isParent = targetCat != null && (targetCat.parentId == null || targetCat.parentId!.isEmpty);
-
-                        final spentForThis = allExpenses.where((t) {
-                          if (t.projectBudgetId != null && t.projectBudgetId!.isNotEmpty) return false;
-                          final noteLower = t.note?.toLowerCase() ?? '';
-                          final merchantLower = t.merchant?.toLowerCase() ?? '';
-                          final isEventTx = activeProjectTags.any((tag) => noteLower.contains(tag) || merchantLower.contains(tag));
-                          if (isEventTx) return false;
-
-                          if (t.date.isBefore(boundary.start(cycleRange.startDate)) || !t.date.isBefore(boundary.end(cycleRange.endDate))) return false;
-                          if (isParent) {
-                            if (t.categoryId == b.categoryId) return true;
-                            final sub = catMap[t.categoryId];
-                            return sub != null && sub.parentId == b.categoryId;
-                          } else {
-                            return t.categoryId == b.categoryId;
-                          }
-                        }).fold(0.0, (s, t) => s + t.amount);
-
-                        totalSpent += spentForThis;
-                      }
-
-                      final remaining = math.max(0.0, totalBudgetAmount - totalSpent);
-                      final spendPct = totalBudgetAmount > 0 ? (totalSpent / totalBudgetAmount).clamp(0.0, 1.0) : 0.0;
+                      final recurringBudgetsForThisMonth = recurring.budgets;
+                      final totalBudgetAmount = recurring.totalLimit;
+                      final totalSpent = recurring.totalSpent;
+                      final remaining =
+                          math.max(0.0, totalBudgetAmount - totalSpent);
+                      final spendPct = totalBudgetAmount > 0
+                          ? (totalSpent / totalBudgetAmount).clamp(0.0, 1.0)
+                          : 0.0;
 
                       if (recurringBudgetsForThisMonth.isEmpty) {
                         return const SliverToBoxAdapter(child: SizedBox(height: 6));
@@ -801,8 +954,9 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen>
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  Wrap(
+                                    spacing: 12,
+                                    runSpacing: 4,
                                     children: [
                                       Text(
                                         'TỔNG NGÂN SÁCH THÁNG ${DateFormat('MM/yyyy').format(anchorMonth)}',
@@ -853,8 +1007,9 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen>
                                     ],
                                   ),
                                   const SizedBox(height: 10),
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  Wrap(
+                                    spacing: 12,
+                                    runSpacing: 4,
                                     children: [
                                       CurrencyText(
                                         'Đã chi: ${_formatCurrency(totalSpent)} (${(spendPct * 100).toStringAsFixed(0)}%)',
@@ -879,22 +1034,8 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen>
 
                   budgetsAsync.when(
                     data: (budgets) {
-                      final allCategories = categoriesAsync.valueOrNull ?? <Category>[];
-                      final allExpenses = expensesAsync.valueOrNull ?? <Transaction>[];
-                      final allProjects = projectBudgetsAsync.valueOrNull ?? <ProjectBudget>[];
-                      final catMap = {for (final c in allCategories) c.id: c};
-
-                      final activeProjectTags = allProjects
-                          .where((p) => p.status != 'ARCHIVED')
-                          .map((p) => p.tag.toLowerCase().trim())
-                          .toSet();
-
-                      final recurringBudgetsForThisMonth = budgets.where((b) {
-                        if (b.id.startsWith('event_')) return false;
-                        return b.periodMonth.year == anchorMonth.year && b.periodMonth.month == anchorMonth.month;
-                      }).toList();
-
-                      if (recurringBudgetsForThisMonth.isEmpty) {
+                      final groups = recurring.groups;
+                      if (groups.isEmpty) {
                         return SliverToBoxAdapter(
                           child: Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 32),
@@ -1001,184 +1142,51 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen>
                         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
                         sliver: SliverList(
                           delegate: SliverChildBuilderDelegate(
-                                (context, index) {
-                              final budget = recurringBudgetsForThisMonth[index];
-                              final targetCategory = catMap[budget.categoryId];
-                              final isChild = targetCategory != null &&
-                                  targetCategory.parentId != null &&
-                                  targetCategory.parentId!.isNotEmpty;
-
-                              Category? parentCategory;
-                              if (isChild && targetCategory.parentId != null) {
-                                parentCategory = catMap[targetCategory.parentId!];
-                              }
-
-                              final spent = allExpenses.where((t) {
-                                if (t.projectBudgetId != null && t.projectBudgetId!.isNotEmpty) return false;
-                                final noteLower = t.note?.toLowerCase() ?? '';
-                                final merchantLower = t.merchant?.toLowerCase() ?? '';
-                                final isEventTx = activeProjectTags.any((tag) => noteLower.contains(tag) || merchantLower.contains(tag));
-                                if (isEventTx) return false;
-
-                                if (t.date.isBefore(boundary.start(cycleRange.startDate)) || !t.date.isBefore(boundary.end(cycleRange.endDate))) return false;
-                                if (isChild) {
-                                  return t.categoryId == budget.categoryId;
-                                } else {
-                                  if (t.categoryId == budget.categoryId) return true;
-                                  final sub = catMap[t.categoryId];
-                                  return sub != null && sub.parentId == budget.categoryId;
-                                }
-                              }).fold(0.0, (sum, t) => sum + t.amount);
-
-                              final remaining = budget.amount - spent;
-                              final isOver = remaining < 0;
-                              final ratio = budget.amount > 0 ? (spent / budget.amount).clamp(0.0, 1.0) : 0.0;
-
+                            (context, index) {
+                              final group = groups[index];
                               return Padding(
-                                padding: const EdgeInsets.only(bottom: 12),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 6),
                                 child: _buildPeriodDataMotion(
-                                  child: InkWell(
-                                    onTap: () => _openBudgetSetupSheet(context, editBudget: budget),
-                                    borderRadius: BorderRadius.circular(18),
-                                    child: Container(
-                                      padding: const EdgeInsets.all(16),
-                                      decoration: BoxDecoration(
-                                        color: isDark ? AppTokens.darkCard : Colors.white,
-                                        borderRadius: BorderRadius.circular(18),
-                                        border: Border.all(
-                                          color: isOver
-                                              ? AppTokens.expense.withValues(alpha: 0.4)
-                                              : (isDark ? AppTokens.darkBorder : AppTokens.lightBorder),
-                                        ),
-                                      ),
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Row(
-                                            children: [
-                                              CategoryIconBadge(
-                                                category: targetCategory,
-                                                isExpense: true,
-                                                size: 40,
-                                                iconSize: 20,
-                                              ),
-                                              const SizedBox(width: 12),
-                                              Expanded(
-                                                child: Column(
-                                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                                  children: [
-                                                    Row(
-                                                      children: [
-                                                        Flexible(
-                                                          child: Text(
-                                                            targetCategory?.name ?? 'Danh mục',
-                                                            maxLines: 1,
-                                                            overflow: TextOverflow.ellipsis,
-                                                            style: TextStyle(
-                                                              fontSize: 14,
-                                                              fontWeight: FontWeight.w800,
-                                                              color: isDark ? AppTokens.darkText : AppTokens.lightText,
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        const SizedBox(width: 6),
-                                                        Container(
-                                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                                                          decoration: BoxDecoration(
-                                                            color: isChild
-                                                                ? Colors.indigo.withValues(alpha: 0.15)
-                                                                : accent.primary.withValues(alpha: 0.15),
-                                                            borderRadius: BorderRadius.circular(6),
-                                                          ),
-                                                          child: Text(
-                                                            isChild ? 'Mục con' : 'Nhóm cha',
-                                                            style: TextStyle(
-                                                              fontSize: 9,
-                                                              fontWeight: FontWeight.bold,
-                                                              color: isChild ? Colors.indigoAccent : accent.primary,
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                    const SizedBox(height: 2),
-                                                    Text(
-                                                      isChild && parentCategory != null
-                                                          ? 'Thuộc: ${parentCategory.name} • Riêng Tháng ${DateFormat('MM/yyyy').format(anchorMonth)}'
-                                                          : 'Riêng Tháng ${DateFormat('MM/yyyy').format(anchorMonth)} • Kế thừa ngày ${budget.cycleStartDay}',
-                                                      style: TextStyle(
-                                                        fontSize: 11,
-                                                        color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                              IconButton(
-                                                icon: const Icon(Icons.edit_outlined, size: 18),
-                                                color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
-                                                onPressed: () => _openBudgetSetupSheet(context, editBudget: budget),
-                                              ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 14),
-                                          Row(
-                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                            children: [
-                                              CurrencyText(
-                                                '${_formatCurrency(spent)} / ${_formatCurrency(budget.amount)}',
-                                                style: TextStyle(
-                                                  fontSize: 13,
-                                                  fontWeight: FontWeight.w800,
-                                                  color: isDark ? AppTokens.darkText : AppTokens.lightText,
-                                                ),
-                                              ),
-                                              CurrencyText(
-                                                isOver
-                                                    ? 'Vượt ${_formatCurrency(remaining.abs())}'
-                                                    : 'Còn ${_formatCurrency(remaining)}',
-                                                style: TextStyle(
-                                                  fontSize: 11,
-                                                  fontWeight: FontWeight.w800,
-                                                  color: isOver ? AppTokens.expense : const Color(0xFF10B981),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 6),
-                                          Stack(
-                                            children: [
-                                              Container(
-                                                height: 6,
-                                                decoration: BoxDecoration(
-                                                  color: isDark ? Colors.white10 : Colors.black12,
-                                                  borderRadius: BorderRadius.circular(3),
-                                                ),
-                                              ),
-                                              _buildPeriodProgressFill(
-                                                targetFactor: ratio.toDouble(),
-                                                child: Container(
-                                                  height: 6,
-                                                  decoration: BoxDecoration(
-                                                    color: isOver
-                                                        ? AppTokens.expense
-                                                        : (ratio > 0.8
-                                                        ? AppTokens.warning
-                                                        : const Color(0xFF10B981)),
-                                                    borderRadius: BorderRadius.circular(3),
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ],
-                                      ),
+                                  child: AnimatedBuilder(
+                                    animation: _periodTimelineController,
+                                    builder: (context, _) => _ParentBudgetCard(
+                                      key:
+                                          ValueKey('budget-parent:${group.id}'),
+                                      group: group,
+                                      anchorMonth: anchorMonth,
+                                      cycleStartDay:
+                                          group.parentBudget?.cycleStartDay ??
+                                              cycleRange.startDay,
+                                      expanded: _expandedParentCategoryIds
+                                          .contains(group.id),
+                                      progressReveal: _progressRevealFactor,
+                                      onToggle: () {
+                                        HapticFeedback.selectionClick();
+                                        setState(() {
+                                          if (!_expandedParentCategoryIds
+                                              .add(group.id)) {
+                                            _expandedParentCategoryIds
+                                                .remove(group.id);
+                                          }
+                                        });
+                                      },
+                                      onEdit: () => _openBudgetSetupSheet(
+                                          context,
+                                          editBudget: group.parentBudget,
+                                          initialCategory: group.category),
+                                      onEditChild: (budget) =>
+                                          _openBudgetSetupSheet(context,
+                                              editBudget: budget),
+                                      onAddChild: () => _openBudgetSetupSheet(
+                                          context,
+                                          childParent: group.category),
                                     ),
                                   ),
                                 ),
                               );
                             },
-                            childCount: recurringBudgetsForThisMonth.length,
+                            childCount: groups.length,
                           ),
                         ),
                       );
@@ -1666,6 +1674,230 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen>
         accent: accent,
       ),
     );
+  }
+}
+
+class _ParentBudgetCard extends StatelessWidget {
+  const _ParentBudgetCard(
+      {super.key,
+      required this.group,
+      required this.anchorMonth,
+      required this.cycleStartDay,
+      required this.expanded,
+      required this.progressReveal,
+      required this.onToggle,
+      required this.onEdit,
+      required this.onEditChild,
+      required this.onAddChild});
+  final RecurringBudgetParentGroup group;
+  final DateTime anchorMonth;
+  final int cycleStartDay;
+  final bool expanded;
+  final double progressReveal;
+  final VoidCallback onToggle, onEdit, onAddChild;
+  final ValueChanged<Budget> onEditChild;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final reduced = MediaQuery.disableAnimationsOf(context) ||
+        MediaQuery.accessibleNavigationOf(context);
+    final duration =
+        reduced ? Duration.zero : const Duration(milliseconds: 200);
+    final name = group.category?.name ?? 'Danh mục không xác định';
+    final expandedBody = expanded
+        ? Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (final child in group.children)
+                    _ChildBudgetItem(
+                        key: ValueKey('budget-child:${child.budget.id}'),
+                        childBudget: child,
+                        progressReveal: progressReveal,
+                        onEdit: () => onEditChild(child.budget)),
+                  if (group.canAddChild)
+                    TextButton(
+                      key: ValueKey('budget-add-child:${group.id}'),
+                      onPressed: onAddChild,
+                      style:
+                          TextButton.styleFrom(alignment: Alignment.centerLeft),
+                      child: Text('+ Thêm mục con cho $name…'),
+                    ),
+                ]),
+          )
+        : const SizedBox(width: double.infinity);
+    return Material(
+      color: dark ? AppTokens.darkCard : Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: BorderSide(
+            color: group.remaining < 0
+                ? AppTokens.expense.withValues(alpha: 0.4)
+                : dark
+                    ? AppTokens.darkBorder
+                    : AppTokens.lightBorder),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onToggle,
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
+            child: Column(children: [
+              Row(children: [
+                CategoryIconBadge(
+                    category: group.category, size: 40, iconSize: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                      Text(name,
+                          style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: dark
+                                  ? AppTokens.darkText
+                                  : AppTokens.lightText)),
+                      const SizedBox(height: 3),
+                      Text(
+                          'Riêng Tháng ${DateFormat('MM/yyyy').format(anchorMonth)} • Kế thừa ngày $cycleStartDay',
+                          style: TextStyle(
+                              fontSize: 11,
+                              color: dark
+                                  ? AppTokens.darkMuted
+                                  : AppTokens.lightMuted)),
+                    ])),
+                IconButton(
+                    key: ValueKey('budget-edit:${group.id}'),
+                    tooltip: 'Sửa hạn mức $name',
+                    onPressed: onEdit,
+                    icon: const Icon(Icons.edit_outlined, size: 18)),
+                AnimatedRotation(
+                  key: ValueKey('budget-caret:${group.id}'),
+                  turns: expanded ? 0.5 : 0,
+                  duration: duration,
+                  curve: Curves.easeInOutCubic,
+                  child:
+                      const Icon(Icons.keyboard_arrow_down_rounded, size: 24),
+                ),
+              ]),
+              const SizedBox(height: 12),
+              _RecurringBudgetMoney(
+                  spent: group.totalSpent,
+                  limit: group.totalLimit,
+                  progressHeight: 6,
+                  progressReveal: progressReveal),
+            ]),
+          ),
+          if (reduced)
+            expandedBody
+          else
+            AnimatedSize(
+              duration: duration,
+              curve: Curves.easeInOutCubic,
+              alignment: Alignment.topCenter,
+              child: expandedBody,
+            ),
+        ]),
+      ),
+    );
+  }
+}
+
+class _ChildBudgetItem extends StatelessWidget {
+  const _ChildBudgetItem(
+      {super.key,
+      required this.childBudget,
+      required this.progressReveal,
+      required this.onEdit});
+  final RecurringBudgetChild childBudget;
+  final double progressReveal;
+  final VoidCallback onEdit;
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      constraints: const BoxConstraints(minHeight: 48),
+      padding: const EdgeInsets.fromLTRB(12, 4, 8, 12),
+      decoration: BoxDecoration(
+        color: dark ? AppTokens.darkCardSubtle : AppTokens.lightCardSubtle,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+            color: dark ? AppTokens.darkBorder : AppTokens.lightBorder),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          CategoryIconBadge(
+              category: childBudget.category, size: 28, iconSize: 20),
+          const SizedBox(width: 10),
+          Expanded(
+              child: Text(childBudget.category.name,
+                  style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: dark ? AppTokens.darkText : AppTokens.lightText))),
+          IconButton(
+              key: ValueKey('budget-child-edit:${childBudget.budget.id}'),
+              tooltip: 'Sửa hạn mức ${childBudget.category.name}',
+              onPressed: onEdit,
+              icon: const Icon(Icons.edit_outlined, size: 18)),
+        ]),
+        _RecurringBudgetMoney(
+            spent: childBudget.spent,
+            limit: childBudget.budget.amount,
+            progressHeight: 4,
+            progressReveal: progressReveal),
+      ]),
+    );
+  }
+}
+
+class _RecurringBudgetMoney extends StatelessWidget {
+  const _RecurringBudgetMoney(
+      {required this.spent,
+      required this.limit,
+      required this.progressHeight,
+      required this.progressReveal});
+  final double spent, limit, progressHeight, progressReveal;
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final remaining = limit - spent;
+    final ratio = limit > 0 ? (spent / limit).clamp(0.0, 1.0).toDouble() : 0.0;
+    final color = remaining < 0
+        ? AppTokens.expense
+        : ratio > 0.8
+            ? AppTokens.warning
+            : AppTokens.income;
+    final money =
+        NumberFormat.currency(locale: 'vi_VN', symbol: '₫', decimalDigits: 0);
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      ClipRRect(
+          borderRadius: BorderRadius.circular(3),
+          child: Stack(children: [
+            Container(
+                height: progressHeight,
+                color: dark ? Colors.white12 : const Color(0xFFE2E8F0)),
+            FractionallySizedBox(
+                widthFactor: ratio * progressReveal,
+                child: Container(height: progressHeight, color: color)),
+          ])),
+      const SizedBox(height: 8),
+      CurrencyText('${money.format(spent)} / ${money.format(limit)}',
+          style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: dark ? AppTokens.darkText : AppTokens.lightText)),
+      const SizedBox(height: 3),
+      CurrencyText(
+          '${remaining < 0 ? 'Vượt' : 'Còn'} ${money.format(remaining.abs())}',
+          style: TextStyle(
+              fontSize: 12, fontWeight: FontWeight.w700, color: color)),
+    ]);
   }
 }
 
@@ -2452,12 +2684,14 @@ class _BudgetSetupSheet extends ConsumerStatefulWidget {
   final Budget? editBudget;
   final Category? initialCategory;
   final DateTime? initialAnchor;
+  final Category? childParent;
 
   const _BudgetSetupSheet({
     super.key,
     this.editBudget,
     this.initialCategory,
     this.initialAnchor,
+    this.childParent,
   });
 
   @override
@@ -2543,13 +2777,21 @@ class _BudgetSetupSheetState extends ConsumerState<_BudgetSetupSheet> {
   Future<void> _openUnifiedCategorySelector() async {
     final chosen = await CategoryTreeModal.show(
       context,
-      initialType: CategoryType.expense,
-      allowSelectParent: true,
+      initialType: widget.childParent?.type ?? CategoryType.expense,
+      allowSelectParent: widget.childParent == null,
+      parentCategoryId: widget.childParent?.id,
       selectedCategoryId: _selectedCategoryId,
-      title: 'Chọn Danh Mục Ngân Sách',
+      title: widget.childParent == null
+          ? 'Chọn Danh Mục Ngân Sách'
+          : 'Chọn mục cho ${widget.childParent!.name}',
     );
 
     if (!mounted || chosen == null) return;
+    if (widget.childParent != null &&
+        chosen.parentId != widget.childParent!.id) {
+      _categoryFeedback.reject();
+      return;
+    }
 
     setState(() {
       _selectedCategoryId = chosen.id;
@@ -2560,7 +2802,9 @@ class _BudgetSetupSheetState extends ConsumerState<_BudgetSetupSheet> {
 
   Future<void> _saveBudget() async {
     final amount = double.tryParse(_amountBuffer) ?? 0.0;
-    final categoryInvalid = _selectedCategoryId == null;
+    final categoryInvalid = _selectedCategoryId == null ||
+        (widget.childParent != null &&
+            _selectedCategoryObject?.parentId != widget.childParent!.id);
     final amountInvalid = amount <= 0;
 
     if (categoryInvalid || amountInvalid) {
