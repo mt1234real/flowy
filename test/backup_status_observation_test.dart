@@ -288,8 +288,8 @@ void main() {
       }
       expect(
           find.text(phase == ManualBackupPhase.running
-              ? 'Đang sao lưu dữ liệu…'
-              : 'Đã sao lưu lên Google Drive'),
+              ? 'Đang sao lưu'
+              : 'Đã sao lưu'),
           findsOneWidget);
     }
     AppFeedback.dismissImmediately();

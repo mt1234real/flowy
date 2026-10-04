@@ -97,6 +97,8 @@ enum AppTopFeedbackTone {
   error,
 }
 
+enum AppLiveFeedbackPresentation { standard, ambientBackup }
+
 /// One latest live status, separate from the single transient feedback slot.
 @immutable
 class AppLiveFeedback {
@@ -104,6 +106,7 @@ class AppLiveFeedback {
   final IconData icon;
   final AppTopFeedbackTone tone;
   final bool terminal, spinning, reduceMotion;
+  final AppLiveFeedbackPresentation presentation;
   final VoidCallback? onPresented;
   const AppLiveFeedback(
       {required this.id,
@@ -113,6 +116,7 @@ class AppLiveFeedback {
       this.terminal = false,
       this.spinning = false,
       this.reduceMotion = false,
+      this.presentation = AppLiveFeedbackPresentation.standard,
       this.onPresented});
 }
 
@@ -319,6 +323,7 @@ abstract final class AppFeedback {
         previous?.message == feedback.message &&
         previous?.spinning == feedback.spinning &&
         previous?.reduceMotion == feedback.reduceMotion &&
+        previous?.presentation == feedback.presentation &&
         previous?.terminal == feedback.terminal) {
       _resumeLive();
       return;
@@ -1025,6 +1030,13 @@ class _TopBannerOverlayState extends State<_TopBannerOverlay> {
   IconData get _icon => _live?.icon ?? widget.icon;
   AppTopFeedbackTone get _tone => _live?.tone ?? widget.tone;
   bool get _reduced => _mediaReduced || (_live?.reduceMotion ?? false);
+  bool get _ambientBackup =>
+      _live?.presentation == AppLiveFeedbackPresentation.ambientBackup;
+  Duration get _contentDuration =>
+      Duration(milliseconds: _ambientBackup ? 150 : 180);
+  Duration get _exitDuration => _ambientBackup
+      ? const Duration(milliseconds: 170)
+      : AppFeedbackTokens.topBannerExitDuration;
 
   @override
   void initState() {
@@ -1036,6 +1048,7 @@ class _TopBannerOverlayState extends State<_TopBannerOverlay> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || _closed || _closing) return;
       setState(() => _shown = true);
+      if (_ambientBackup && _reduced) _finishEntry();
     });
   }
 
@@ -1050,6 +1063,7 @@ class _TopBannerOverlayState extends State<_TopBannerOverlay> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     _mediaReduced = MediaQuery.disableAnimationsOf(context);
+    if (_ambientBackup && _reduced) _finishEntry();
   }
 
   void updateLive(AppLiveFeedback value) {
@@ -1059,10 +1073,12 @@ class _TopBannerOverlayState extends State<_TopBannerOverlay> {
     if (value.terminal &&
         !(_live?.terminal ?? false) &&
         _visible.elapsedMilliseconds < 800) {
-      _terminalTimer =
-          Timer(Duration(milliseconds: 800 - _visible.elapsedMilliseconds), () {
-        if (mounted && !_closing) _applyLive(value);
-      });
+      _terminalTimer = Timer(
+        Duration(milliseconds: 800 - _visible.elapsedMilliseconds),
+        () {
+          if (mounted && !_closing) _applyLive(value);
+        },
+      );
     } else {
       _applyLive(value);
     }
@@ -1070,7 +1086,8 @@ class _TopBannerOverlayState extends State<_TopBannerOverlay> {
 
   void _applyLive(AppLiveFeedback value) {
     if (!mounted || _closing || _closed) return;
-    final terminalChanged = value.terminal &&
+    final terminalChanged =
+        value.terminal &&
         (_live?.terminal != true ||
             _live?.id != value.id ||
             _live?.message != value.message);
@@ -1079,13 +1096,13 @@ class _TopBannerOverlayState extends State<_TopBannerOverlay> {
     if (value.terminal && _entered) {
       // Hold the fully presented terminal content, rather than counting its
       // crossfade as part of the success hold. Revocation cancels this callback.
-      _terminalTimer = Timer(
-          _reduced ? Duration.zero : const Duration(milliseconds: 180), () {
+      _terminalTimer = Timer(_reduced ? Duration.zero : _contentDuration, () {
         if (!mounted || _closed || _closing || !identical(_live, value)) return;
         if (terminalChanged) _presentTerminal();
         _startHold();
       });
     }
+    if (_ambientBackup && _reduced) _finishEntry();
   }
 
   void _presentTerminal() {
@@ -1095,12 +1112,16 @@ class _TopBannerOverlayState extends State<_TopBannerOverlay> {
   void _startHold() {
     _holdTimer?.cancel();
     _holdTimer = Timer(
-        _tone == AppTopFeedbackTone.success
-            ? AppFeedbackTokens.topBannerSuccessHoldDuration
-            : AppFeedbackTokens.topBannerHoldDuration, () {
-      completedHold = true;
-      unawaited(dismiss());
-    });
+      _tone == AppTopFeedbackTone.success
+          ? _ambientBackup
+                ? const Duration(milliseconds: 1600)
+                : AppFeedbackTokens.topBannerSuccessHoldDuration
+          : AppFeedbackTokens.topBannerHoldDuration,
+      () {
+        completedHold = true;
+        unawaited(dismiss());
+      },
+    );
   }
 
   Future<void> dismiss() {
@@ -1112,8 +1133,7 @@ class _TopBannerOverlayState extends State<_TopBannerOverlay> {
     _terminalTimer?.cancel();
     _closing = true;
     setState(() => _shown = false);
-    _exitTimer = Timer(
-        _reduced ? Duration.zero : AppFeedbackTokens.topBannerExitDuration, () {
+    _exitTimer = Timer(_reduced ? Duration.zero : _exitDuration, () {
       if (!_closed) {
         _closed = true;
         widget.onClosed();
@@ -1141,29 +1161,37 @@ class _TopBannerOverlayState extends State<_TopBannerOverlay> {
   }
 
   Color get _iconColor => switch (_tone) {
-        AppTopFeedbackTone.success => const Color(0xFF34D399),
-        AppTopFeedbackTone.error => AppTokens.expense,
-        AppTopFeedbackTone.info => const Color(0xFF93C5FD),
-      };
+    AppTopFeedbackTone.success => const Color(0xFF34D399),
+    AppTopFeedbackTone.error => AppTokens.expense,
+    AppTopFeedbackTone.info => const Color(0xFF93C5FD),
+  };
 
   Widget _indicator() {
     if (_live?.spinning == true) {
       return SizedBox(
-          width: 13,
-          height: 13,
-          child: CircularProgressIndicator(
-            strokeWidth: 1.8,
-            value: _reduced ? 0.75 : null,
-            color: Colors.white,
-          ));
+        width: _ambientBackup ? 12 : 13,
+        height: _ambientBackup ? 12 : 13,
+        child: CircularProgressIndicator(
+          strokeWidth: _ambientBackup ? 1.5 : 1.8,
+          value: _reduced ? 0.75 : null,
+          color: _ambientBackup
+              ? Colors.white.withValues(alpha: 0.92)
+              : Colors.white,
+        ),
+      );
     }
     final queued = _live != null && !_live!.terminal;
     return Icon(
-        queued && _icon == Icons.schedule_rounded
-            ? Icons.cloud_queue_rounded
-            : _icon,
-        size: 15,
-        color: queued ? Colors.white.withValues(alpha: 0.8) : _iconColor);
+      queued && _icon == Icons.schedule_rounded
+          ? Icons.cloud_queue_rounded
+          : _icon,
+      size: _ambientBackup ? 14 : 15,
+      color: queued
+          ? Colors.white.withValues(alpha: _ambientBackup ? 0.72 : 0.8)
+          : _ambientBackup && _tone == AppTopFeedbackTone.error
+          ? const Color(0xFFFCA5A5)
+          : _iconColor,
+    );
   }
 
   Widget _content(TextStyle style) {
@@ -1173,45 +1201,73 @@ class _TopBannerOverlayState extends State<_TopBannerOverlay> {
       mainAxisSize: MainAxisSize.min,
       children: [
         _indicator(),
-        const SizedBox(width: 8),
+        SizedBox(width: _ambientBackup ? 7 : 8),
         Flexible(
-            child: Text(_message,
-                maxLines: 1, overflow: TextOverflow.ellipsis, style: style)),
+          child: Text(
+            _message,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: style,
+          ),
+        ),
       ],
     );
     final child = SizedBox(
-      height: AppFeedbackTokens.topBannerHeight,
+      height: _ambientBackup ? 34 : AppFeedbackTokens.topBannerHeight,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14),
+        padding: EdgeInsets.symmetric(horizontal: _ambientBackup ? 12 : 14),
         child: _reduced
             ? row
             : AnimatedSwitcher(
-                duration: const Duration(milliseconds: 180),
+                duration: _contentDuration,
                 switchInCurve: Curves.easeOutQuad,
                 switchOutCurve: Curves.easeOutQuad,
                 // Outgoing rows never determine width or escape the clipped surface.
-                layoutBuilder: (current, previous) =>
-                    Stack(alignment: Alignment.center, children: [
-                  for (final old in previous)
-                    Positioned.fill(child: Align(child: old)),
-                  if (current != null) current,
-                ]),
+                layoutBuilder: (current, previous) => Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    for (final old in previous)
+                      Positioned.fill(child: Align(child: old)),
+                    if (current != null) current,
+                  ],
+                ),
                 transitionBuilder: (child, animation) {
-                  // Fade the old label away before the new one is readable.
-                  // Both rows still share the same 180ms vertical transition.
                   final incoming = child.key == identity;
-                  final opacity = animation.drive(CurveTween(
+                  if (_ambientBackup) {
+                    return FadeTransition(
+                      opacity: animation,
+                      child: AnimatedBuilder(
+                        animation: animation,
+                        builder: (_, content) => Transform.translate(
+                          offset: Offset(
+                            0,
+                            (incoming ? 3 : -3) * (1 - animation.value),
+                          ),
+                          child: content,
+                        ),
+                        child: child,
+                      ),
+                    );
+                  }
+                  // Preserve the generic Z1 transition: fade the old label
+                  // before the new one is readable within its 180ms slide.
+                  final opacity = animation.drive(
+                    CurveTween(
                       curve: incoming
                           ? const Interval(0.75, 1)
-                          : const Interval(0.9, 1)));
+                          : const Interval(0.9, 1),
+                    ),
+                  );
                   return FadeTransition(
-                      opacity: opacity,
-                      child: SlideTransition(
-                          position: Tween<Offset>(
-                                  begin: const Offset(0, 0.25),
-                                  end: Offset.zero)
-                              .animate(animation),
-                          child: child));
+                    opacity: opacity,
+                    child: SlideTransition(
+                      position: Tween<Offset>(
+                        begin: const Offset(0, 0.25),
+                        end: Offset.zero,
+                      ).animate(animation),
+                      child: child,
+                    ),
+                  );
                 },
                 child: row,
               ),
@@ -1222,92 +1278,149 @@ class _TopBannerOverlayState extends State<_TopBannerOverlay> {
     return _reduced
         ? child
         : AnimatedSize(
-            duration: const Duration(milliseconds: 260),
+            duration: Duration(milliseconds: _ambientBackup ? 200 : 260),
             curve: Curves.easeOutCubic,
             alignment: Alignment.center,
-            child: child);
+            child: child,
+          );
   }
 
   @override
   Widget build(BuildContext context) {
     final media = MediaQuery.of(context);
-    final inheritedTextStyle = Theme.of(context).textTheme.bodyMedium?.copyWith(
-              fontSize: 12.5,
-              height: 1.2,
-              fontWeight: FontWeight.w600,
-              color: Colors.white,
-              letterSpacing: 0.2,
-              decoration: TextDecoration.none,
-            ) ??
-        const TextStyle(
-            fontSize: 12.5,
-            height: 1.2,
-            fontWeight: FontWeight.w600,
-            color: Colors.white,
-            letterSpacing: 0.2,
-            decoration: TextDecoration.none);
+    final inheritedTextStyle =
+        Theme.of(context).textTheme.bodyMedium?.copyWith(
+          fontSize: _ambientBackup ? 12.25 : 12.5,
+          height: 1.2,
+          fontWeight: FontWeight.w600,
+          color: _ambientBackup
+              ? Colors.white.withValues(alpha: 0.96)
+              : Colors.white,
+          letterSpacing: _ambientBackup ? 0.12 : 0.2,
+          decoration: TextDecoration.none,
+        ) ??
+        TextStyle(
+          fontSize: _ambientBackup ? 12.25 : 12.5,
+          height: 1.2,
+          fontWeight: FontWeight.w600,
+          color: _ambientBackup
+              ? Colors.white.withValues(alpha: 0.96)
+              : Colors.white,
+          letterSpacing: _ambientBackup ? 0.12 : 0.2,
+          decoration: TextDecoration.none,
+        );
     final maxWidth = math
         .max(
-            0.0,
-            math.min(
-                AppFeedbackTokens.topBannerMaxWidth,
-                media.size.width -
-                    AppFeedbackTokens.topBannerHorizontalScreenMargin * 2))
+          0.0,
+          math.min(
+            AppFeedbackTokens.topBannerMaxWidth,
+            media.size.width -
+                AppFeedbackTokens.topBannerHorizontalScreenMargin * 2,
+          ),
+        )
         .toDouble();
     final radius = BorderRadius.circular(AppFeedbackTokens.topBannerRadius);
+    final capsule = IgnorePointer(
+      ignoring: true,
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: maxWidth),
+          child: Material(
+            type: MaterialType.transparency,
+            child: Semantics(
+              liveRegion: true,
+              label: _message,
+              child: ExcludeSemantics(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: radius,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(
+                          alpha: _ambientBackup ? 0.11 : 0.18,
+                        ),
+                        blurRadius: _ambientBackup ? 11 : 16,
+                        offset: Offset(0, _ambientBackup ? 3 : 6),
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: radius,
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(
+                        sigmaX: _ambientBackup
+                            ? 12
+                            : AppFeedbackTokens.topBannerBlurSigma,
+                        sigmaY: _ambientBackup
+                            ? 12
+                            : AppFeedbackTokens.topBannerBlurSigma,
+                      ),
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: _ambientBackup
+                              ? const Color(0xCC1F2937)
+                              : const Color(0xDD111827),
+                          borderRadius: radius,
+                          border: Border.all(
+                            color: Colors.white.withValues(
+                              alpha: _ambientBackup ? 0.08 : 0.12,
+                            ),
+                            width: 0.8,
+                          ),
+                        ),
+                        child: _content(inheritedTextStyle),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    if (_ambientBackup) {
+      // Same entry and ownership; only the backup presentation settles locally
+      // with a small fade/translation instead of travelling above the screen.
+      return Positioned(
+        top: media.padding.top + 8,
+        left: AppFeedbackTokens.topBannerHorizontalScreenMargin,
+        right: AppFeedbackTokens.topBannerHorizontalScreenMargin,
+        child: _reduced
+            ? capsule
+            : TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0, end: _shown ? 1 : 0),
+                duration: _closing
+                    ? _exitDuration
+                    : const Duration(milliseconds: 200),
+                curve: _closing ? Curves.easeInCubic : Curves.easeOutCubic,
+                onEnd: _finishEntry,
+                builder: (_, value, child) => Opacity(
+                  opacity: value,
+                  child: Transform.translate(
+                    offset: Offset(0, (_closing ? -6 : -7) * (1 - value)),
+                    child: child,
+                  ),
+                ),
+                child: capsule,
+              ),
+      );
+    }
     return AnimatedPositioned(
       onEnd: _finishEntry,
-      top:
-          _shown ? media.padding.top + AppFeedbackTokens.topBannerSafeGap : -60,
+      top: _shown
+          ? media.padding.top + AppFeedbackTokens.topBannerSafeGap
+          : -60,
       left: AppFeedbackTokens.topBannerHorizontalScreenMargin,
       right: AppFeedbackTokens.topBannerHorizontalScreenMargin,
       duration: _reduced
           ? Duration.zero
           : _closing
-              ? AppFeedbackTokens.topBannerExitDuration
-              : AppFeedbackTokens.topBannerEnterDuration,
+          ? AppFeedbackTokens.topBannerExitDuration
+          : AppFeedbackTokens.topBannerEnterDuration,
       curve: _closing ? Curves.easeInCubic : Curves.easeOutBack,
-      child: IgnorePointer(
-          ignoring: true,
-          child: Align(
-            alignment: Alignment.topCenter,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: maxWidth),
-              child: Material(
-                type: MaterialType.transparency,
-                child: Semantics(
-                  liveRegion: true,
-                  label: _message,
-                  child: ExcludeSemantics(
-                      child: DecoratedBox(
-                    decoration: BoxDecoration(borderRadius: radius, boxShadow: [
-                      BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.18),
-                          blurRadius: 16,
-                          offset: const Offset(0, 6)),
-                    ]),
-                    child: ClipRRect(
-                      borderRadius: radius,
-                      child: BackdropFilter(
-                        filter: ImageFilter.blur(
-                            sigmaX: AppFeedbackTokens.topBannerBlurSigma,
-                            sigmaY: AppFeedbackTokens.topBannerBlurSigma),
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                              color: const Color(0xDD111827),
-                              borderRadius: radius,
-                              border: Border.all(
-                                  color: Colors.white.withValues(alpha: 0.12),
-                                  width: 0.8)),
-                          child: _content(inheritedTextStyle),
-                        ),
-                      ),
-                    ),
-                  )),
-                ),
-              ),
-            ),
-          )),
+      child: capsule,
     );
   }
 }

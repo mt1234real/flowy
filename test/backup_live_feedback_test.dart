@@ -120,7 +120,7 @@ void main() {
   testWidgets('backupLive_queuedShowsQueuedPill', (tester) async {
     await mount(tester);
     await emit(tester, ManualBackupPhase.queued);
-    expect(find.text('Đang chờ sao lưu…'), findsOneWidget);
+    expect(find.text('Đang chờ sao lưu'), findsOneWidget);
     expect(find.byIcon(Icons.cloud_queue_rounded), findsOneWidget);
     expect(pill(), findsOneWidget);
     expect(haptics, isEmpty);
@@ -130,7 +130,7 @@ void main() {
     await mount(tester);
     await emit(tester, ManualBackupPhase.running);
     await tester.pump(const Duration(minutes: 1));
-    expect(find.text('Đang sao lưu dữ liệu…'), findsOneWidget);
+    expect(find.text('Đang sao lưu'), findsOneWidget);
     expect(pill(), findsOneWidget);
     expect(haptics, isEmpty);
     await finish(tester);
@@ -141,8 +141,8 @@ void main() {
     final element = tester.element(pill());
     await emit(tester, ManualBackupPhase.running);
     expect(tester.element(pill()), same(element));
-    expect(find.text('Đang chờ sao lưu…'), findsNothing);
-    expect(find.text('Đang sao lưu dữ liệu…'), findsOneWidget);
+    expect(find.text('Đang chờ sao lưu'), findsNothing);
+    expect(find.text('Đang sao lưu'), findsOneWidget);
     await finish(tester);
   });
   for (final phase in [ManualBackupPhase.success, ManualBackupPhase.failure]) {
@@ -157,8 +157,8 @@ void main() {
       expect(tester.element(pill()), same(element));
       expect(
           find.text(phase == ManualBackupPhase.success
-              ? 'Đã sao lưu lên Google Drive'
-              : 'Chưa thể sao lưu'),
+              ? 'Đã sao lưu'
+              : 'Sao lưu chưa hoàn tất'),
           findsOneWidget);
       expect(find.textContaining('RAW exception'), findsNothing);
       expect(haptics.length, 1);
@@ -172,10 +172,10 @@ void main() {
     await mount(tester);
     await emit(tester, ManualBackupPhase.running);
     await emit(tester, ManualBackupPhase.success);
-    expect(find.text('Đang sao lưu dữ liệu…'), findsOneWidget);
+    expect(find.text('Đang sao lưu'), findsOneWidget);
     await tester.pump(const Duration(milliseconds: 850));
     await tester.pump(const Duration(milliseconds: 340));
-    expect(find.text('Đã sao lưu lên Google Drive'), findsOneWidget);
+    expect(find.text('Đã sao lưu'), findsOneWidget);
     await finish(tester);
   });
   testWidgets('backupLive_runningMiniSpinnerWithoutLayoutJitter',
@@ -185,13 +185,13 @@ void main() {
     final progress = tester.widget<CircularProgressIndicator>(
         find.byType(CircularProgressIndicator));
     expect(progress.value, isNull);
-    expect(progress.strokeWidth, 1.8);
+    expect(progress.strokeWidth, 1.5);
     expect(find.byIcon(Icons.sync_rounded), findsNothing);
     await tester
         .pump(const Duration(milliseconds: 320)); // Finish capsule entry.
-    final position = tester.getTopLeft(find.text('Đang sao lưu dữ liệu…'));
+    final position = tester.getTopLeft(find.text('Đang sao lưu'));
     await tester.pump(const Duration(milliseconds: 250));
-    expect(tester.getTopLeft(find.text('Đang sao lưu dữ liệu…')), position);
+    expect(tester.getTopLeft(find.text('Đang sao lưu')), position);
     await finish(tester);
   });
   testWidgets('backupLive_reducedMotionUsesStaticProgress', (tester) async {
@@ -218,7 +218,7 @@ void main() {
         .where((w) => w.properties.liveRegion == true)
         .toList();
     expect(semantics.length, 1);
-    expect(semantics.single.properties.label, 'Đang sao lưu dữ liệu…');
+    expect(semantics.single.properties.label, 'Đang sao lưu');
     await finish(tester);
   });
   testWidgets('backupLive_transientSuccessTemporarilyOverridesAndResumes',
@@ -227,10 +227,10 @@ void main() {
     await emit(tester, ManualBackupPhase.running);
     await transient(tester, 'Đã ghi chép: 200.000 ₫');
     expect(find.text('Đã ghi chép: 200.000 ₫'), findsOneWidget);
-    expect(find.text('Đang sao lưu dữ liệu…'), findsNothing);
+    expect(find.text('Đang sao lưu'), findsNothing);
     expect(pill(), findsOneWidget);
     await expire(tester);
-    expect(find.text('Đang sao lưu dữ liệu…'), findsOneWidget);
+    expect(find.text('Đang sao lưu'), findsOneWidget);
     expect(pill(), findsOneWidget);
     await finish(tester);
   });
@@ -243,8 +243,8 @@ void main() {
     expect(find.text('Entry'), findsOneWidget);
     expect(pill(), findsOneWidget);
     await expire(tester);
-    expect(find.text('Đã sao lưu lên Google Drive'), findsOneWidget);
-    expect(find.text('Đang sao lưu dữ liệu…'), findsNothing);
+    expect(find.text('Đã sao lưu'), findsOneWidget);
+    expect(find.text('Đang sao lưu'), findsNothing);
     await expire(tester);
     expect(pill(), findsNothing);
     await finish(tester);
@@ -263,7 +263,7 @@ void main() {
     expect(find.text('Entry 0'), findsNothing);
     expect(pill(), findsOneWidget);
     await expire(tester);
-    expect(find.text('Đang sao lưu dữ liệu…'), findsOneWidget);
+    expect(find.text('Đang sao lưu'), findsOneWidget);
     await finish(tester);
   });
   testWidgets('backupLive_survivesRouteChangeAndSettingsDisposal',
@@ -279,7 +279,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
     await frames(tester);
     expect(find.text('Settings'), findsNothing);
-    expect(find.text('Đang sao lưu dữ liệu…'), findsOneWidget);
+    expect(find.text('Đang sao lưu'), findsOneWidget);
     expect(find.byType(BackupLiveFeedbackHost), findsOneWidget);
     expect(pill(), findsOneWidget);
     await finish(tester);
@@ -289,7 +289,7 @@ void main() {
     await emit(tester, ManualBackupPhase.running);
     await tester.tap(find.text('Settings'));
     await tester.pump(const Duration(milliseconds: 340));
-    expect(find.text('Đang sao lưu dữ liệu…'), findsOneWidget);
+    expect(find.text('Đang sao lưu'), findsOneWidget);
     await finish(tester);
   });
   testWidgets('backupLive_oldSuccessDoesNotReplayEveryStartup', (tester) async {
@@ -325,7 +325,7 @@ void main() {
     await tester.pump(const Duration(seconds: 15));
     await frames(tester);
     await tester.pump(const Duration(milliseconds: 340));
-    expect(find.text('Đang sao lưu dữ liệu…'), findsOneWidget);
+    expect(find.text('Đang sao lưu'), findsOneWidget);
     await finish(tester);
   });
   testWidgets('backupLive_foregroundResumeRefreshesPersistedRunning',
@@ -337,7 +337,7 @@ void main() {
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     await frames(tester);
     await tester.pump(const Duration(milliseconds: 340));
-    expect(find.text('Đang sao lưu dữ liệu…'), findsOneWidget);
+    expect(find.text('Đang sao lưu'), findsOneWidget);
     await finish(tester);
   });
   testWidgets('backupLive_presentationReceiptNeverExportedOrDirtiesBackup',
@@ -356,7 +356,7 @@ void main() {
     await mount(tester);
     await emit(tester, ManualBackupPhase.queued);
     await tester.pump(const Duration(seconds: 30));
-    expect(find.text('Đang chờ sao lưu…'), findsOneWidget);
+    expect(find.text('Đang chờ sao lưu'), findsOneWidget);
     statuses.add(const BackupStatus());
     await frames(tester);
     expect(pill(), findsNothing);
@@ -388,7 +388,7 @@ void main() {
     await emit(tester, ManualBackupPhase.failure);
     expect(find.text('Entry'), findsOneWidget);
     await expire(tester);
-    expect(find.text('Chưa thể sao lưu'), findsOneWidget);
+    expect(find.text('Sao lưu chưa hoàn tất'), findsOneWidget);
     expect(find.textContaining('RAW exception'), findsNothing);
     await expire(tester);
     expect(pill(), findsNothing);
@@ -410,7 +410,7 @@ void main() {
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     await frames(tester);
     await expire(tester);
-    expect(find.text('Đã sao lưu lên Google Drive'), findsOneWidget);
+    expect(find.text('Đã sao lưu'), findsOneWidget);
     expect(prefs.containsKey(backupLivePresentedKey), isTrue);
     expect(haptics.length, 1);
     await finish(tester);
@@ -438,7 +438,7 @@ void main() {
     expect(haptics.length, 1);
     await transient(tester, 'Entry');
     await expire(tester);
-    expect(find.text('Đã sao lưu lên Google Drive'), findsOneWidget);
+    expect(find.text('Đã sao lưu'), findsOneWidget);
     expect(haptics.length, 1);
     await finish(tester);
   });
@@ -475,7 +475,7 @@ void main() {
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     await frames(tester);
     await tester.pump(const Duration(milliseconds: 340));
-    expect(find.text('Đã sao lưu lên Google Drive'), findsOneWidget);
+    expect(find.text('Đã sao lưu'), findsOneWidget);
     await expire(tester);
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
@@ -501,7 +501,7 @@ void main() {
         .add(BackupStatus(manualRequest: request(ManualBackupPhase.running)));
     await frames(tester);
     await tester.pump(const Duration(milliseconds: 340));
-    expect(find.text('Đang sao lưu dữ liệu…'), findsOneWidget);
+    expect(find.text('Đang sao lưu'), findsOneWidget);
     await finish(tester);
   });
 }
