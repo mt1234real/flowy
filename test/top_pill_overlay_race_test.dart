@@ -46,14 +46,14 @@ void main() {
       await tester.pump();
       expect(pills.evaluate().length, lessThanOrEqualTo(1));
     }
-    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pump(const Duration(milliseconds: 340));
     expect(pills.evaluate().length, lessThanOrEqualTo(1));
   }
 
   Future<void> expire(WidgetTester tester) async {
-    await tester.pump(const Duration(milliseconds: 1900));
+    await tester.pump(const Duration(milliseconds: 2300));
     expect(pills.evaluate().length, lessThanOrEqualTo(1));
-    await tester.pump(const Duration(milliseconds: 150));
+    await tester.pump(const Duration(milliseconds: 230));
     await frames(tester);
   }
 
@@ -156,7 +156,7 @@ void main() {
     // Cancel A's mounted timers while retaining the live state.
     AppFeedback.dismissCurrent(context);
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 150));
+    await tester.pump(const Duration(milliseconds: 230));
     await frames(tester);
     expect(find.text('Running'), findsOneWidget);
     await tester.pump(const Duration(seconds: 4));

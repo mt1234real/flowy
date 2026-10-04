@@ -17,7 +17,8 @@ void main() {
   Future<void> show(WidgetTester tester) async {
     await tester.pump();
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 340));
   }
 
   Future<void> finish(WidgetTester tester) async {
@@ -32,11 +33,12 @@ void main() {
     await show(tester);
     expect(find.text('Success'), findsOneWidget);
     expect(find.byIcon(Icons.check_circle_rounded), findsOneWidget);
-    final box = tester.widgetList<Container>(find.byType(Container)).where(
-        (w) => w.constraints?.maxHeight == AppFeedbackTokens.topBannerHeight);
+    final box = tester
+        .widgetList<SizedBox>(find.byType(SizedBox))
+        .where((w) => w.height == AppFeedbackTokens.topBannerHeight);
     expect(box.length, 1);
-    await tester.pump(const Duration(milliseconds: 1900));
-    await tester.pump(const Duration(milliseconds: 150));
+    await tester.pump(const Duration(milliseconds: 2300));
+    await tester.pump(const Duration(milliseconds: 230));
     expect(find.text('Success'), findsNothing);
     await finish(tester);
   });
@@ -46,7 +48,7 @@ void main() {
     await show(tester);
     AppFeedback.showError(context, 'Latest', emitHaptic: false);
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 150));
+    await tester.pump(const Duration(milliseconds: 230));
     await show(tester);
     expect(find.text('Old'), findsNothing);
     expect(find.text('Latest'), findsOneWidget);
@@ -59,7 +61,7 @@ void main() {
     await show(tester);
     AppFeedback.dismissCurrent(context);
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 150));
+    await tester.pump(const Duration(milliseconds: 230));
     expect(find.text('Transient'), findsNothing);
     await finish(tester);
   });

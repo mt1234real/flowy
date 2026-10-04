@@ -63,6 +63,7 @@ void main() {
     await tester.pump();
     await tester.pump();
     await tester.pump();
+    await tester.pump();
   }
 
   Future<void> mount(WidgetTester tester,
@@ -90,7 +91,7 @@ void main() {
   Future<void> emit(WidgetTester tester, ManualBackupPhase phase) async {
     statuses.add(BackupStatus(manualRequest: request(phase)));
     await frames(tester);
-    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pump(const Duration(milliseconds: 340));
   }
 
   Future<void> finish(WidgetTester tester) async {
@@ -104,22 +105,23 @@ void main() {
   Future<void> transient(WidgetTester tester, String message) async {
     AppFeedback.showSuccess(pageContext, message, emitHaptic: false);
     await frames(tester);
-    await tester.pump(const Duration(milliseconds: 150));
-    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pump(const Duration(milliseconds: 230));
+    await frames(tester); // Mount/start the replacement capsule's entry.
+    await tester.pump(const Duration(milliseconds: 340));
   }
 
   Future<void> expire(WidgetTester tester) async {
-    await tester.pump(const Duration(milliseconds: 1900));
-    await tester.pump(const Duration(milliseconds: 150));
+    await tester.pump(const Duration(milliseconds: 2300));
+    await tester.pump(const Duration(milliseconds: 230));
     await frames(tester);
-    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pump(const Duration(milliseconds: 340));
   }
 
   testWidgets('backupLive_queuedShowsQueuedPill', (tester) async {
     await mount(tester);
     await emit(tester, ManualBackupPhase.queued);
     expect(find.text('Đang chờ sao lưu…'), findsOneWidget);
-    expect(find.byIcon(Icons.schedule_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.cloud_queue_rounded), findsOneWidget);
     expect(pill(), findsOneWidget);
     expect(haptics, isEmpty);
     await finish(tester);
@@ -151,7 +153,7 @@ void main() {
       final element = tester.element(pill());
       await emit(tester, phase);
       await tester.pump(const Duration(milliseconds: 850));
-      await tester.pump(const Duration(milliseconds: 200));
+      await tester.pump(const Duration(milliseconds: 340));
       expect(tester.element(pill()), same(element));
       expect(
           find.text(phase == ManualBackupPhase.success
@@ -172,32 +174,33 @@ void main() {
     await emit(tester, ManualBackupPhase.success);
     expect(find.text('Đang sao lưu dữ liệu…'), findsOneWidget);
     await tester.pump(const Duration(milliseconds: 850));
-    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pump(const Duration(milliseconds: 340));
     expect(find.text('Đã sao lưu lên Google Drive'), findsOneWidget);
     await finish(tester);
   });
-  testWidgets('backupLive_runningIconRotatesWithoutLayoutJitter',
+  testWidgets('backupLive_runningMiniSpinnerWithoutLayoutJitter',
       (tester) async {
     await mount(tester);
     await emit(tester, ManualBackupPhase.running);
-    final rotation = tester.widget<RotationTransition>(find.ancestor(
-        of: find.byIcon(Icons.sync_rounded),
-        matching: find.byType(RotationTransition)));
-    final start = rotation.turns.value;
+    final progress = tester.widget<CircularProgressIndicator>(
+        find.byType(CircularProgressIndicator));
+    expect(progress.value, isNull);
+    expect(progress.strokeWidth, 1.8);
+    expect(find.byIcon(Icons.sync_rounded), findsNothing);
+    await tester
+        .pump(const Duration(milliseconds: 320)); // Finish capsule entry.
     final position = tester.getTopLeft(find.text('Đang sao lưu dữ liệu…'));
     await tester.pump(const Duration(milliseconds: 250));
-    expect(rotation.turns.value, isNot(start));
     expect(tester.getTopLeft(find.text('Đang sao lưu dữ liệu…')), position);
     await finish(tester);
   });
-  testWidgets('backupLive_reducedMotionUsesStaticIcon', (tester) async {
+  testWidgets('backupLive_reducedMotionUsesStaticProgress', (tester) async {
     await mount(tester, reduced: true);
     await emit(tester, ManualBackupPhase.running);
-    final rotation = tester.widget<RotationTransition>(find.ancestor(
-        of: find.byIcon(Icons.sync_rounded),
-        matching: find.byType(RotationTransition)));
+    final progress = tester.widget<CircularProgressIndicator>(
+        find.byType(CircularProgressIndicator));
     await tester.pump(const Duration(milliseconds: 350));
-    expect(rotation.turns.value, 0);
+    expect(progress.value, 0.75);
     await finish(tester);
   });
   testWidgets('backupLive_pollingSameStateDoesNotRetriggerHapticOrSemantics',
@@ -253,8 +256,9 @@ void main() {
       AppFeedback.showInfo(pageContext, 'Entry $i', emitHaptic: false);
     }
     await frames(tester);
-    await tester.pump(const Duration(milliseconds: 150));
-    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pump(const Duration(milliseconds: 230));
+    await frames(tester);
+    await tester.pump(const Duration(milliseconds: 340));
     expect(find.text('Entry 7'), findsOneWidget);
     expect(find.text('Entry 0'), findsNothing);
     expect(pill(), findsOneWidget);
@@ -284,7 +288,7 @@ void main() {
     await mount(tester);
     await emit(tester, ManualBackupPhase.running);
     await tester.tap(find.text('Settings'));
-    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pump(const Duration(milliseconds: 340));
     expect(find.text('Đang sao lưu dữ liệu…'), findsOneWidget);
     await finish(tester);
   });
@@ -320,7 +324,7 @@ void main() {
         jsonEncode(request(ManualBackupPhase.running).toJson()));
     await tester.pump(const Duration(seconds: 15));
     await frames(tester);
-    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pump(const Duration(milliseconds: 340));
     expect(find.text('Đang sao lưu dữ liệu…'), findsOneWidget);
     await finish(tester);
   });
@@ -332,7 +336,7 @@ void main() {
         jsonEncode(request(ManualBackupPhase.running).toJson()));
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     await frames(tester);
-    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pump(const Duration(milliseconds: 340));
     expect(find.text('Đang sao lưu dữ liệu…'), findsOneWidget);
     await finish(tester);
   });
@@ -370,7 +374,7 @@ void main() {
         icon: Icons.sync_rounded,
         spinning: true));
     await frames(tester);
-    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pump(const Duration(milliseconds: 340));
     expect(find.text('Running'), findsOneWidget);
     expect(find.text('Queued'), findsNothing);
     expect(pill(), findsOneWidget);
@@ -396,7 +400,7 @@ void main() {
     final store = BackupStateStore(prefs);
     await store.writeManualRequest(request(ManualBackupPhase.running));
     await frames(tester);
-    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pump(const Duration(milliseconds: 340));
     await transient(tester, 'Entry');
     await store.writeManualRequest(request(ManualBackupPhase.success));
     await frames(tester);
@@ -417,7 +421,7 @@ void main() {
     final terminal = request(ManualBackupPhase.failure);
     statuses.add(BackupStatus(manualRequest: terminal));
     await frames(tester);
-    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pump(const Duration(milliseconds: 340));
     for (var i = 0; i < 5; i++) {
       statuses.add(BackupStatus(manualRequest: terminal));
       await frames(tester);
@@ -464,13 +468,13 @@ void main() {
     await BackupStateStore(prefs)
         .writeManualRequest(request(ManualBackupPhase.running));
     await frames(tester);
-    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pump(const Duration(milliseconds: 340));
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
     await prefs.setString(backupManualRequestKey,
         jsonEncode(request(ManualBackupPhase.success).toJson()));
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     await frames(tester);
-    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pump(const Duration(milliseconds: 340));
     expect(find.text('Đã sao lưu lên Google Drive'), findsOneWidget);
     await expire(tester);
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
@@ -485,7 +489,7 @@ void main() {
     await BackupStateStore(prefs)
         .writeManualRequest(request(ManualBackupPhase.running));
     await frames(tester);
-    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pump(const Duration(milliseconds: 340));
     final ignoring = tester.widget<IgnorePointer>(
         find.descendant(of: pill(), matching: find.byType(IgnorePointer)));
     expect(ignoring.ignoring, isTrue);
@@ -496,7 +500,7 @@ void main() {
     statuses
         .add(BackupStatus(manualRequest: request(ManualBackupPhase.running)));
     await frames(tester);
-    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pump(const Duration(milliseconds: 340));
     expect(find.text('Đang sao lưu dữ liệu…'), findsOneWidget);
     await finish(tester);
   });
