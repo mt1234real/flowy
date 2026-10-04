@@ -1,36 +1,25 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../services/backup_state.dart';
+import '../services/backup_status_observation.dart';
 import '../theme/app_theme.dart';
 
-final backupStatusProvider = StreamProvider.autoDispose<BackupStatus>((ref) {
+// Non-autoDispose: consumer/provider recreation must retain the observation
+// engine and its read gate for the lifetime of the application ProviderScope.
+final backupStatusObservationProvider =
+    Provider<BackupStatusObservation>((ref) {
   final store = BackupStateStore(ref.read(sharedPreferencesProvider));
-  return Stream<BackupStatus>.multi((events) {
-    var active = true;
-    Future<void> refresh() async {
-      try {
-        final status = await store.read();
-        if (active) events.add(status);
-      } catch (_) {
-        // Keep the last readable state; never display a raw storage exception.
-      }
-    }
-
-    unawaited(refresh());
-    final changes = BackupStateStore.changes.listen((_) => refresh());
-    // A background isolate writes preferences independently of foreground cache.
-    final timer = Timer.periodic(const Duration(seconds: 15), (_) => refresh());
-    events.onCancel = () {
-      active = false;
-      timer.cancel();
-      changes.cancel();
-    };
-  });
+  final observation = BackupStatusObservation(
+      coordinator: BackupStatusReadCoordinator(store.read),
+      changes: BackupStateStore.changes);
+  ref.onDispose(observation.dispose);
+  return observation;
 });
+
+final backupStatusProvider = StreamProvider.autoDispose<BackupStatus>(
+    (ref) => ref.watch(backupStatusObservationProvider).stream);
 
 class BackupStatusDetails extends ConsumerWidget {
   const BackupStatusDetails({super.key});

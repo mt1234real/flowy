@@ -65,7 +65,9 @@ class _BackupLiveFeedbackHostState extends ConsumerState<BackupLiveFeedbackHost>
       _shown = null;
     } else {
       // Refresh cross-isolate persisted writes immediately on foreground resume.
-      ref.invalidate(backupStatusProvider);
+      ref.read(backupStatusObservationProvider).refreshNow();
+      // Resume a still-pending pill even if the fresh snapshot is unchanged.
+      _schedulePresentation();
     }
   }
 
