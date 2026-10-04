@@ -5,6 +5,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../services/backup_schedule.dart';
 import '../services/backup_state.dart';
+import '../features/notifications/notification_background.dart';
 import '../theme/app_theme.dart';
 import '../core/feedback/app_feedback.dart';
 import 'backup_status_details.dart';
@@ -13,6 +14,7 @@ final manualBackupEnqueueProvider =
     Provider<Future<ManualBackupRequest> Function()>((ref) {
   final prefs = ref.read(sharedPreferencesProvider);
   return () async {
+    await ensureBackupWorkerInitialized();
     final documents = await getApplicationDocumentsDirectory();
     return enqueueManualBackup(prefs, directory: documents.path);
   };

@@ -21,6 +21,17 @@ Future<bool> runCloudBackupTask({
   await prefs.reload();
   if (automatic && !due()) return true;
   final store = BackupStateStore(prefs);
+  if (manual && (requestId == null || requestId.isEmpty)) {
+    await withRequestAccess(() async {
+      final request = await store.readManualRequest();
+      if (request?.pending == true) {
+        await store.transitionManualRequest(
+            request!.id, ManualBackupPhase.failure,
+            message: 'Yêu cầu sao lưu không hợp lệ. Hãy thử lại.');
+      }
+    });
+    return false;
+  }
   Future<void> transition(ManualBackupPhase phase, {String? message}) =>
       withRequestAccess(() async {
         if (requestId != null) {

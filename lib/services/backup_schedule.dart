@@ -28,7 +28,27 @@ abstract class BackupWorkScheduler {
   Future<void> manual(String requestId);
 }
 
-class WorkmanagerBackupScheduler implements BackupWorkScheduler {
+/// Optional authoritative inspection; test/non-Android schedulers can retain
+/// the conservative KEEP re-registration fallback.
+abstract class ManualBackupWorkInspector {
+  Future<WorkState?> manualState(String requestId);
+}
+
+class WorkmanagerBackupScheduler
+    implements BackupWorkScheduler, ManualBackupWorkInspector {
+  @override
+  Future<WorkState?> manualState(String requestId) async {
+    final name = '$cloudManualBackupTask.$requestId';
+    // KEEP uses a stable name per logical request. Do not replace active work.
+    if (await Workmanager().isScheduledByUniqueName(name)) {
+      final info = await Workmanager().getWorkInfo(name);
+      return info?.state == WorkState.running
+          ? WorkState.running
+          : WorkState.scheduled;
+    }
+    return (await Workmanager().getWorkInfo(name))?.state;
+  }
+
   @override
   Future<void> manual(String requestId) => Workmanager().registerOneOffTask(
       '$cloudManualBackupTask.$requestId', cloudManualBackupTask,
@@ -88,7 +108,39 @@ Future<void> recoverManualBackup(SharedPreferences prefs,
     final request = await store.readManualRequest();
     if (request?.pending == true) {
       try {
-        await work.manual(request!.id);
+        WorkState? state;
+        if (work is ManualBackupWorkInspector) {
+          try {
+            state = await (work as ManualBackupWorkInspector)
+                .manualState(request!.id);
+          } catch (_) {
+            // Failed inspection is not evidence that a live worker has died.
+            // A later lifecycle reconciliation can query it again.
+            return;
+          }
+          if (state == WorkState.running) return;
+          if (state == WorkState.scheduled) {
+            if (request.phase == ManualBackupPhase.running) {
+              await store.transitionManualRequest(
+                  request.id, ManualBackupPhase.queued);
+            }
+            return;
+          }
+          if (state != null) {
+            // A scheduler terminal result alone is never an upload receipt.
+            await store.transitionManualRequest(
+                request.id, ManualBackupPhase.failure,
+                message: 'Sao lưu theo yêu cầu đã dừng. Hãy thử lại.');
+            return;
+          }
+        }
+        // No scheduler record: recover the SAME intent with KEEP, not a new
+        // request or a replacement that could interrupt an active pipeline.
+        if (request!.phase == ManualBackupPhase.running) {
+          await store.transitionManualRequest(
+              request.id, ManualBackupPhase.queued);
+        }
+        await work.manual(request.id);
       } catch (_) {
         await store.transitionManualRequest(
             request!.id, ManualBackupPhase.failure,

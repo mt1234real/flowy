@@ -23,6 +23,17 @@ class _Workmanager extends WorkmanagerPlatform {
   final registrations = <String>[];
   bool fail = false;
   @override
+  Future<bool> isScheduledByUniqueName(String name) async =>
+      pending.containsKey(name);
+  @override
+  Future<WorkInfo?> getWorkInfo(String name) async => pending.containsKey(name)
+      ? WorkInfo(
+          uniqueName: name,
+          state: WorkState.scheduled,
+          isPeriodic: false,
+          taskName: cloudManualBackupTask)
+      : null;
+  @override
   Future<void> registerOneOffTask(
     String uniqueName,
     String taskName, {

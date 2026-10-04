@@ -48,7 +48,10 @@ class _NotificationHostState extends ConsumerState<NotificationHost>
     }
     _subscriptions.add(NotificationPlatform.instance.taps.stream
         .listen((_) => _openPending()));
-    _timer = Timer.periodic(const Duration(minutes: 1), (_) => _queue());
+    _timer = Timer.periodic(const Duration(minutes: 1), (_) {
+      _queue();
+      unawaited(reconcileManualBackgroundBackup());
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) => _refresh());
   }
 
@@ -66,8 +69,8 @@ class _NotificationHostState extends ConsumerState<NotificationHost>
           jsonEncode(ref.read(cycleStartDaysByMonthProvider)));
       if (!mounted) return;
       await coordinator.refresh(ref.read(notificationPreferencesProvider),
-            ref.read(cycleStartDaysByMonthProvider),
-            boundary: ref.read(dayCutoffProvider));
+          ref.read(cycleStartDaysByMonthProvider),
+          boundary: ref.read(dayCutoffProvider));
       if (!mounted) return;
       ref.invalidate(unreadNotificationCountProvider);
       ref.invalidate(notificationListProvider);
@@ -105,7 +108,10 @@ class _NotificationHostState extends ConsumerState<NotificationHost>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _queue();
+    if (state == AppLifecycleState.resumed) {
+      _queue();
+      unawaited(reconcileManualBackgroundBackup());
+    }
   }
 
   @override
@@ -129,15 +135,15 @@ class _NotificationHostState extends ConsumerState<NotificationHost>
     ref.listen(fiscalTodayProvider, (_, __) => _queue());
     ref.listen(cycleStartDaysByMonthProvider, (_, __) => _queue());
     ref.listen(notificationDailySnapshotProvider, (_, value) {
-        if (value == null || ref.read(backupOperationProvider) != null) return;
-        if (value.day != ref.read(fiscalTodayProvider)) return;
+      if (value == null || ref.read(backupOperationProvider) != null) return;
+      if (value.day != ref.read(fiscalTodayProvider)) return;
       unawaited(ref
           .read(notificationCoordinatorProvider)
           .dailyLimit(
               safe: value.safe,
               spent: value.spent,
-                prefs: ref.read(notificationPreferencesProvider),
-                boundary: ref.read(dayCutoffProvider))
+              prefs: ref.read(notificationPreferencesProvider),
+              boundary: ref.read(dayCutoffProvider))
           .catchError(
               (Object e) => debugPrint('Daily notification failed: $e')));
     });
