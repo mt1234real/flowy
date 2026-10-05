@@ -38,9 +38,7 @@ class _ManualBackupActionState extends ConsumerState<ManualBackupAction> {
     HapticFeedback.mediumImpact();
     try {
       await ref.read(manualBackupEnqueueProvider)();
-      if (mounted) {
-        AppFeedback.showInfo(context, 'Đã đưa yêu cầu sao lưu vào hàng đợi.');
-      }
+      // Persisted QUEUED/RUNNING feedback is owned by the root live host.
     } catch (_) {
       if (mounted) {
         AppFeedback.showError(context,

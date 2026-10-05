@@ -108,6 +108,20 @@ Future<void> main() async {
   );
 }
 
+/// Apply the product animation policy before both root feedback hosts and the
+/// navigator overlay. Channel 1 reads the same effective MediaQuery for live
+/// backup and ordinary feedback, never the pre-override platform flags.
+Widget buildFlowyFeedbackRoot(BuildContext context, Widget? child) {
+  final mediaQueryData = MediaQuery.of(context);
+  return MediaQuery(
+    data: mediaQueryData.copyWith(disableAnimations: false),
+    child: BackupLiveFeedbackHost(
+      navigatorKey: backupNavigatorKey,
+      child: BackupProgressHost(child: child!),
+    ),
+  );
+}
+
 class FlowyApp extends ConsumerWidget {
   const FlowyApp({super.key});
 
@@ -132,20 +146,7 @@ class FlowyApp extends ConsumerWidget {
         debugShowCheckedModeBanner: false,
 
         // 🌟 GHI ĐÈ THIẾT LẬP TRỢ NĂNG TOÀN CỤC: BẢO VỆ MỌI ANIMATION TRÊN HYPEROS / ANDROID
-        builder: (context, child) {
-          final mediaQueryData = MediaQuery.of(context);
-          return BackupLiveFeedbackHost(
-            navigatorKey: backupNavigatorKey,
-            reduceMotion: mediaQueryData.disableAnimations ||
-                mediaQueryData.accessibleNavigation,
-            child: MediaQuery(
-              data: mediaQueryData.copyWith(
-                disableAnimations: false,
-              ),
-              child: BackupProgressHost(child: child!),
-            ),
-          );
-        },
+        builder: buildFlowyFeedbackRoot,
 
         // Cấu hình Theme đồng bộ với AppTheme
         theme: AppTheme.buildTheme(

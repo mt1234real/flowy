@@ -71,7 +71,7 @@ void main() {
     await tester.tap(find.text('Manual'));
     await tester.pump();
     expect(upload.isCompleted, isFalse);
-    expect(find.text('Đã đưa yêu cầu sao lưu vào hàng đợi.'), findsOneWidget);
+    expect(find.text('Đã đưa yêu cầu sao lưu vào hàng đợi.'), findsNothing);
     await tester.tap(find.text('Leave settings'));
     await tester.pumpAndSettle();
     expect(find.text('Other page'), findsOneWidget);
@@ -90,7 +90,7 @@ void main() {
     expect(find.byType(Dialog), findsNothing);
     expect(find.text('Vui lòng giữ ứng dụng mở.'), findsNothing);
     expect(find.textContaining('Đã sao lưu lên Google Drive'), findsNothing);
-    expect(find.text('Đã đưa yêu cầu sao lưu vào hàng đợi.'), findsOneWidget);
+    expect(find.text('Đã đưa yêu cầu sao lưu vào hàng đợi.'), findsNothing);
     await finish(tester);
   });
   testWidgets('repeatTap_isDisabledDuringEnqueue_andQueuedRequest',
