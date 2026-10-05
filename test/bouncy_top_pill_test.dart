@@ -7,10 +7,10 @@ void main() {
   late Channel1Harness h;
   setUp(() => h = Channel1Harness());
   for (final step in [
-    (0, -50.0, 1.0),
-    (140, 50.0, 1.05),
-    (210, 33.0, .96),
-    (260, 36.0, 1.0)
+    (0, -30.0, 1.0),
+    (130, 48.0, 1.05),
+    (190, 33.0, .96),
+    (240, 36.0, 1.0)
   ]) {
     testWidgets('z2_entry_${step.$1}ms_exactPhase', (t) async {
       await h.mount(t);
@@ -22,16 +22,16 @@ void main() {
       expect(t.getSize(h.surface).height, 42);
     });
   }
-  testWidgets('z2_entry_total260ms_fallAccelerates', (t) async {
+  testWidgets('z2_entry_total240ms_fallAccelerates', (t) async {
     await h.mount(t);
     h.live('Queued');
     await h.frames(t);
     await t.pump(const Duration(milliseconds: 35));
-    final a = h.y(t) + 50;
+    final a = h.y(t) + 30;
     await t.pump(const Duration(milliseconds: 35));
-    final b = h.y(t) + 50 - a;
+    final b = h.y(t) + 30 - a;
     expect(b, greaterThan(a));
-    await t.pump(const Duration(milliseconds: 190));
+    await t.pump(const Duration(milliseconds: 170));
     expect(h.y(t), 36);
     expect(h.sy(t), 1);
   });
@@ -39,18 +39,21 @@ void main() {
     await h.mount(t);
     h.live('Queued');
     await h.frames(t);
-    await t.pump(const Duration(milliseconds: 139));
+    await t.pump(const Duration(milliseconds: 129));
     expect(h.haptics, isEmpty);
     await t.pump(const Duration(milliseconds: 1));
     expect(h.haptics, ['HapticFeedbackType.lightImpact']);
-    await t.pump(const Duration(milliseconds: 120));
+    await t.pump(const Duration(milliseconds: 370));
     h.live('Running', running: true);
     await h.reel(t);
     for (var i = 0; i < 5; i++) {
       h.live('Running', running: true);
       await h.frames(t);
     }
-    expect(h.haptics, ['HapticFeedbackType.lightImpact']);
+    expect(h.haptics, [
+      'HapticFeedbackType.lightImpact',
+      'HapticFeedbackType.selectionClick'
+    ]);
   });
   testWidgets('z2_success_mediumImpactAfterReelOnce', (t) async {
     await h.mount(t);
@@ -58,7 +61,7 @@ void main() {
     await h.settle(t);
     h.live('Success', terminal: true);
     await h.frames(t);
-    await t.pump(const Duration(milliseconds: 119));
+    await t.pump(const Duration(milliseconds: 239));
     expect(h.haptics, ['HapticFeedbackType.lightImpact']);
     await t.pump(const Duration(milliseconds: 1));
     expect(h.haptics,
@@ -155,8 +158,8 @@ void main() {
     h.live('Running', running: true);
     await h.frames(t);
     await t.pump(const Duration(milliseconds: 70));
-    expect(h.y(t), 50);
-    await t.pump(const Duration(milliseconds: 120));
+    expect(h.y(t), lessThan(48));
+    await t.pump(const Duration(milliseconds: 130));
     expect(h.y(t), 36);
     expect(h.haptics, ['HapticFeedbackType.lightImpact']);
   });
@@ -180,10 +183,7 @@ void main() {
     await h.frames(t);
     final newSlide = find.ancestor(
         of: find.text('New'), matching: find.byType(SlideTransition));
-    expect(t.widget<SlideTransition>(newSlide).position.value.dy, .7);
-    final newScale = find.ancestor(
-        of: find.text('New'), matching: find.byType(ScaleTransition));
-    expect(t.widget<ScaleTransition>(newScale).scale.value, .92);
+    expect(t.widget<SlideTransition>(newSlide).position.value.dy, .8);
     expect(
         t.element(find.ancestor(
             of: h.inside(CircularProgressIndicator),
@@ -215,16 +215,15 @@ void main() {
     await t.pump(const Duration(milliseconds: 1));
     await t.pump();
     expect(find.text('Old'), findsNothing);
-    await t.pump(const Duration(milliseconds: 29));
+    await t.pump(const Duration(milliseconds: 39));
     expect(t.widget<SlideTransition>(newSlide).position.value.dy, 0);
-    expect(t.widget<ScaleTransition>(newScale).scale.value, 1);
   });
-  testWidgets('z2_reel_explicit90Out120In', (t) async {
+  testWidgets('z2_reel_explicit90Out130In', (t) async {
     await h.mount(t);
     h.live('Queued');
     await h.settle(t);
     final reel = t.widget<AnimatedSwitcher>(h.inside(AnimatedSwitcher));
-    expect(reel.duration, const Duration(milliseconds: 120));
+    expect(reel.duration, const Duration(milliseconds: 130));
     expect(reel.reverseDuration, const Duration(milliseconds: 90));
   });
   testWidgets('z2_successGlyph_scale85_110_100', (t) async {
@@ -252,27 +251,27 @@ void main() {
     await h.settle(t);
     h.live('Success', terminal: true);
     await h.frames(t);
-    await t.pump(const Duration(milliseconds: 120));
+    await t.pump(const Duration(milliseconds: 240));
     await t.pump(const Duration(milliseconds: 1999));
     expect(h.y(t), 36);
     await t.pump(const Duration(milliseconds: 1));
-    await t.pump(const Duration(milliseconds: 30));
-    expect(h.y(t), 38);
-    await t.pump(const Duration(milliseconds: 130));
+    await t.pump(const Duration(milliseconds: 110));
+    expect(h.y(t), 36);
+    await t.pump(const Duration(milliseconds: 160));
     expect(h.pill, findsNothing);
   });
-  testWidgets('z2_exit_total160ms_first30Plus2EndsMinus60', (t) async {
+  testWidgets('z2_exit_total270ms_collapseThenLaunch', (t) async {
     await h.mount(t);
     AppFeedback.showInfo(h.page, 'Old', emitHaptic: false);
     await h.settle(t);
     AppFeedback.dismissCurrent(h.page);
     await t.pump();
-    await t.pump(const Duration(milliseconds: 30));
-    expect(h.y(t), 38);
-    expect(h.sy(t), closeTo(.98, .001));
-    await t.pump(const Duration(milliseconds: 129));
+    await t.pump(const Duration(milliseconds: 110));
+    expect(h.y(t), 36);
+    expect(h.sy(t), closeTo(1, .001));
+    await t.pump(const Duration(milliseconds: 159));
     expect(h.y(t), closeTo(-60, 3));
-    expect(t.widget<Opacity>(h.inside(Opacity)).opacity, lessThan(.01));
+    expect(t.widget<Opacity>(h.inside(Opacity).first).opacity, lessThan(.01));
     await t.pump(const Duration(milliseconds: 1));
     expect(h.pill, findsNothing);
   });
@@ -318,22 +317,20 @@ void main() {
     ('Short', 'A much longer status message'),
     ('A much longer status message', 'Short')
   ]) {
-    testWidgets('z2_width200ms_centerFixed_${pair.$1}', (t) async {
+    testWidgets('z2_width240ms_centerFixed_${pair.$1}', (t) async {
       await h.mount(t);
       h.live(pair.$1);
       await h.settle(t);
       final before = t.getSize(h.surface).width;
       h.live(pair.$2);
       await h.frames(t);
-      for (var i = 0; i < 10; i++) {
+      for (var i = 0; i < 12; i++) {
         await t.pump(const Duration(milliseconds: 20));
         expect(t.getCenter(h.surface).dx, closeTo(400, .5));
         h.single(t);
       }
       expect(t.getSize(h.surface).width, isNot(before));
-      final size = t.widget<AnimatedSize>(h.inside(AnimatedSize));
-      expect(size.duration, const Duration(milliseconds: 200));
-      expect(size.alignment, Alignment.center);
+      expect(h.inside(AnimatedSize), findsNothing);
     });
   }
   testWidgets('z2_rapidQueueRunningTransientSuccess_latestWinsOneSession',

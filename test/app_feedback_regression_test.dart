@@ -18,7 +18,7 @@ void main() {
     await tester.pump();
     await tester.pump();
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 461));
+    await tester.pump(const Duration(milliseconds: 501));
   }
 
   Future<void> finish(WidgetTester tester) async {
@@ -61,7 +61,7 @@ void main() {
     await show(tester);
     AppFeedback.dismissCurrent(context);
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 230));
+    await tester.pump(AppFeedbackTokens.topBannerExitDuration);
     expect(find.text('Transient'), findsNothing);
     await finish(tester);
   });

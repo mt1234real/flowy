@@ -46,7 +46,7 @@ void main() {
       await tester.pump();
       expect(pills.evaluate().length, lessThanOrEqualTo(1));
     }
-    await tester.pump(const Duration(milliseconds: 461));
+    await tester.pump(const Duration(milliseconds: 501));
     expect(pills.evaluate().length, lessThanOrEqualTo(1));
   }
 

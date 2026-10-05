@@ -103,12 +103,12 @@ class Channel1Harness {
 
   Future<void> settle(WidgetTester t) async {
     await frames(t);
-    await t.pump(const Duration(milliseconds: 261));
+    await t.pump(const Duration(milliseconds: 501));
   }
 
   Future<void> reel(WidgetTester t) async {
     await frames(t);
-    await t.pump(const Duration(milliseconds: 121));
+    await t.pump(const Duration(milliseconds: 241));
     await t.pump();
   }
 
@@ -153,7 +153,7 @@ void registerHudVisualTests({required bool backup}) {
     expect(t.getCenter(h.surface).dx, 400);
     expect(find.text(backup ? 'ĐỒNG BỘ CLOUD' : 'THÔNG BÁO'), findsOneWidget);
     expect(t.widget<Padding>(h.inside(Padding).first).padding,
-        const EdgeInsets.symmetric(horizontal: 14, vertical: 4));
+        const EdgeInsets.symmetric(vertical: 4));
   });
   for (final scale in [1.0, 2.0, 3.0]) {
     testWidgets('${prefix}_largeTextScale${scale}_growsSafelyWithoutOverflow',
@@ -223,7 +223,7 @@ void registerHudVisualTests({required bool backup}) {
     expect(t.widget<Icon>(find.byIcon(Icons.schedule_rounded)).size, 14);
     expect(
         t
-            .widgetList<SizedBox>(h.inside(SizedBox))
+            .widgetList<Positioned>(h.inside(Positioned))
             .where((w) => w.width == 24 && w.height == 24)
             .length,
         1);
@@ -253,7 +253,7 @@ void registerHudVisualTests({required bool backup}) {
     await t.pump(const Duration(milliseconds: 1998));
     expect(h.pill, findsOneWidget);
     await t.pump(const Duration(milliseconds: 2));
-    await t.pump(const Duration(milliseconds: 160));
+    await t.pump(const Duration(milliseconds: 270));
     expect(h.pill, findsNothing);
   });
   testWidgets('${prefix}_failureSafe_noSuccessHaptic_andAutoDismiss',
@@ -265,11 +265,11 @@ void registerHudVisualTests({required bool backup}) {
     expect(h.haptics.where((e) => e == 'HapticFeedbackType.mediumImpact'),
         isEmpty);
     await t.pump(const Duration(milliseconds: 1800));
-    await t.pump(const Duration(milliseconds: 160));
+    await t.pump(const Duration(milliseconds: 270));
     expect(h.pill, findsNothing);
   });
   for (final grow in [true, false]) {
-    testWidgets('${prefix}_widthMorph200_centerInvariant_$grow', (t) async {
+    testWidgets('${prefix}_widthMorph240_centerInvariant_$grow', (t) async {
       await h.mount(t);
       live(grow ? 'Short' : 'A longer status message for backup');
       await h.settle(t);
@@ -280,7 +280,7 @@ void registerHudVisualTests({required bool backup}) {
       await t.pump(const Duration(milliseconds: 80));
       final middle = t.getSize(h.surface).width;
       expect(t.getCenter(h.surface).dx, closeTo(400, .5));
-      await t.pump(const Duration(milliseconds: 120));
+      await t.pump(const Duration(milliseconds: 160));
       final after = t.getSize(h.surface).width;
       expect(middle, greaterThan(grow ? before : after));
       expect(middle, lessThan(grow ? after : before));
@@ -351,7 +351,7 @@ void registerHudVisualTests({required bool backup}) {
       await h.frames(t);
       final entry = t.element(h.pill);
       if (duringMorph) {
-        await t.pump(const Duration(milliseconds: 261));
+        await t.pump(const Duration(milliseconds: 501));
         live('A longer running message', running: true);
         await h.frames(t);
       }

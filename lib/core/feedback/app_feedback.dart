@@ -27,11 +27,11 @@ abstract final class AppFeedbackTokens {
   // ---------------------------------------------------------------------------
   // Channel 1: Safe-Area Top Banner Pill
   // ---------------------------------------------------------------------------
-  static const Duration topBannerEnterDuration = Duration(milliseconds: 260);
+  static const Duration topBannerEnterDuration = Duration(milliseconds: 500);
   static const Duration topBannerSuccessHoldDuration =
       Duration(milliseconds: 2000);
   static const Duration topBannerHoldDuration = Duration(milliseconds: 1800);
-  static const Duration topBannerExitDuration = Duration(milliseconds: 160);
+  static const Duration topBannerExitDuration = Duration(milliseconds: 270);
 
   static const double topBannerSafeGap = 12.0;
   static const double topBannerEnterTravel = 16.0;
@@ -1101,21 +1101,68 @@ class _TopBannerOverlay extends StatefulWidget {
   State<_TopBannerOverlay> createState() => _TopBannerOverlayState();
 }
 
+enum _TopMotionPhase {
+  drop,
+  expand,
+  resting,
+  contentMorph,
+  collapse,
+  anticipate,
+  launch,
+}
+
+typedef _TopPose = ({double y, double sx, double sy, double opacity});
+
 class _TopBannerOverlayState extends State<_TopBannerOverlay>
     with TickerProviderStateMixin {
-  late final AnimationController _entryController, _exitController;
+  late final AnimationController _entryController,
+      _morphController,
+      _exitController;
   late _TopPresentation _presentation;
   Timer? _holdTimer, _readyTimer, _exitTimer;
   bool completedHold = false;
   bool _shown = false, _entered = false, _closing = false, _closed = false;
-  bool _ready = true, _impactDelivered = false, _successPending = false;
-  bool _mediaReduced = false;
+  bool _ready = true, _impactDelivered = false, _exitImpactDelivered = false;
+  bool _successPending = false,
+      _selectionPending = false,
+      _mediaReduced = false;
   int _generation = 0;
-  double? _exitOrigin;
+  double _targetWidth = 42, _maxWidth = 520, _hudHeight = 42;
+  double _labelHeight = 12,
+      _statusHeight = 15,
+      _morphFrom = 42,
+      _exitWidth = 42,
+      _exitHeight = 42;
+  _TopPose? _recoveryFrom, _exitOrigin;
   Completer<void>? _dismissCompleter;
   String? get liveId => _presentation.live?.id;
   bool get _reduced =>
       _mediaReduced || (_presentation.live?.reduceMotion ?? false);
+  double get _circleWidth => math.min(42, _maxWidth);
+  double get _minimumWidth => math.min(84, _maxWidth);
+  double _ms(AnimationController controller, int duration) =>
+      (controller.value * duration * 1000).round() / 1000;
+  double _mix(double a, double b, double t) => a + (b - a) * t;
+  double _clampWidth(double width) =>
+      width.clamp(_circleWidth, _maxWidth).toDouble();
+  _TopMotionPhase get _phase {
+    if (_closing) {
+      final ms = _ms(_exitController, 270);
+      return ms <= 110
+          ? _TopMotionPhase.collapse
+          : ms <= 160
+          ? _TopMotionPhase.anticipate
+          : _TopMotionPhase.launch;
+    }
+    if (!_entered) {
+      return _ms(_entryController, 500) <= 240
+          ? _TopMotionPhase.drop
+          : _TopMotionPhase.expand;
+    }
+    return _morphController.isAnimating
+        ? _TopMotionPhase.contentMorph
+        : _TopMotionPhase.resting;
+  }
 
   @override
   void initState() {
@@ -1126,14 +1173,14 @@ class _TopBannerOverlayState extends State<_TopBannerOverlay>
         AppAnimationPolicy.createController(
             vsync: this,
             duration: AppFeedbackTokens.topBannerEnterDuration,
-            debugLabel: 'TopPill.entryImpact',
+            debugLabel: 'TopPill.circleDropExpand',
           )
           ..addListener(() {
             if (!_closed &&
                 !_closing &&
                 !_reduced &&
                 !_impactDelivered &&
-                _entryController.value >= 140 / 260) {
+                _ms(_entryController, 500) >= 130) {
               _impactDelivered = true;
               if (_presentation.emitHaptic) HapticFeedback.lightImpact();
             }
@@ -1141,11 +1188,26 @@ class _TopBannerOverlayState extends State<_TopBannerOverlay>
           ..addStatusListener((status) {
             if (status == AnimationStatus.completed) _finishEntry();
           });
-    _exitController = AppAnimationPolicy.createController(
+    _morphController = AppAnimationPolicy.createController(
       vsync: this,
-      duration: AppFeedbackTokens.topBannerExitDuration,
-      debugLabel: 'TopPill.exitLaunch',
+      duration: const Duration(milliseconds: 240),
+      debugLabel: 'TopPill.elasticWidth',
     );
+    _exitController =
+        AppAnimationPolicy.createController(
+          vsync: this,
+          duration: AppFeedbackTokens.topBannerExitDuration,
+          debugLabel: 'TopPill.collapseSquashLaunch',
+        )..addListener(() {
+          if (_closing &&
+              !_closed &&
+              !_reduced &&
+              !_exitImpactDelivered &&
+              _ms(_exitController, 270) >= 160) {
+            _exitImpactDelivered = true;
+            if (_presentation.emitHaptic) HapticFeedback.lightImpact();
+          }
+        });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || _closed || _closing) return;
       _shown = true;
@@ -1157,31 +1219,112 @@ class _TopBannerOverlayState extends State<_TopBannerOverlay>
     });
   }
 
-  void _finishEntry() {
-    if (!mounted || _closed || _closing || !_shown || _entered) return;
-    _entered = true;
-    if (_reduced) {
-      _impactDelivered = true; // A skipped impact has no physical haptic.
-      _entryController.value = 1;
+  ({TextStyle label, TextStyle status}) _styles() {
+    final theme = Theme.of(context);
+    final base = theme.textTheme.bodyMedium ?? const TextStyle();
+    return (
+      label: base.copyWith(
+        fontSize: 10,
+        fontWeight: FontWeight.w700,
+        letterSpacing: .5,
+        height: 1.2,
+        color: theme.brightness == Brightness.dark
+            ? Colors.white70
+            : theme.colorScheme.onSurfaceVariant,
+        decoration: TextDecoration.none,
+      ),
+      status: base.copyWith(
+        fontSize: 12.5,
+        fontWeight: FontWeight.w800,
+        letterSpacing: .12,
+        height: 1.2,
+        color: theme.colorScheme.onSurface,
+        decoration: TextDecoration.none,
+      ),
+    );
+  }
+
+  // Cached once per presentation/dependency change. Ticker frames interpolate
+  // numeric geometry only; no intrinsic/offstage tree or TextPainter loop.
+  void _measure() {
+    final media = MediaQuery.of(context);
+    _maxWidth = math.max(
+      0,
+      math.min(
+        AppFeedbackTokens.topBannerMaxWidth,
+        media.size.width -
+            AppFeedbackTokens.topBannerHorizontalScreenMargin * 2,
+      ),
+    );
+    final styles = _styles();
+    double width(String text, TextStyle style) {
+      final painter = TextPainter(
+        text: TextSpan(text: text, style: style),
+        textDirection: Directionality.of(context),
+        textScaler: media.textScaler,
+        locale: Localizations.maybeLocaleOf(context),
+        maxLines: 1,
+      )..layout();
+      final result = painter.width;
+      painter.dispose();
+      return result;
     }
-    _settledPresentation();
+
+    _labelHeight = media.textScaler.scale(10) * 1.2;
+    _statusHeight = media.textScaler.scale(12.5) * 1.2;
+    _hudHeight = math.max(42, 8 + _labelHeight + _statusHeight);
+    _targetWidth =
+        (60 +
+                math.max(
+                  width(_presentation.category, styles.label),
+                  width(_presentation.message, styles.status),
+                ))
+            .clamp(_minimumWidth, _maxWidth)
+            .toDouble();
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     _mediaReduced = MediaQuery.disableAnimationsOf(context);
+    _measure();
     if (_reduced && !_closing) {
       _entryController.stop();
+      _morphController.stop();
       _finishEntry();
     }
   }
 
-  // Pre-mount replacement is handled by the owner's latest builder model.
-  // Mounted replacements mutate only this state and revoke all older timers.
+  void _finishEntry() {
+    if (!mounted || _closed || _closing || !_shown || _entered) return;
+    _entered = true;
+    if (_reduced) {
+      _impactDelivered = true;
+      _entryController.value = 1;
+    }
+    _settledPresentation();
+  }
+
+  bool _sameVisual(_TopPresentation a, _TopPresentation b) =>
+      a.message == b.message &&
+      a.category == b.category &&
+      a.tone == b.tone &&
+      a.icon == b.icon &&
+      a.live?.spinning == b.live?.spinning &&
+      a.live?.terminal == b.live?.terminal &&
+      a.live?.id == b.live?.id &&
+      a.live?.reduceMotion == b.live?.reduceMotion;
+
   void present(_TopPresentation value) {
-    if (!mounted || _closed) return;
+    if (!mounted ||
+        _closed ||
+        (!_closing && _sameVisual(_presentation, value))) {
+      return;
+    }
     final old = _presentation;
+    final targetY = MediaQuery.paddingOf(context).top + 12;
+    final currentWidth = _width;
+    final currentPose = _pose(targetY);
     final epoch = ++_generation;
     _holdTimer?.cancel();
     _readyTimer?.cancel();
@@ -1191,24 +1334,45 @@ class _TopBannerOverlayState extends State<_TopBannerOverlay>
       _exitController.stop();
       _closing = false;
       _shown = _entered = true;
+      _impactDelivered = true;
       _entryController.value = 1;
+      // Even after launch starts, recover the same owned entry from its current
+      // pose. No second shell, screen drop replay, or stale removal/haptic.
+      _recoveryFrom = currentPose;
       final completer = _dismissCompleter;
       _dismissCompleter = null;
       if (completer != null && !completer.isCompleted) completer.complete();
+    } else {
+      _recoveryFrom = null;
+    }
+    if (!_entered && _ms(_entryController, 500) > 240) {
+      // Retarget an expansion from its actual shell width instead of jumping
+      // to a newly measured keyframe. The already-settled drop is not replayed.
+      _entered = true;
+      _entryController.stop();
+      _entryController.value = 1;
     }
     _successPending =
         value.tone == AppTopFeedbackTone.success &&
         old.tone != AppTopFeedbackTone.success;
+    _selectionPending =
+        value.tone == AppTopFeedbackTone.info &&
+        !(value.live?.terminal ?? false);
     setState(() {
       _presentation = value;
       _ready = _reduced;
     });
+    _measure();
+    _morphFrom = currentWidth;
     if (_reduced) {
       _entryController.stop();
+      _morphController.stop();
+      _morphController.value = 1;
       _finishEntry();
       _settledPresentation();
     } else {
-      _readyTimer = Timer(const Duration(milliseconds: 120), () {
+      if (_entered) _morphController.forward(from: 0);
+      _readyTimer = Timer(const Duration(milliseconds: 240), () {
         if (!mounted || _closed || _closing || epoch != _generation) return;
         _ready = true;
         _settledPresentation();
@@ -1220,13 +1384,13 @@ class _TopBannerOverlayState extends State<_TopBannerOverlay>
     if (!_entered || !_ready || _closed || _closing) return;
     final live = _presentation.live;
     if (live?.terminal == true) {
-      AppFeedback._presentLive(
-        live!,
-      ); // Existing receipt/dedup is authoritative.
+      AppFeedback._presentLive(live!);
     } else if (_successPending && _presentation.emitHaptic) {
       HapticFeedback.mediumImpact();
+    } else if (_selectionPending && !_reduced && _presentation.emitHaptic) {
+      HapticFeedback.selectionClick();
     }
-    _successPending = false;
+    _successPending = _selectionPending = false;
     if (_presentation.persistent) return;
     _holdTimer?.cancel();
     final epoch = _generation;
@@ -1242,6 +1406,171 @@ class _TopBannerOverlayState extends State<_TopBannerOverlay>
     );
   }
 
+  double get _width {
+    if (_reduced) return _closing ? _circleWidth : _targetWidth;
+    if (_closing) {
+      return _clampWidth(
+        _mix(
+          _exitWidth,
+          _circleWidth,
+          Curves.easeInOutCubic.transform(
+            (_ms(_exitController, 270) / 110).clamp(0, 1),
+          ),
+        ),
+      );
+    }
+    if (!_entered) {
+      final ms = _ms(_entryController, 500) - 240;
+      if (ms <= 0) return _circleWidth;
+      if (ms <= 150) {
+        return _clampWidth(
+          _mix(
+            _circleWidth,
+            math.min(_targetWidth + 18, _maxWidth),
+            Curves.easeOutCubic.transform(ms / 150),
+          ),
+        );
+      }
+      if (ms <= 220) {
+        return _clampWidth(
+          _mix(
+            math.min(_targetWidth + 18, _maxWidth),
+            math.max(_minimumWidth, _targetWidth - 4),
+            Curves.easeInOutCubic.transform((ms - 150) / 70),
+          ),
+        );
+      }
+      return _clampWidth(
+        _mix(
+          math.max(_minimumWidth, _targetWidth - 4),
+          _targetWidth,
+          Curves.easeOutCubic.transform((ms - 220) / 40),
+        ),
+      );
+    }
+    if (_morphController.isAnimating ||
+        _morphController.value < 1 && _ready == false) {
+      final ms = _ms(_morphController, 240);
+      final peak = _targetWidth > _morphFrom
+          ? math.min(_targetWidth + 10, _maxWidth)
+          : _targetWidth < _morphFrom
+          ? math.max(_targetWidth - 8, _minimumWidth)
+          : _targetWidth;
+      return _clampWidth(
+        ms <= 140
+            ? _mix(_morphFrom, peak, Curves.easeOutQuad.transform(ms / 140))
+            : _mix(
+                peak,
+                _targetWidth,
+                Curves.easeInOutCubic.transform((ms - 140) / 100),
+              ),
+      );
+    }
+    return _targetWidth;
+  }
+
+  double get _reveal {
+    if (_reduced) return _closing ? 0 : 1;
+    if (_closing) return 1 - (_ms(_exitController, 270) / 60).clamp(0, 1);
+    if (!_entered) {
+      return Curves.easeOutQuad.transform(
+        ((_ms(_entryController, 500) - 360) / 140).clamp(0, 1),
+      );
+    }
+    if (_recoveryFrom != null) {
+      return Curves.easeOutQuad.transform(_morphController.value);
+    }
+    return 1;
+  }
+
+  double get _height {
+    if (_closing) {
+      return _mix(
+        _exitHeight,
+        42,
+        (_ms(_exitController, 270) / 110).clamp(0, 1),
+      );
+    }
+    if (!_entered && !_reduced) {
+      return _mix(
+        42,
+        _hudHeight,
+        ((_ms(_entryController, 500) - 240) / 260).clamp(0, 1),
+      );
+    }
+    return _hudHeight;
+  }
+
+  _TopPose _pose(double target) {
+    if (_reduced) return (y: target, sx: 1, sy: 1, opacity: 1);
+    if (_closing) {
+      final ms = _ms(_exitController, 270);
+      if (ms <= 110) {
+        final t = Curves.easeInOutCubic.transform(ms / 110);
+        final origin = _exitOrigin!;
+        return (
+          y: _mix(origin.y, target, t),
+          sx: _mix(origin.sx, 1, t),
+          sy: _mix(origin.sy, 1, t),
+          opacity: origin.opacity,
+        );
+      }
+      if (ms <= 160) {
+        final t = Curves.easeInQuad.transform((ms - 110) / 50);
+        return (
+          y: target + 3 * t,
+          sx: _mix(1, 46 / 42, t),
+          sy: _mix(1, 36 / 42, t),
+          opacity: 1,
+        );
+      }
+      final t = Curves.fastOutSlowIn.transform((ms - 160) / 110);
+      return (
+        y: _mix(target + 3, -60, t),
+        sx: _mix(46 / 42, 38 / 42, t),
+        sy: _mix(36 / 42, 46 / 42, t),
+        opacity: 1 - t,
+      );
+    }
+    if (_recoveryFrom != null) {
+      final origin = _recoveryFrom!;
+      final t = Curves.easeOutCubic.transform(_morphController.value);
+      return (
+        y: _mix(origin.y, target, t),
+        sx: _mix(origin.sx, 1, t),
+        sy: _mix(origin.sy, 1, t),
+        opacity: _mix(origin.opacity, 1, t),
+      );
+    }
+    final ms = _ms(_entryController, 500);
+    if (_entered || ms >= 240) return (y: target, sx: 1, sy: 1, opacity: 1);
+    if (ms <= 130) {
+      final t = Curves.easeInQuad.transform(ms / 130);
+      return (
+        y: _mix(-30, target + 12, t),
+        sx: 1,
+        sy: _mix(1, 1.05, t),
+        opacity: 1,
+      );
+    }
+    if (ms <= 190) {
+      final t = Curves.easeOutCubic.transform((ms - 130) / 60);
+      return (
+        y: _mix(target + 12, target - 3, t),
+        sx: 1,
+        sy: _mix(1.05, .96, t),
+        opacity: 1,
+      );
+    }
+    final t = Curves.easeInOutSine.transform((ms - 190) / 50);
+    return (
+      y: _mix(target - 3, target, t),
+      sx: 1,
+      sy: _mix(.96, 1, t),
+      opacity: 1,
+    );
+  }
+
   Future<void> dismiss() {
     if (_closed) return Future.value();
     if (_dismissCompleter != null) return _dismissCompleter!.future;
@@ -1250,8 +1579,12 @@ class _TopBannerOverlayState extends State<_TopBannerOverlay>
     final epoch = ++_generation;
     _holdTimer?.cancel();
     _readyTimer?.cancel();
-    _exitOrigin = _entryPose(MediaQuery.paddingOf(context).top + 12).y;
+    _exitWidth = _width;
+    _exitHeight = _height;
+    _exitOrigin = _pose(MediaQuery.paddingOf(context).top + 12);
     _entryController.stop();
+    _morphController.stop();
+    _exitImpactDelivered = false;
     setState(() => _closing = true);
     if (!_reduced) _exitController.forward(from: 0);
     _exitTimer = Timer(
@@ -1273,6 +1606,7 @@ class _TopBannerOverlayState extends State<_TopBannerOverlay>
     _readyTimer?.cancel();
     _exitTimer?.cancel();
     _entryController.stop();
+    _morphController.stop();
     _exitController.stop();
     if (!(_dismissCompleter?.isCompleted ?? true)) {
       _dismissCompleter?.complete();
@@ -1283,44 +1617,9 @@ class _TopBannerOverlayState extends State<_TopBannerOverlay>
   void dispose() {
     cancelImmediately();
     _entryController.dispose();
+    _morphController.dispose();
     _exitController.dispose();
     super.dispose();
-  }
-
-  ({double y, double sy, double opacity}) _entryPose(double target) {
-    if (_reduced) return (y: target, sy: 1, opacity: 1);
-    final ms = (_entryController.value * 260000).round() / 1000;
-    double mix(double a, double b, double t) => a + (b - a) * t;
-    if (ms <= 140) {
-      final t = Curves.easeInQuad.transform(ms / 140);
-      return (y: mix(-50, target + 14, t), sy: mix(1, 1.05, t), opacity: 1);
-    }
-    if (ms <= 210) {
-      final t = Curves.easeOutCubic.transform((ms - 140) / 70);
-      return (
-        y: mix(target + 14, target - 3, t),
-        sy: mix(1.05, .96, t),
-        opacity: 1,
-      );
-    }
-    final t = Curves.easeInOutSine.transform((ms - 210) / 50);
-    return (y: mix(target - 3, target, t), sy: mix(.96, 1, t), opacity: 1);
-  }
-
-  ({double y, double sy, double opacity}) _exitPose(double target) {
-    final ms = (_exitController.value * 160000).round() / 1000;
-    if (ms <= 30) {
-      final t = Curves.easeInQuad.transform(ms / 30);
-      final start = _exitOrigin ?? target;
-      return (y: start + (target + 2 - start) * t, sy: 1 - .02 * t, opacity: 1);
-    }
-    final raw = (ms - 30) / 130;
-    final t = Curves.easeInBack.transform(raw);
-    return (
-      y: target + 2 + (-60 - target - 2) * t,
-      sy: .98 + .02 * raw,
-      opacity: 1 - raw,
-    );
   }
 
   Widget _indicator(Color foreground, Color muted) {
@@ -1351,51 +1650,68 @@ class _TopBannerOverlayState extends State<_TopBannerOverlay>
   }
 
   Widget _content(
+    double physicalWidth,
     TextStyle labelStyle,
     TextStyle statusStyle,
     Color foreground,
     Color muted,
   ) {
-    final scaler = MediaQuery.textScalerOf(context);
-    final labelHeight = scaler.scale(10) * 1.2;
-    final statusHeight = scaler.scale(12.5) * 1.2;
-    // At normal scale exactly 42dp; accessibility scales may grow both rows.
-    final height = math.max(42.0, 8 + labelHeight + statusHeight);
+    // One HUD tree at its measured target width. Only the shell width changes;
+    // type stays unscaled. Text is invisible until expansion has room for it.
+    final width = math.max(_targetWidth, physicalWidth);
     final identity = ValueKey((
       _presentation.message,
       _presentation.icon,
       _presentation.tone,
       _presentation.live?.spinning,
     ));
-    final unit = Row(
+    final circle = _phase == _TopMotionPhase.drop;
+    final progress = circle
+        ? 0.0
+        : _closing
+        ? (1 - (_ms(_exitController, 270) / 110).clamp(0, 1))
+        : !_entered
+        ? ((_ms(_entryController, 500) - 240) / 150).clamp(0, 1)
+        : 1.0;
+    final glyphLeft = _mix((physicalWidth - 24) / 2, 14, progress.toDouble());
+    final unit = SizedBox(
       key: identity,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        SizedBox(
-          width: 24,
-          height: 24,
-          child: Center(child: _indicator(foreground, muted)),
-        ),
-        const SizedBox(width: 8),
-        Flexible(
-          child: Padding(
-            padding: EdgeInsets.only(top: labelHeight),
-            child: Text(
-              _presentation.message,
-              style: statusStyle,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+      width: width,
+      height: _hudHeight - 8,
+      child: Stack(
+        children: [
+          Positioned(
+            left: glyphLeft,
+            top: (_hudHeight - 8 - 24) / 2,
+            width: 24,
+            height: 24,
+            child: Center(child: _indicator(foreground, muted)),
+          ),
+          Positioned(
+            left: 46,
+            right: 14,
+            top:
+                (_hudHeight - 8 - _labelHeight - _statusHeight) / 2 +
+                _labelHeight,
+            child: Opacity(
+              opacity: _reveal,
+              child: Text(
+                _presentation.message,
+                style: statusStyle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
     final reel = _reduced
         ? unit
         : AnimatedSwitcher(
-            duration: const Duration(milliseconds: 120),
+            duration: const Duration(milliseconds: 130),
             reverseDuration: const Duration(milliseconds: 90),
-            switchInCurve: Curves.linear,
+            switchInCurve: Curves.easeOutQuad,
             switchOutCurve: Curves.linear,
             layoutBuilder: (current, old) => Stack(
               alignment: Alignment.centerLeft,
@@ -1412,10 +1728,11 @@ class _TopBannerOverlayState extends State<_TopBannerOverlay>
             ),
             transitionBuilder: (child, animation) {
               final incoming = child.key == identity;
+              // Delay the incoming fade until outgoing text is no longer readable.
               final fade = animation.drive(
                 CurveTween(
                   curve: incoming
-                      ? const Interval(.75, 1)
+                      ? const Interval(.9, 1)
                       : const Interval(.25, 1),
                 ),
               );
@@ -1423,32 +1740,32 @@ class _TopBannerOverlayState extends State<_TopBannerOverlay>
                 opacity: fade,
                 child: SlideTransition(
                   position: Tween<Offset>(
-                    begin: Offset(0, incoming ? .7 : -.7),
+                    begin: Offset(0, incoming ? .8 : -.8),
                     end: Offset.zero,
                   ).animate(animation),
-                  child: ScaleTransition(
-                    scale: Tween<double>(
-                      begin: incoming ? .92 : 1,
-                      end: 1,
-                    ).animate(animation),
-                    child: child,
-                  ),
+                  child: child,
                 ),
               );
             },
             child: unit,
           );
-    final body = SizedBox(
-      height: height,
+    return OverflowBox(
+      alignment: Alignment.centerLeft,
+      minWidth: width,
+      maxWidth: width,
+      minHeight: _hudHeight,
+      maxHeight: _hudHeight,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-        child: Center(
-          widthFactor: 1,
-          child: Stack(
-            alignment: Alignment.centerLeft,
-            children: [
-              Padding(
-                padding: EdgeInsets.only(left: 32, bottom: statusHeight),
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Stack(
+          alignment: Alignment.centerLeft,
+          children: [
+            Positioned(
+              left: 46,
+              right: 14,
+              top: (_hudHeight - 8 - _labelHeight - _statusHeight) / 2,
+              child: Opacity(
+                opacity: _reveal,
                 child: Text(
                   _presentation.category,
                   key: const ValueKey('top.category'),
@@ -1457,20 +1774,12 @@ class _TopBannerOverlayState extends State<_TopBannerOverlay>
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              reel,
-            ],
-          ),
+            ),
+            reel,
+          ],
         ),
       ),
     );
-    return _reduced
-        ? body
-        : AnimatedSize(
-            duration: const Duration(milliseconds: 200),
-            curve: Curves.easeOutCubic,
-            alignment: Alignment.center,
-            child: body,
-          );
   }
 
   @override
@@ -1478,106 +1787,86 @@ class _TopBannerOverlayState extends State<_TopBannerOverlay>
     final media = MediaQuery.of(context);
     final theme = Theme.of(context);
     final dark = theme.brightness == Brightness.dark;
-    final foreground = theme.colorScheme.onSurface;
-    final muted = dark ? Colors.white70 : theme.colorScheme.onSurfaceVariant;
-    final base = theme.textTheme.bodyMedium ?? const TextStyle();
-    final labelStyle = base.copyWith(
-      fontSize: 10,
-      fontWeight: FontWeight.w700,
-      letterSpacing: .5,
-      height: 1.2,
-      color: muted,
-      decoration: TextDecoration.none,
-    );
-    final statusStyle = base.copyWith(
-      fontSize: 12.5,
-      fontWeight: FontWeight.w800,
-      letterSpacing: .12,
-      height: 1.2,
-      color: foreground,
-      decoration: TextDecoration.none,
-    );
-    final maxWidth = math.max(
-      0.0,
-      math.min(
-        AppFeedbackTokens.topBannerMaxWidth,
-        media.size.width -
-            AppFeedbackTokens.topBannerHorizontalScreenMargin * 2,
-      ),
-    );
+    final styles = _styles();
     final radius = BorderRadius.circular(999);
-    final capsule = IgnorePointer(
-      ignoring: true,
-      child: Align(
-        alignment: Alignment.topCenter,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: maxWidth),
-          child: Material(
-            type: MaterialType.transparency,
-            child: Semantics(
-              liveRegion: true,
-              label: '${_presentation.category}. ${_presentation.message}',
-              child: ExcludeSemantics(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    borderRadius: radius,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: dark ? .35 : .08),
-                        blurRadius: dark ? 20 : 18,
-                        offset: Offset(0, dark ? 8 : 6),
-                      ),
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: radius,
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: dark
-                              ? const Color(0xE01A2620)
-                              : Colors.white.withValues(alpha: .88),
-                          borderRadius: radius,
-                          border: Border.all(
-                            width: .8,
-                            color: dark
-                                ? Colors.white.withValues(alpha: .12)
-                                : Colors.black.withValues(alpha: .06),
-                          ),
-                        ),
-                        child: _content(
-                          labelStyle,
-                          statusStyle,
-                          foreground,
-                          muted,
-                        ),
-                      ),
-                    ),
-                  ),
+    return AnimatedBuilder(
+      animation: Listenable.merge([
+        _entryController,
+        _morphController,
+        _exitController,
+      ]),
+      builder: (context, child) {
+        final pose = _pose(media.padding.top + 12);
+        final width = _width;
+        final glass = DecoratedBox(
+          decoration: BoxDecoration(
+            color: dark
+                ? const Color(0xE01A2620)
+                : Colors.white.withValues(alpha: .88),
+            borderRadius: radius,
+            border: Border.all(
+              width: .8,
+              color: dark
+                  ? Colors.white.withValues(alpha: .12)
+                  : Colors.black.withValues(alpha: .06),
+            ),
+          ),
+          child: _content(
+            width,
+            styles.label,
+            styles.status,
+            theme.colorScheme.onSurface,
+            dark ? Colors.white70 : theme.colorScheme.onSurfaceVariant,
+          ),
+        );
+        final surface = DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: radius,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: dark ? .35 : .08),
+                blurRadius: dark ? 20 : 18,
+                offset: Offset(0, dark ? 8 : 6),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: radius,
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+              child: glass,
+            ),
+          ),
+        );
+        final capsule = IgnorePointer(
+          ignoring: true,
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: SizedBox(
+              width: width,
+              height: _height,
+              child: Material(
+                type: MaterialType.transparency,
+                child: Semantics(
+                  liveRegion: true,
+                  label: '${_presentation.category}. ${_presentation.message}',
+                  child: ExcludeSemantics(child: surface),
                 ),
               ),
             ),
           ),
-        ),
-      ),
-    );
-    return AnimatedBuilder(
-      animation: Listenable.merge([_entryController, _exitController]),
-      child: capsule,
-      builder: (_, child) {
-        final target = media.padding.top + AppFeedbackTokens.topBannerSafeGap;
-        final pose = _closing ? _exitPose(target) : _entryPose(target);
+        );
         return Positioned(
-          top: _reduced ? target : pose.y,
+          top: pose.y,
           left: AppFeedbackTokens.topBannerHorizontalScreenMargin,
           right: AppFeedbackTokens.topBannerHorizontalScreenMargin,
           child: Opacity(
-            opacity: _reduced ? 1 : pose.opacity,
+            opacity: pose.opacity,
             child: Transform.scale(
-              scaleY: _reduced ? 1 : pose.sy,
+              scaleX: pose.sx,
+              scaleY: pose.sy,
               alignment: Alignment.center,
-              child: child,
+              child: capsule,
             ),
           ),
         );
@@ -1585,7 +1874,6 @@ class _TopBannerOverlayState extends State<_TopBannerOverlay>
     );
   }
 }
-
 class _TopSuccessGlyph extends StatefulWidget {
   const _TopSuccessGlyph({required this.child});
   final Widget child;
