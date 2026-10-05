@@ -18,7 +18,7 @@ void main() {
     await tester.pump();
     await tester.pump();
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 340));
+    await tester.pump(const Duration(milliseconds: 461));
   }
 
   Future<void> finish(WidgetTester tester) async {

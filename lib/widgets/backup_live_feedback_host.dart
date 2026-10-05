@@ -114,16 +114,16 @@ class _BackupLiveFeedbackHostState extends ConsumerState<BackupLiveFeedbackHost>
       id: request.id,
       presentation: AppLiveFeedbackPresentation.ambientBackup,
       message: switch (phase) {
-        ManualBackupPhase.queued => 'Đang chờ sao lưu',
-        ManualBackupPhase.running => 'Đang sao lưu',
-        ManualBackupPhase.success => 'Đã sao lưu',
+        ManualBackupPhase.queued => 'Đang chờ sao lưu…',
+        ManualBackupPhase.running => 'Đang sao lưu dữ liệu…',
+        ManualBackupPhase.success => 'Đã sao lưu lên Google Drive',
         // Intentionally concise: never render arbitrary exception text here.
         ManualBackupPhase.failure => 'Sao lưu chưa hoàn tất',
       },
       icon: switch (phase) {
-        ManualBackupPhase.queued => Icons.cloud_queue_rounded,
+        ManualBackupPhase.queued => Icons.schedule_rounded,
         ManualBackupPhase.running => Icons.sync_rounded,
-        ManualBackupPhase.success => Icons.check_rounded,
+        ManualBackupPhase.success => Icons.check_circle_rounded,
         ManualBackupPhase.failure => Icons.error_outline_rounded,
       },
       tone: phase == ManualBackupPhase.success
