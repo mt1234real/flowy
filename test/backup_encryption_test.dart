@@ -726,6 +726,8 @@ void main() {
         'user_avatar_type': 'customImage',
         'user_avatar_image_base64': base64Encode(avatar),
       });
+      // Auth identity is local-only, deliberately not imported from a capsule.
+      await prefs.setString('user_email', 'A@example.invalid');
       await prefs.setBool('has_completed_onboarding', true);
       api = _Drive();
       google = _Google('A');
@@ -1033,7 +1035,9 @@ void main() {
           api.files.contents[item.fileId] = _legacyFixture([1, 2, 3], 'A');
         }
         await expectLater(service.downloadAndDecryptBackup(item.fileId),
-            throwsA(isA<BackupCryptoFailure>()));
+            throwsA(failure == 'wrong-account'
+                ? isA<BackupAuthenticationFailure>()
+                : isA<BackupCryptoFailure>()));
         expect(ledgerFingerprint(live.path), before);
         expect({for (final key in prefs.getKeys()) key: prefs.get(key)},
             beforePrefs);

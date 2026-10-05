@@ -20,11 +20,13 @@ import 'fiscal_day.dart';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:extension_google_sign_in_as_googleapis_auth/extension_google_sign_in_as_googleapis_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:google_sign_in_platform_interface/google_sign_in_platform_interface.dart';
+import 'package:googleapis_auth/googleapis_auth.dart' as google_auth;
+import 'package:http/http.dart' as http;
 import 'package:googleapis/drive/v3.dart' as drive;
 import 'package:intl/intl.dart';
 import 'package:path/path.dart' as p;
@@ -241,7 +243,6 @@ class CloudBackupService {
   final drive.DriveApi? _driveApiOverride;
 
   Timer? _debounceTimer;
-  bool _silentAuth = false;
 
   CloudBackupService({
     required AppDatabase db,
@@ -251,13 +252,7 @@ class CloudBackupService {
   })  : _db = db,
         _ref = ref,
         _driveApiOverride = driveApi,
-        _googleSignIn = googleSignIn ??
-            GoogleSignIn(
-              scopes: [
-                'email',
-                'https://www.googleapis.com/auth/drive.appdata',
-              ],
-            );
+        _googleSignIn = googleSignIn ?? ref.read(googleSignInProvider);
 
   /// Kích hoạt bộ đếm debounce 3 phút sau mỗi lần ghi chép mới
   Future<void> notifyDataChanged() async {
@@ -267,11 +262,17 @@ class CloudBackupService {
 
   /// Khởi tạo Google Drive API client có chứng thực
   Future<({drive.DriveApi api, String accountId})> _getDriveSession() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.reload();
+    final profileEmail = prefs.getString('user_email')?.trim().toLowerCase();
+    // A plugin session alone is not an intentional Flowy profile login.
+    if (profileEmail == null || profileEmail.isEmpty) {
+      throw const BackupAuthenticationFailure();
+    }
     GoogleSignInAccount? account = _googleSignIn.currentUser;
     account ??= await _googleSignIn.signInSilently();
-    if (!_silentAuth) account ??= await _googleSignIn.signIn();
 
-    if (account == null) {
+    if (account == null || account.email.trim().toLowerCase() != profileEmail) {
       throw const BackupAuthenticationFailure();
     }
 
@@ -283,12 +284,23 @@ class CloudBackupService {
       throw const BackupAuthenticationFailure();
     }
 
-    final authClient = await _googleSignIn.authenticatedClient();
-    if (authClient == null ||
-        _googleSignIn.currentUser?.id.trim() != accountId) {
-      authClient?.close();
+    // The extension's authenticatedClient uses account.authentication, which
+    // requests interactive token recovery. Passive Drive access must not do so.
+    final tokens = await GoogleSignInPlatform.instance.getTokens(
+        email: account.email, shouldRecoverAuth: false);
+    await prefs.reload();
+    if (tokens.accessToken == null ||
+        _googleSignIn.currentUser?.id.trim() != accountId ||
+        prefs.getString('user_email')?.trim().toLowerCase() != profileEmail) {
       throw const BackupAuthenticationFailure();
     }
+    final authClient = google_auth.authenticatedClient(
+        http.Client(),
+        google_auth.AccessCredentials(
+            google_auth.AccessToken('Bearer', tokens.accessToken!,
+                DateTime.now().toUtc().add(const Duration(days: 365))),
+            null,
+            _googleSignIn.scopes));
 
     return (api: drive.DriveApi(authClient), accountId: accountId);
   }
@@ -406,7 +418,6 @@ class CloudBackupService {
 
   Future<CloudBackupItem> _performBackup({required bool silent}) async {
     if (_busy || _attempting) throw StateError('Một tác vụ sao lưu đang chạy');
-    _silentAuth = silent;
     final notifier = _ref.read(cloudBackupNotifierProvider.notifier);
 
     if (!silent) {
@@ -419,6 +430,7 @@ class CloudBackupService {
       final item = await runBackupAttempt(
           store,
           () => createBackup(
+                silent: silent,
                 onProgress: (status, message, progress) {
                   if (!silent) {
                     notifier.updateProgress(status, message, progress);
@@ -446,13 +458,14 @@ class CloudBackupService {
   static bool _attempting = false;
 
   Future<CloudBackupItem> createBackup({
+    bool silent = false,
     void Function(CloudBackupStatus status, String message, double progress)?
         onProgress,
   }) async {
     if (_busy) throw StateError('Một tác vụ sao lưu đang chạy');
     _busy = true;
     final progress =
-        _silentAuth ? null : _ref.read(backupOperationProvider.notifier);
+        silent ? null : _ref.read(backupOperationProvider.notifier);
     progress?.state = 'Đang chuẩn bị bản sao lưu…';
     Directory? tempDir;
     try {
@@ -620,6 +633,8 @@ class CloudBackupService {
       }
 
       return items;
+    } on BackupAuthenticationFailure {
+      rethrow;
     } catch (e) {
       debugPrint('CloudBackupService: listBackups error: $e');
       rethrow;
@@ -975,9 +990,7 @@ final backupSyncNotifierProvider =
     StateNotifierProvider<BackupSyncNotifier, BackupSyncState>((ref) {
   final service = ref.watch(cloudBackupServiceProvider);
   final db = ref.watch(databaseProvider);
-  final googleSignIn = GoogleSignIn(
-    scopes: ['email', 'https://www.googleapis.com/auth/drive.appdata'],
-  );
+  final googleSignIn = ref.watch(googleSignInProvider);
   return BackupSyncNotifier(service, db, googleSignIn);
 });
 
@@ -987,11 +1000,13 @@ final backupSyncNotifierProvider =
 
 final cloudBackupServiceProvider = Provider<CloudBackupService>((ref) {
   final db = ref.watch(databaseProvider);
-  return CloudBackupService(db: db, ref: ref);
+  return CloudBackupService(
+      db: db, ref: ref, googleSignIn: ref.watch(googleSignInProvider));
 });
 
 class CloudBackupNotifier extends StateNotifier<CloudBackupState> {
   final CloudBackupService _service;
+  int _historyGeneration = 0;
 
   CloudBackupNotifier(this._service)
       : super(const CloudBackupState(status: CloudBackupStatus.idle)) {
@@ -1036,9 +1051,10 @@ class CloudBackupNotifier extends StateNotifier<CloudBackupState> {
   }
 
   Future<void> loadBackups() async {
+    final generation = ++_historyGeneration;
     try {
       final backups = await _service.listBackups();
-      if (!mounted) return;
+      if (!mounted || generation != _historyGeneration) return;
       DateTime? latestTime;
       if (backups.isNotEmpty) {
         latestTime = backups.first.createdTime;
@@ -1047,9 +1063,18 @@ class CloudBackupNotifier extends StateNotifier<CloudBackupState> {
         backups: backups,
         lastBackupTime: latestTime,
       );
+    } on BackupAuthenticationFailure {
+      // Guest/expired sessions are normal for passive history initialization.
+      if (!mounted || generation != _historyGeneration) return;
+      state = CloudBackupState(status: state.status);
     } catch (e) {
       debugPrint('CloudBackupNotifier: loadBackups error: $e');
     }
+  }
+
+  void clearAccountHistory() {
+    ++_historyGeneration;
+    state = CloudBackupState(status: state.status);
   }
 
   Future<void> performBackup() async {
@@ -1072,7 +1097,13 @@ class CloudBackupNotifier extends StateNotifier<CloudBackupState> {
 final cloudBackupNotifierProvider =
     StateNotifierProvider<CloudBackupNotifier, CloudBackupState>((ref) {
   final service = ref.watch(cloudBackupServiceProvider);
-  return CloudBackupNotifier(service);
+  final notifier = CloudBackupNotifier(service);
+  ref.listen(currentUserProfileProvider, (previous, next) {
+    if (previous?.isSignedIn == true && previous?.email != next.email) {
+      notifier.clearAccountHistory();
+    }
+  });
+  return notifier;
 });
 void _reconcileInBackground(Map<String, dynamic> args) => reconcileBackup(
     args['path'] as String,

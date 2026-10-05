@@ -109,9 +109,12 @@ class TestCloudService extends CloudBackupService {
   Future<List<CloudBackupItem>> listBackups() async => [];
   @override
   Future<CloudBackupItem> createBackup({
+    bool silent = false,
     void Function(CloudBackupStatus, String, double)? onProgress,
   }) =>
-      upload != null ? upload!() : super.createBackup(onProgress: onProgress);
+      upload != null
+          ? upload!()
+          : super.createBackup(silent: silent, onProgress: onProgress);
 }
 
 void main() {
@@ -572,6 +575,7 @@ void main() {
     });
     test('silent authentication failure is visible and never opens login',
         () async {
+      await prefs.setString('user_email', 'A@example.invalid');
       await store.markDirty();
       await expectLater(
           container

@@ -20,7 +20,6 @@
 import 'package:drift/drift.dart' as drift;
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import 'package:intl/intl.dart';
 
 import '../../../data/database.dart';
@@ -90,16 +89,9 @@ class OnboardingState {
 class OnboardingController extends StateNotifier<OnboardingState> {
   final Ref _ref;
   final AppDatabase _db;
-  final GoogleSignIn _googleSignIn;
 
   OnboardingController(this._ref, this._db)
-      : _googleSignIn = GoogleSignIn(
-          scopes: [
-            'email',
-            'https://www.googleapis.com/auth/drive.appdata',
-          ],
-        ),
-        super(const OnboardingState());
+      : super(const OnboardingState());
 
   void setStep(int step) {
     state = state.copyWith(currentStep: step);
@@ -134,20 +126,15 @@ class OnboardingController extends StateNotifier<OnboardingState> {
   Future<bool> signInWithGoogleAndCheckBackup() async {
     state = state.copyWith(isGoogleLoading: true);
     try {
-      final account = await _googleSignIn.signIn();
-      if (account == null) {
-        state = state.copyWith(isGoogleLoading: false);
-        return false;
-      }
-
       final profileNotifier = _ref.read(userProfileNotifierProvider.notifier);
       await profileNotifier.signInWithGoogle();
+      final profile = _ref.read(currentUserProfileProvider);
 
       state = state.copyWith(
-        displayName: account.displayName?.isNotEmpty == true
-            ? account.displayName!
-            : state.displayName,
-        photoUrl: account.photoUrl,
+        displayName: profile.displayName,
+        photoUrl: profile.avatarType == UserAvatarType.google
+            ? profile.avatarValue
+            : null,
       );
 
       // Quét ngầm Google Drive appDataFolder

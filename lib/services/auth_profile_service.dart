@@ -247,7 +247,6 @@ class AuthProfileService {
       );
 
       await _persistProfile(userProfile);
-      await recoverPendingBackup(await SharedPreferences.getInstance());
       return userProfile;
     } catch (e) {
       debugPrint('AuthProfileService: signInWithGoogle error: $e');
@@ -353,33 +352,46 @@ class AuthProfileService {
 // ==============================================================================
 
 /// Singleton provider cho AuthProfileService
+/// One foreground client; background ProviderScopes create their own client.
+final googleSignInProvider = Provider<GoogleSignIn>((ref) => GoogleSignIn(
+      scopes: ['email', 'https://www.googleapis.com/auth/drive.appdata'],
+    ));
+
 final authProfileServiceProvider = Provider<AuthProfileService>((ref) {
-  return AuthProfileService();
+  return AuthProfileService(googleSignIn: ref.watch(googleSignInProvider));
 });
 
 /// StateNotifier quản lý phản ứng thời gian thực trạng thái UserProfile
 class UserProfileNotifier extends StateNotifier<AsyncValue<UserProfile>> {
   final AuthProfileService _service;
+  int _identityGeneration = 0;
 
   UserProfileNotifier(this._service) : super(const AsyncValue.loading()) {
     _init();
   }
 
   Future<void> _init() async {
+    final generation = _identityGeneration;
     try {
       final profile = await _service.loadProfile();
+      if (!mounted || generation != _identityGeneration) return;
       state = AsyncValue.data(profile);
     } catch (e, st) {
+      if (!mounted || generation != _identityGeneration) return;
       state = AsyncValue.error(e, st);
     }
   }
 
   Future<void> signInWithGoogle() async {
+    ++_identityGeneration;
     final previous = state.valueOrNull ?? UserProfile.guest();
     state = const AsyncValue.loading();
     try {
       final newProfile = await _service.signInWithGoogle();
+      if (!mounted) return;
       state = AsyncValue.data(newProfile);
+      // Scheduling recovery must not delay publishing the chosen identity.
+      await recoverPendingBackup(await SharedPreferences.getInstance());
     } catch (e, st) {
       state = AsyncValue.data(previous);
       rethrow;
@@ -387,6 +399,7 @@ class UserProfileNotifier extends StateNotifier<AsyncValue<UserProfile>> {
   }
 
   Future<void> signOut() async {
+    ++_identityGeneration;
     state = const AsyncValue.loading();
     try {
       final guest = await _service.signOut();

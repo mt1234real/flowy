@@ -180,6 +180,7 @@ void main() {
   });
   test('manualWorker_realPipelineSilentAuthFailure_neverOpensCurtain',
       () async {
+    await prefs.setString('user_email', 'A@example.invalid');
     final db = AppDatabase.forTesting(NativeDatabase.memory());
     final google = NoSilentAccount();
     final container = ProviderContainer(overrides: [
