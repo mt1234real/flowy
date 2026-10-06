@@ -31,6 +31,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../widgets/sliding_segmented_bar.dart';
+import '../core/animation/app_animation_policy.dart';
 import '../core/feedback/app_feedback.dart';
 import '../data/database.dart';
 import '../services/auth_profile_service.dart';
@@ -50,34 +51,6 @@ import 'ledger_screen.dart'
 import 'main_scaffold.dart' show bottomNavIndexProvider;
 import 'vault_auth_screen.dart';
 import 'wallet_manager_screen.dart';
-
-/// 🌟 ROUTE TRANSITION TRƯỢT TRẦN ÉP GIỮ NGUYÊN HOẠT ẢNH BẤT CHẤP HỆ ĐIỀU HÀNH
-class PreservedPageRouteBuilder<T> extends PageRouteBuilder<T> {
-  PreservedPageRouteBuilder({
-    super.settings,
-    required super.pageBuilder,
-    super.transitionsBuilder,
-    super.transitionDuration = const Duration(milliseconds: 300),
-    super.reverseTransitionDuration = const Duration(milliseconds: 300),
-    super.opaque = true,
-    super.barrierDismissible = false,
-    super.barrierColor,
-    super.barrierLabel,
-    super.maintainState = true,
-    super.fullscreenDialog = false,
-    super.allowSnapshotting = true,
-  });
-
-  @override
-  AnimationController createAnimationController() {
-    return AnimationController(
-      vsync: navigator!,
-      duration: transitionDuration,
-      reverseDuration: reverseTransitionDuration,
-      animationBehavior: AnimationBehavior.preserve,
-    );
-  }
-}
 
 // 🌟 Provider chế độ chu kỳ chỉ áp dụng riêng cho DashboardScreen
 final dashboardCycleModeProvider =

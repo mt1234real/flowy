@@ -4,7 +4,7 @@
 // Root Navigation Shell Motion:
 // - 4 bottom tabs:
 //   + Haptic selectionClick
-//   + Preserved icon scale 1.0 -> 1.18 -> 1.15 / 180ms
+//   + Icon lift -3dp, scale 1.045 and subtle accent halo
 //   + Outline -> Filled crossfade
 //   + Muted -> Accent color interpolation
 //
@@ -14,7 +14,7 @@
 //   + Release 0.93 -> 1.02 -> 1.0 / 120ms
 //   + QuickEntrySheet.show() launches near rebound peak (Fluid Sheet Engine)
 //
-// - IndexedStack stays structurally fixed.
+// - Tab states stay mounted through a local Fade Through transition.
 // - Inactive tabs get TickerMode(false) to stop hidden motion.
 // - All critical animation controllers use AnimationBehavior.preserve.
 // ==============================================================================
@@ -26,6 +26,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/animation/app_animation_policy.dart';
+import '../core/animation/flowy_navigation_motion.dart';
 import '../features/notifications/notification_host.dart';
 import '../theme/app_theme.dart';
 import '../widgets/quick_entry_sheet.dart';
@@ -45,11 +46,6 @@ final bottomNavIndexProvider = StateProvider<int>((ref) => 0);
 // ==============================================================================
 
 abstract final class MainShellMotion {
-  // Bottom navigation
-  static const navSelect = Duration(milliseconds: 180);
-  static const navDeselect = Duration(milliseconds: 140);
-  static const navIconMorph = Duration(milliseconds: 150);
-
   // FAB
   static const fabPress = Duration(milliseconds: 80);
   static const fabRelease = Duration(milliseconds: 120);
@@ -108,17 +104,9 @@ class _MainScaffoldState extends ConsumerState<MainScaffold>
       // ========================================================================
 
       body: NotificationHost(
-        child: IndexedStack(
+        child: FlowyTabTransitionStack(
           index: currentTabIndex,
-          children: List.generate(
-            _screens.length,
-            (index) {
-              return TickerMode(
-                enabled: currentTabIndex == index,
-                child: _screens[index],
-              );
-            },
-          ),
+          children: _screens,
         ),
       ),
 
@@ -276,8 +264,8 @@ class _PreservedNavTabItemState extends State<_PreservedNavTabItem>
 
     _controller = AppAnimationPolicy.createController(
       vsync: this,
-      duration: MainShellMotion.navSelect,
-      reverseDuration: MainShellMotion.navDeselect,
+      duration: FlowyNavigationMotion.navSelect,
+      reverseDuration: FlowyNavigationMotion.navDeselect,
       debugLabel: 'MainShell.Nav.${widget.label}',
     );
 
@@ -293,12 +281,16 @@ class _PreservedNavTabItemState extends State<_PreservedNavTabItem>
     }
 
     if (widget.selected) {
-      _controller.forward(from: 0.0);
+      _controller.animateTo(
+        1.0,
+        duration: FlowyNavigationMotion.navSelect,
+        curve: FlowyNavigationMotion.curve,
+      );
     } else {
       _controller.animateBack(
         0.0,
-        duration: MainShellMotion.navDeselect,
-        curve: Curves.easeOut,
+        duration: FlowyNavigationMotion.navDeselect,
+        curve: FlowyNavigationMotion.curve,
       );
     }
   }
@@ -307,31 +299,6 @@ class _PreservedNavTabItemState extends State<_PreservedNavTabItem>
   void dispose() {
     _controller.dispose();
     super.dispose();
-  }
-
-  // ============================================================================
-  // SCALE CURVE
-  // ============================================================================
-
-  double _resolveIconScale(double p) {
-    if (!widget.selected) {
-      return 1.0 + (0.15 * Curves.easeOut.transform(p));
-    }
-
-    const peakPoint = 0.72;
-
-    if (p <= peakPoint) {
-      final local = (p / peakPoint).clamp(0.0, 1.0);
-      final eased = Curves.easeOutCubic.transform(local);
-      return _lerp(1.0, 1.18, eased);
-    }
-
-    final local = ((p - peakPoint) / (1.0 - peakPoint)).clamp(0.0, 1.0);
-    return _lerp(1.18, 1.15, Curves.easeOutCubic.transform(local));
-  }
-
-  double _lerp(double a, double b, double t) {
-    return a + ((b - a) * t);
   }
 
   // ============================================================================
@@ -366,56 +333,52 @@ class _PreservedNavTabItemState extends State<_PreservedNavTabItem>
           animation: _controller,
           builder: (context, _) {
             final p = _controller.value.clamp(0.0, 1.0);
-            final scale = _resolveIconScale(p);
-
-            final currentColor = Color.lerp(
-                  mutedColor,
-                  selectedColor,
-                  Curves.easeOut.transform(p),
-                ) ??
-                mutedColor;
-
-            const morphEnd = 150.0 / 180.0;
-            final iconMorph = Curves.easeOut.transform(
-              (p / morphEnd).clamp(0.0, 1.0),
-            );
-
-            final labelWeight = FontWeight.lerp(
-                  FontWeight.w500,
-                  FontWeight.w700,
-                  p,
-                ) ??
-                FontWeight.w500;
+            final currentColor = Color.lerp(mutedColor, selectedColor, p)!;
 
             return Column(
               mainAxisSize: MainAxisSize.min,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Transform.scale(
-                  scale: scale,
-                  child: SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        Opacity(
-                          opacity: 1.0 - iconMorph,
-                          child: Icon(
-                            widget.outlineIcon,
-                            size: 22,
-                            color: currentColor,
+                Transform.translate(
+                  offset: Offset(0, FlowyNavigationMotion.iconLift * p),
+                  child: Transform.scale(
+                    scale: 1 + (FlowyNavigationMotion.iconScale - 1) * p,
+                    child: SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        alignment: Alignment.center,
+                        children: [
+                          Positioned.fill(
+                            left: -4,
+                            top: -4,
+                            right: -4,
+                            bottom: -4,
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: RadialGradient(colors: [
+                                  selectedColor.withValues(
+                                    alpha: FlowyNavigationMotion.haloAlpha * p,
+                                  ),
+                                  selectedColor.withValues(alpha: 0),
+                                ]),
+                              ),
+                            ),
                           ),
-                        ),
-                        Opacity(
-                          opacity: iconMorph,
-                          child: Icon(
-                            widget.filledIcon,
-                            size: 22,
-                            color: currentColor,
+                          Opacity(
+                            opacity: 1 - p,
+                            child: Icon(widget.outlineIcon,
+                                size: 22, color: currentColor),
                           ),
-                        ),
-                      ],
+                          Opacity(
+                            opacity: p,
+                            child: Icon(widget.filledIcon,
+                                size: 22, color: currentColor),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -424,7 +387,7 @@ class _PreservedNavTabItemState extends State<_PreservedNavTabItem>
                   widget.label,
                   style: TextStyle(
                     fontSize: 10,
-                    fontWeight: labelWeight,
+                    fontWeight: FontWeight.w600,
                     color: currentColor,
                   ),
                 ),
