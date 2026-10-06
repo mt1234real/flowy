@@ -7,7 +7,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:pfm_app/core/animation/flowy_navigation_motion.dart';
 import 'package:pfm_app/data/database.dart';
+import 'package:pfm_app/screens/budget_screen.dart';
+import 'package:pfm_app/screens/dashboard_screen.dart';
+import 'package:pfm_app/screens/ledger_screen.dart';
 import 'package:pfm_app/screens/main_scaffold.dart';
+import 'package:pfm_app/screens/settings_screen.dart';
 import 'package:pfm_app/theme/app_theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -186,17 +190,37 @@ void main() {
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(SystemChannels.platform, null);
     });
-    Future<void> mountShell(WidgetTester tester) async {
+    Future<void> mountShell(WidgetTester tester,
+        {double safeBottom = 0,
+        Brightness brightness = Brightness.light}) async {
       tester.view.physicalSize = const Size(1080, 1920);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
       await tester.pumpWidget(UncontrolledProviderScope(
         container: container,
-        child: const MaterialApp(home: MainScaffold()),
+        child: MaterialApp(
+          theme: ThemeData(brightness: brightness),
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(context).copyWith(
+              padding: EdgeInsets.only(top: 24, bottom: safeBottom),
+              viewPadding: EdgeInsets.only(top: 24, bottom: safeBottom),
+            ),
+            child: child!,
+          ),
+          home: const MainScaffold(),
+        ),
       ));
       await tester.pump();
     }
+
+    Scaffold shell(WidgetTester tester) => tester.widget<Scaffold>(find
+        .descendant(
+            of: find.byType(MainScaffold), matching: find.byType(Scaffold))
+        .first);
+    Finder dock(WidgetTester tester) => find.descendant(
+        of: find.byWidget(shell(tester).bottomNavigationBar!),
+        matching: find.byType(BackdropFilter));
 
     Future<void> unmount(WidgetTester tester) async {
       await tester.pumpWidget(const SizedBox.shrink());
@@ -280,5 +304,184 @@ void main() {
       expect(tester.getCenter(label), labelPosition);
       await unmount(tester);
     });
+
+    for (final safeBottom in [0.0, 24.0, 48.0]) {
+      testWidgets(
+          'floatingDock_safeBottom${safeBottom}_canvasAndScrollClearance',
+          (tester) async {
+        await mountShell(tester, safeBottom: safeBottom);
+        final engine = find.byType(FlowyTabTransitionStack);
+        final dockRect = tester.getRect(dock(tester));
+        expect(dockRect.height, 72);
+        expect(dockRect.left, 16);
+        expect(dockRect.right, 1080 - 16);
+        expect(dockRect.bottom, 1920 - safeBottom - 16);
+        expect(tester.getRect(engine).bottom, 1920);
+        // Consumers see only the device inset, never the dock's occupied height.
+        expect(MediaQuery.paddingOf(tester.element(engine)).bottom, safeBottom);
+
+        for (final entry in {
+          0: DashboardScreen,
+          1: LedgerScreen,
+          2: BudgetScreen,
+          3: SettingsScreen,
+        }.entries) {
+          container.read(bottomNavIndexProvider.notifier).state = entry.key;
+          await tester.pump();
+          await tester.pump(const Duration(milliseconds: 260));
+          final scroll = find
+              .descendant(
+                of: find.byType(entry.value),
+                matching: find.byType(Scrollable),
+              )
+              .first;
+          expect(
+              tester.getRect(scroll).bottom, closeTo(1920 - safeBottom, 0.1));
+          expect(tester.getRect(scroll).bottom, greaterThan(dockRect.top));
+          expect(tester.getRect(dock(tester)), dockRect);
+        }
+
+        final settingsScroll = find.descendant(
+            of: find.byType(SettingsScreen), matching: find.byType(Scrollable));
+        final position = tester.state<ScrollableState>(settingsScroll).position;
+        final lastLabel = find.byWidgetPredicate((widget) =>
+            widget is Text &&
+            (widget.data?.startsWith('Flowy • Phiên bản') ?? false));
+        // Build the end of the lazy ListView before using its exact extent.
+        await tester.scrollUntilVisible(lastLabel, 500,
+            scrollable: settingsScroll, maxScrolls: 30);
+        await tester.pump();
+        position.jumpTo(position.maxScrollExtent);
+        await tester.pump();
+        expect(tester.getRect(lastLabel).bottom,
+            lessThanOrEqualTo(dockRect.top - 8));
+        expect(tester.takeException(), isNull);
+        await unmount(tester);
+      });
+    }
+
+    testWidgets('floatingDock_tabStateAndSpatialAnchorsSurviveRapidSwitching',
+        (tester) async {
+      await mountShell(tester, safeBottom: 24);
+      final screenTypes = [
+        DashboardScreen,
+        LedgerScreen,
+        BudgetScreen,
+        SettingsScreen
+      ];
+      final states = screenTypes
+          .map((type) => tester.state(find.byType(type, skipOffstage: false)))
+          .toList();
+      final engineState = tester.state(find.byType(FlowyTabTransitionStack));
+      final dockRect = tester.getRect(dock(tester));
+      final fabRect =
+          tester.getRect(find.byWidget(shell(tester).floatingActionButton!));
+      for (final index in [1, 2, 3, 0, 2]) {
+        container.read(bottomNavIndexProvider.notifier).state = index;
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 35));
+        expect(tester.getRect(dock(tester)), dockRect);
+        expect(
+            tester.getRect(find.byWidget(shell(tester).floatingActionButton!)),
+            fabRect);
+        for (var i = 0; i < 4; i++) {
+          expect(
+              identical(
+                  tester
+                      .state(find.byType(screenTypes[i], skipOffstage: false)),
+                  states[i]),
+              true);
+        }
+      }
+      await tester.pump(const Duration(milliseconds: 260));
+      expect(
+          identical(
+              tester.state(find.byType(FlowyTabTransitionStack)), engineState),
+          true);
+      expect(container.read(bottomNavIndexProvider), 2);
+      expect(tester.takeException(), isNull);
+      await unmount(tester);
+    });
+
+    testWidgets(
+        'floatingDock_blocksPageHitOnlyInsideDock_andFabStaysAboveGlass',
+        (tester) async {
+      await mountShell(tester, safeBottom: 24);
+      final rect = tester.getRect(dock(tester));
+      final pageRenderObject =
+          tester.renderObject(find.byType(FlowyTabTransitionStack));
+      final inside = tester.hitTestOnBinding(rect.center);
+      expect(
+          inside.path.any((entry) => identical(entry.target, pageRenderObject)),
+          false);
+      final outside = tester.hitTestOnBinding(Offset(8, rect.center.dy));
+      expect(
+          outside.path
+              .any((entry) => identical(entry.target, pageRenderObject)),
+          true);
+      final fab = find.byWidget(shell(tester).floatingActionButton!);
+      final fabHit = tester.hitTestOnBinding(tester.getCenter(fab));
+      expect(
+          fabHit.path.any((entry) =>
+              identical(entry.target, tester.renderObject(dock(tester)))),
+          false);
+      // Exercise the real FAB gesture without submitting/opening Quick Entry.
+      final press = await tester.startGesture(tester.getCenter(fab));
+      await tester.pump(const Duration(milliseconds: 110));
+      expect(haptics, contains('HapticFeedbackType.lightImpact'));
+      await press.cancel();
+      await tester.pump(const Duration(milliseconds: 160));
+      await tester.tap(find.text('Sổ GD').last);
+      await tester.pump();
+      expect(container.read(bottomNavIndexProvider), 1);
+      await unmount(tester);
+    });
+
+    for (final brightness in Brightness.values) {
+      testWidgets(
+          'floatingDock_${brightness.name}_singleClippedBlurAndUnclippedShadow',
+          (tester) async {
+        await mountShell(tester, brightness: brightness);
+        final nav = find.byWidget(shell(tester).bottomNavigationBar!);
+        final glass = dock(tester);
+        expect(glass, findsOneWidget);
+        final clip = tester.widget<ClipRRect>(
+            find.ancestor(of: glass, matching: find.byType(ClipRRect)).first);
+        expect(clip.borderRadius, BorderRadius.circular(26));
+        final surface = tester
+            .widgetList<Container>(
+                find.descendant(of: glass, matching: find.byType(Container)))
+            .where((widget) =>
+                widget.decoration is BoxDecoration &&
+                (widget.decoration as BoxDecoration).border != null)
+            .single;
+        final decoration = surface.decoration! as BoxDecoration;
+        final dark = brightness == Brightness.dark;
+        expect(
+            decoration.color,
+            (dark ? AppTokens.darkCard : AppTokens.lightCard)
+                .withValues(alpha: dark ? 0.68 : 0.66));
+        final border = decoration.border! as Border;
+        expect(border.top.width, 0.8);
+        expect(border.top.color,
+            Colors.white.withValues(alpha: dark ? 0.10 : 0.18));
+        final shadowContainer = tester
+            .widgetList<Container>(
+                find.descendant(of: nav, matching: find.byType(Container)))
+            .where((widget) =>
+                widget.decoration is BoxDecoration &&
+                (widget.decoration as BoxDecoration).boxShadow != null)
+            .single;
+        final shadow =
+            (shadowContainer.decoration! as BoxDecoration).boxShadow!.single;
+        expect(
+            shadow.color, Colors.black.withValues(alpha: dark ? 0.16 : 0.08));
+        expect(shadow.blurRadius, 24);
+        expect(shadow.offset, const Offset(0, 6));
+        expect(shadowContainer.child, isA<ClipRRect>());
+        expect(shell(tester).extendBody, true);
+        await unmount(tester);
+      });
+    }
   });
 }

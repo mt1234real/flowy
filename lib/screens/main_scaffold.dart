@@ -55,6 +55,17 @@ abstract final class MainShellMotion {
   static const sheetOut = Duration(milliseconds: 240);
 }
 
+/// The tabs already reserve 96dp at the end of their scroll content:
+/// 72dp dock + 16dp floating gap + 8dp breathing room. Their SafeArea handles
+/// the real device inset separately, without reserving a second dock strip.
+abstract final class MainShellDock {
+  static const height = 72.0;
+  static const horizontalInset = 16.0;
+  static const bottomGap = 16.0;
+  static const radius = 26.0;
+  static const blurSigma = 16.0;
+}
+
 // ==============================================================================
 // MAIN SCAFFOLD
 // ==============================================================================
@@ -94,6 +105,7 @@ class _MainScaffoldState extends ConsumerState<MainScaffold>
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final accent = ref.watch(accentPresetProvider);
     final currentTabIndex = ref.watch(bottomNavIndexProvider);
+    final deviceBottomPadding = MediaQuery.paddingOf(context).bottom;
 
     return Scaffold(
       extendBody: true,
@@ -103,11 +115,24 @@ class _MainScaffoldState extends ConsumerState<MainScaffold>
       // CONTENT
       // ========================================================================
 
-      body: NotificationHost(
-        child: FlowyTabTransitionStack(
-          index: currentTabIndex,
-          children: _screens,
-        ),
+      body: Builder(
+        builder: (context) {
+          final bodyMedia = MediaQuery.of(context);
+          // extendBody paints under the dock, but its synthesized bottom
+          // padding would make each tab's SafeArea stop above that dock.
+          // Keep the real device padding and Scaffold's keyboard handling.
+          return MediaQuery(
+            data: bodyMedia.copyWith(
+              padding: bodyMedia.padding.copyWith(bottom: deviceBottomPadding),
+            ),
+            child: NotificationHost(
+              child: FlowyTabTransitionStack(
+                index: currentTabIndex,
+                children: _screens,
+              ),
+            ),
+          );
+        },
       ),
 
       // ========================================================================
@@ -124,100 +149,118 @@ class _MainScaffoldState extends ConsumerState<MainScaffold>
       // BOTTOM NAVIGATION
       // ========================================================================
 
-      bottomNavigationBar: Container(
-        height: 72,
-        margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(26),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(
-              sigmaX: 16,
-              sigmaY: 16,
-            ),
-            child: Container(
-              decoration: BoxDecoration(
-                color: isDark
-                    ? AppTokens.darkCard.withValues(alpha: 0.85)
-                    : AppTokens.lightCard.withValues(alpha: 0.90),
-                borderRadius: BorderRadius.circular(26),
-                border: Border.all(
-                  color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder,
-                  width: 1,
-                ),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Container(
+          height: MainShellDock.height,
+          margin: const EdgeInsets.fromLTRB(
+            MainShellDock.horizontalInset,
+            0,
+            MainShellDock.horizontalInset,
+            MainShellDock.bottomGap,
+          ),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(MainShellDock.radius),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: isDark ? 0.16 : 0.08),
+                blurRadius: 24,
+                offset: const Offset(0, 6),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  // ===========================================================
-                  // DASHBOARD
-                  // ===========================================================
-
-                  _PreservedNavTabItem(
-                    selected: currentTabIndex == 0,
-                    outlineIcon: Icons.dashboard_outlined,
-                    filledIcon: Icons.dashboard_rounded,
-                    label: 'Tổng quan',
-                    accent: accent,
-                    isDark: isDark,
-                    onSelected: () {
-                      ref.read(bottomNavIndexProvider.notifier).state = 0;
-                    },
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(MainShellDock.radius),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(
+                sigmaX: MainShellDock.blurSigma,
+                sigmaY: MainShellDock.blurSigma,
+              ),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? AppTokens.darkCard.withValues(alpha: 0.68)
+                      : AppTokens.lightCard.withValues(alpha: 0.66),
+                  borderRadius: BorderRadius.circular(MainShellDock.radius),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: isDark ? 0.10 : 0.18),
+                    width: 0.8,
                   ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    // ===========================================================
+                    // DASHBOARD
+                    // ===========================================================
 
-                  // ===========================================================
-                  // LEDGER
-                  // ===========================================================
+                    _PreservedNavTabItem(
+                      selected: currentTabIndex == 0,
+                      outlineIcon: Icons.dashboard_outlined,
+                      filledIcon: Icons.dashboard_rounded,
+                      label: 'Tổng quan',
+                      accent: accent,
+                      isDark: isDark,
+                      onSelected: () {
+                        ref.read(bottomNavIndexProvider.notifier).state = 0;
+                      },
+                    ),
 
-                  _PreservedNavTabItem(
-                    selected: currentTabIndex == 1,
-                    outlineIcon: Icons.receipt_long_outlined,
-                    filledIcon: Icons.receipt_long_rounded,
-                    label: 'Sổ GD',
-                    accent: accent,
-                    isDark: isDark,
-                    onSelected: () {
-                      ref.read(bottomNavIndexProvider.notifier).state = 1;
-                    },
-                  ),
+                    // ===========================================================
+                    // LEDGER
+                    // ===========================================================
 
-                  // ===========================================================
-                  // FAB GAP
-                  // ===========================================================
+                    _PreservedNavTabItem(
+                      selected: currentTabIndex == 1,
+                      outlineIcon: Icons.receipt_long_outlined,
+                      filledIcon: Icons.receipt_long_rounded,
+                      label: 'Sổ GD',
+                      accent: accent,
+                      isDark: isDark,
+                      onSelected: () {
+                        ref.read(bottomNavIndexProvider.notifier).state = 1;
+                      },
+                    ),
 
-                  const SizedBox(width: 44),
+                    // ===========================================================
+                    // FAB GAP
+                    // ===========================================================
 
-                  // ===========================================================
-                  // BUDGET
-                  // ===========================================================
+                    const SizedBox(width: 44),
 
-                  _PreservedNavTabItem(
-                    selected: currentTabIndex == 2,
-                    outlineIcon: Icons.pie_chart_outline,
-                    filledIcon: Icons.pie_chart_rounded,
-                    label: 'Ngân sách',
-                    accent: accent,
-                    isDark: isDark,
-                    onSelected: () {
-                      ref.read(bottomNavIndexProvider.notifier).state = 2;
-                    },
-                  ),
+                    // ===========================================================
+                    // BUDGET
+                    // ===========================================================
 
-                  // ===========================================================
-                  // SETTINGS
-                  // ===========================================================
+                    _PreservedNavTabItem(
+                      selected: currentTabIndex == 2,
+                      outlineIcon: Icons.pie_chart_outline,
+                      filledIcon: Icons.pie_chart_rounded,
+                      label: 'Ngân sách',
+                      accent: accent,
+                      isDark: isDark,
+                      onSelected: () {
+                        ref.read(bottomNavIndexProvider.notifier).state = 2;
+                      },
+                    ),
 
-                  _PreservedNavTabItem(
-                    selected: currentTabIndex == 3,
-                    outlineIcon: Icons.settings_outlined,
-                    filledIcon: Icons.settings_rounded,
-                    label: 'Cài đặt',
-                    accent: accent,
-                    isDark: isDark,
-                    onSelected: () {
-                      ref.read(bottomNavIndexProvider.notifier).state = 3;
-                    },
-                  ),
-                ],
+                    // ===========================================================
+                    // SETTINGS
+                    // ===========================================================
+
+                    _PreservedNavTabItem(
+                      selected: currentTabIndex == 3,
+                      outlineIcon: Icons.settings_outlined,
+                      filledIcon: Icons.settings_rounded,
+                      label: 'Cài đặt',
+                      accent: accent,
+                      isDark: isDark,
+                      onSelected: () {
+                        ref.read(bottomNavIndexProvider.notifier).state = 3;
+                      },
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
