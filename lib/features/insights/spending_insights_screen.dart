@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../core/animation/app_animation_policy.dart';
+import '../../core/animation/flowy_navigation_motion.dart';
 import '../../core/feedback/app_feedback.dart';
 import '../../data/database.dart';
 import '../../screens/ledger_screen.dart' show cycleStartDaysByMonthProvider;
@@ -242,10 +243,11 @@ class _SpendingInsightsScreenState
   }
 
   void _openBucket(InsightsBucket bucket, bool fromScheme) {
-    Navigator.of(context).push(PreservedMaterialPageRoute(
+    Navigator.of(context).push(flowySurfaceRoute<void>(
         builder: (_) => SpendingInsightsScreen(
             initialPeriod: _period,
-            anchor: widget.anchor == null ? ref.read(fiscalTodayProvider) : _anchor,
+            anchor:
+                widget.anchor == null ? ref.read(fiscalTodayProvider) : _anchor,
             initialWallets: bucket.id.startsWith('wallet:')
                 ? {bucket.id.substring(7)}
                 : _wallets,

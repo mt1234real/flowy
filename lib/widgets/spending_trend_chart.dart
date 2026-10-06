@@ -17,6 +17,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../core/animation/app_animation_policy.dart';
+import '../core/animation/flowy_navigation_motion.dart';
 import '../data/database.dart';
 import '../theme/app_theme.dart';
 import '../features/insights/spending_insights_screen.dart';
@@ -110,14 +111,8 @@ class _SpendingTrendChartState extends ConsumerState<SpendingTrendChart>
 
   void _openInsights() {
     HapticFeedback.selectionClick();
-    Navigator.of(context).push(PreservedPageRouteBuilder(
-        pageBuilder: (_, animation, secondary) =>
-            const SpendingInsightsScreen(),
-        transitionsBuilder: (_, animation, secondary, child) => SlideTransition(
-            position: Tween(begin: const Offset(1, 0), end: Offset.zero)
-                .animate(CurvedAnimation(
-                    parent: animation, curve: Curves.easeOutCubic)),
-            child: child)));
+    Navigator.of(context).push(flowySurfaceRoute<void>(
+        builder: (_) => const SpendingInsightsScreen()));
   }
 
   String _formatCurrency(double amount) {
