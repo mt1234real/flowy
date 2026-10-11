@@ -64,3 +64,6 @@ app.*.map.json
 **/key.properties
 *.jks
 *.keystore
+
+# Keep filtered local context and output/cache out of future history
+/android/.[k]otlin/
