@@ -71,6 +71,7 @@ class _SpendingTrendChartState extends ConsumerState<SpendingTrendChart>
     with SingleTickerProviderStateMixin {
   ChartPeriod _selectedPeriod = ChartPeriod.days7;
   int? _selectedBucketIndex;
+  bool _openingInsights = false;
 
   late final AnimationController _barAnimController;
   late final Animation<double> _barCurveAnimation;
@@ -109,10 +110,19 @@ class _SpendingTrendChartState extends ConsumerState<SpendingTrendChart>
     setState(() => _selectedBucketIndex = index);
   }
 
-  void _openInsights() {
+  Future<void> _openInsights() async {
+    if (_openingInsights || ModalRoute.of(context)?.isCurrent != true) return;
+    _openingInsights = true;
     HapticFeedback.selectionClick();
-    Navigator.of(context).push(flowySurfaceRoute<void>(
-        builder: (_) => const SpendingInsightsScreen()));
+    final route = flowyReferenceRoute<void>(
+      builder: (_) => const SpendingInsightsScreen(),
+    );
+    try {
+      Navigator.of(context, rootNavigator: true).push(route);
+      await route.completed;
+    } finally {
+      _openingInsights = false;
+    }
   }
 
   String _formatCurrency(double amount) {

@@ -19,7 +19,8 @@ import '../theme/app_icons.dart';
 import '../theme/app_theme.dart';
 
 // StreamProvider tự động cập nhật danh mục từ Drift SQLite
-final categoriesTreeStreamProvider = StreamProvider.autoDispose<List<Category>>((ref) {
+final categoriesTreeStreamProvider =
+    StreamProvider.autoDispose<List<Category>>((ref) {
   final db = ref.watch(databaseProvider);
   return db.watchAvailableCategories();
 });
@@ -27,7 +28,8 @@ final categoriesTreeStreamProvider = StreamProvider.autoDispose<List<Category>>(
 class CategoryTreeModal extends ConsumerStatefulWidget {
   final CategoryType initialType;
   final String? selectedCategoryId;
-  final bool allowSelectParent; // true cho Thiết lập Ngân Sách, false cho Ghi Chép Giao Dịch
+  final bool
+      allowSelectParent; // true cho Thiết lập Ngân Sách, false cho Ghi Chép Giao Dịch
   final String? title;
   final ScrollController? scrollController;
   final String? parentCategoryId;
@@ -172,7 +174,9 @@ class _CategoryTreeModalState extends ConsumerState<CategoryTreeModal> {
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w800,
-                            color: isDark ? AppTokens.darkText : AppTokens.lightText,
+                            color: isDark
+                                ? AppTokens.darkText
+                                : AppTokens.lightText,
                           ),
                         ),
                         Text(
@@ -181,7 +185,9 @@ class _CategoryTreeModalState extends ConsumerState<CategoryTreeModal> {
                               : 'Chọn danh mục phù hợp với khoản tiền',
                           style: TextStyle(
                             fontSize: 11,
-                            color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                            color: isDark
+                                ? AppTokens.darkMuted
+                                : AppTokens.lightMuted,
                           ),
                         ),
                       ],
@@ -191,7 +197,8 @@ class _CategoryTreeModalState extends ConsumerState<CategoryTreeModal> {
                       icon: Icon(
                         Icons.close_rounded,
                         size: 20,
-                        color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                        color:
+                            isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
                       ),
                       onPressed: () {
                         if (mounted && Navigator.of(context).canPop()) {
@@ -252,7 +259,8 @@ class _CategoryTreeModalState extends ConsumerState<CategoryTreeModal> {
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
                 child: TextField(
                   controller: _searchController,
-                  onChanged: (val) => setState(() => _searchQuery = val.trim().toLowerCase()),
+                  onChanged: (val) =>
+                      setState(() => _searchQuery = val.trim().toLowerCase()),
                   style: TextStyle(
                     fontSize: 13,
                     color: isDark ? AppTokens.darkText : AppTokens.lightText,
@@ -261,22 +269,26 @@ class _CategoryTreeModalState extends ConsumerState<CategoryTreeModal> {
                     hintText: 'Tìm nhanh danh mục (ăn uống, mua sắm, xăng)...',
                     hintStyle: TextStyle(
                       fontSize: 12,
-                      color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                      color:
+                          isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
                     ),
                     prefixIcon: const Icon(Icons.search_rounded, size: 18),
                     suffixIcon: _searchQuery.isNotEmpty
                         ? IconButton(
-                      icon: const Icon(Icons.clear_rounded, size: 16),
-                      onPressed: () {
-                        _searchController.clear();
-                        setState(() => _searchQuery = '');
-                      },
-                    )
+                            icon: const Icon(Icons.clear_rounded, size: 16),
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() => _searchQuery = '');
+                            },
+                          )
                         : null,
                     isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                    contentPadding: const EdgeInsets.symmetric(
+                        vertical: 10, horizontal: 12),
                     filled: true,
-                    fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                    fillColor: isDark
+                        ? const Color(0xFF0F172A)
+                        : const Color(0xFFF1F5F9),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
                       borderSide: BorderSide.none,
@@ -293,8 +305,9 @@ class _CategoryTreeModalState extends ConsumerState<CategoryTreeModal> {
               Expanded(
                 child: categoriesAsync.when(
                   data: (allCategories) {
-                    final typedCategories =
-                    allCategories.where((c) => c.type == _activeType).toList();
+                    final typedCategories = allCategories
+                        .where((c) => c.type == _activeType)
+                        .toList();
 
                     final parentGroups = typedCategories
                         .where((c) =>

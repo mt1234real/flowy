@@ -1230,7 +1230,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   child: Padding(
                     padding: const EdgeInsets.only(top: 16, bottom: 8),
                     child: Text(
-                      'Flowy • Phiên bản 1.0.0-beta.1',
+                      'Flowy • Phiên bản 1.0.0-beta.2',
                       style: TextStyle(
                         fontSize: 11.5,
                         fontWeight: FontWeight.w600,

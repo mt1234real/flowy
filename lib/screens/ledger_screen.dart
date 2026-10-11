@@ -76,8 +76,27 @@ enum CycleMode { calendar, customCycle }
 final cycleModeProvider = StateProvider<CycleMode>((ref) => CycleMode.customCycle);
 
 final currentAnchorMonthProvider = StateProvider<DateTime>((ref) {
-  final now = ref.read(dayCutoffProvider).date(DateTime.now());
-  return DateTime(now.year, now.month, 1);
+  DateTime resolveDefault() => resolveActiveCycleAnchorMonth(
+        fiscalDate: ref.read(dayCutoffProvider).date(DateTime.now()),
+        mode: ref.read(cycleModeProvider),
+        store: ref.read(cycleStartDaysByMonthProvider),
+      );
+
+  var defaultAnchor = resolveDefault();
+  void refreshDefault() {
+    final nextDefault = resolveDefault();
+    // Follow changed cycle settings only while viewing the default period.
+    // A manually selected historical month must survive dependency changes.
+    if (ref.controller.state == defaultAnchor) {
+      ref.controller.state = nextDefault;
+    }
+    defaultAnchor = nextDefault;
+  }
+
+  ref.listen(cycleModeProvider, (_, next) => refreshDefault());
+  ref.listen(cycleStartDaysByMonthProvider, (_, next) => refreshDefault());
+  ref.listen(dayCutoffProvider, (_, next) => refreshDefault());
+  return defaultAnchor;
 });
 
 final cycleStartDaysByMonthProvider = StateProvider<Map<String, int>>((ref) {
@@ -143,6 +162,19 @@ MonthCycleRange computeMonthCycleRange(DateTime anchorMonth, Map<String, int> st
     daysCount: daysCount,
     startDay: safeStartDay,
   );
+}
+
+DateTime resolveActiveCycleAnchorMonth({
+  required DateTime fiscalDate,
+  required CycleMode mode,
+  required Map<String, int> store,
+}) {
+  final calendarMonth = DateTime(fiscalDate.year, fiscalDate.month, 1);
+  if (mode == CycleMode.customCycle &&
+      fiscalDate.isBefore(computeMonthCycleRange(calendarMonth, store).startDate)) {
+    return DateTime(fiscalDate.year, fiscalDate.month - 1, 1);
+  }
+  return calendarMonth;
 }
 
 enum LedgerFilter { all, expense, income, debt }
@@ -3498,8 +3530,7 @@ class _MonthYearPickerModalState extends ConsumerState<_MonthYearPickerModal> {
                     ),
                     onPressed: () {
                       HapticFeedback.mediumImpact();
-                      final now = ref.read(dayCutoffProvider).date(DateTime.now());
-                      ref.read(currentAnchorMonthProvider.notifier).state = DateTime(now.year, now.month, 1);
+                      ref.invalidate(currentAnchorMonthProvider);
                       Navigator.of(context).pop();
                     },
                   ),

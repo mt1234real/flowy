@@ -49,6 +49,12 @@ app.*.map.json
 /[f]ile_stats.txt
 /[r]epomix-output.xml
 /[l]ib.zip
+/[p]roject_codebase.xml
+/android/[b]uild/
+
+# Local-only architecture context (historical commits are retained)
+/[Pp]ROJECT_CONTEXT.md
+/[Cc]ONTEXT_UPDATE_[1-6].md
 
 # Local credentials
 .env

@@ -770,7 +770,8 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen>
     );
 
     return AppFeedbackDismissRegion(
-      child: AmbientCanvas(child: Scaffold(
+      child: AmbientCanvas(
+          child: Scaffold(
         backgroundColor: Colors.transparent,
         body: SafeArea(
           child: TwoStageOverscrollHeader(
@@ -780,8 +781,8 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen>
               physics: _isHorizontalPeriodDragActive
                   ? const NeverScrollableScrollPhysics()
                   : const BouncingScrollPhysics(
-                parent: AlwaysScrollableScrollPhysics(),
-              ),
+                      parent: AlwaysScrollableScrollPhysics(),
+                    ),
               slivers: [
                 // 1. TOP HEADER & 2 TOP TABS
                 SliverPadding(
@@ -866,7 +867,6 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen>
                           ]);
                         }),
                         const SizedBox(height: 12),
-
                         SlidingSegmentedBar<BudgetTopTab>(
                           selectedValue: currentTopTab,
                           items: [
@@ -876,7 +876,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen>
                               icon: Icons.autorenew_rounded,
                               activeColor: accent.primary,
                               activeBackgroundColor:
-                              accent.primary.withValues(alpha: 0.14),
+                                  accent.primary.withValues(alpha: 0.14),
                             ),
                             SlidingSegmentedItem<BudgetTopTab>(
                               value: BudgetTopTab.event,
@@ -884,7 +884,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen>
                               icon: Icons.flag_rounded,
                               activeColor: accent.primary,
                               activeBackgroundColor:
-                              accent.primary.withValues(alpha: 0.14),
+                                  accent.primary.withValues(alpha: 0.14),
                             ),
                           ],
                           onValueChanged: (tab) {
@@ -901,7 +901,8 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen>
                 // ===============================================================
                 if (currentTopTab == BudgetTopTab.recurring) ...[
                   SliverPadding(
-                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
                     sliver: SliverToBoxAdapter(
                       child: _buildBudgetPeriodBar(
                         context,
@@ -912,7 +913,6 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen>
                       ),
                     ),
                   ),
-
                   budgetsAsync.when(
                     data: (budgets) {
                       final recurringBudgetsForThisMonth = recurring.budgets;
@@ -925,11 +925,13 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen>
                           : 0.0;
 
                       if (recurringBudgetsForThisMonth.isEmpty) {
-                        return const SliverToBoxAdapter(child: SizedBox(height: 6));
+                        return const SliverToBoxAdapter(
+                            child: SizedBox(height: 6));
                       }
 
                       return SliverPadding(
-                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 18, vertical: 8),
                         sliver: SliverToBoxAdapter(
                           child: _buildPeriodDataMotion(
                             child: Container(
@@ -937,15 +939,22 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen>
                               decoration: BoxDecoration(
                                 gradient: LinearGradient(
                                   colors: isDark
-                                      ? [const Color(0xFF1E293B), const Color(0xFF0F172A)]
-                                      : [accent.primary, accent.primary.withValues(alpha: 0.85)],
+                                      ? [
+                                          const Color(0xFF1E293B),
+                                          const Color(0xFF0F172A)
+                                        ]
+                                      : [
+                                          accent.primary,
+                                          accent.primary.withValues(alpha: 0.85)
+                                        ],
                                   begin: Alignment.topLeft,
                                   end: Alignment.bottomRight,
                                 ),
                                 borderRadius: BorderRadius.circular(22),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: accent.primary.withValues(alpha: 0.25),
+                                    color:
+                                        accent.primary.withValues(alpha: 0.25),
                                     blurRadius: 14,
                                     offset: const Offset(0, 4),
                                   ),
@@ -964,23 +973,30 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen>
                                           fontSize: 11,
                                           fontWeight: FontWeight.w700,
                                           letterSpacing: 0.6,
-                                          color: isDark ? AppTokens.darkMuted : Colors.white70,
+                                          color: isDark
+                                              ? AppTokens.darkMuted
+                                              : Colors.white70,
                                         ),
                                       ),
                                       Text(
                                         '${recurringBudgetsForThisMonth.length} danh mục phân bổ',
-                                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                                        style: const TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white),
                                       ),
                                     ],
                                   ),
                                   const SizedBox(height: 6),
                                   Text(
                                     _formatCurrency(totalBudgetAmount),
-                                    style: currencyTextStyle(context, const TextStyle(
-                                      fontSize: 26,
-                                      fontWeight: FontWeight.w900,
-                                      color: Colors.white,
-                                    )),
+                                    style: currencyTextStyle(
+                                        context,
+                                        const TextStyle(
+                                          fontSize: 26,
+                                          fontWeight: FontWeight.w900,
+                                          color: Colors.white,
+                                        )),
                                   ),
                                   const SizedBox(height: 12),
                                   Stack(
@@ -988,8 +1004,10 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen>
                                       Container(
                                         height: 6,
                                         decoration: BoxDecoration(
-                                          color: Colors.white.withValues(alpha: 0.2),
-                                          borderRadius: BorderRadius.circular(3),
+                                          color: Colors.white
+                                              .withValues(alpha: 0.2),
+                                          borderRadius:
+                                              BorderRadius.circular(3),
                                         ),
                                       ),
                                       _buildPeriodProgressFill(
@@ -1000,7 +1018,8 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen>
                                             color: spendPct > 0.9
                                                 ? const Color(0xFFF87171)
                                                 : const Color(0xFF34D399),
-                                            borderRadius: BorderRadius.circular(3),
+                                            borderRadius:
+                                                BorderRadius.circular(3),
                                           ),
                                         ),
                                       ),
@@ -1013,11 +1032,16 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen>
                                     children: [
                                       CurrencyText(
                                         'Đã chi: ${_formatCurrency(totalSpent)} (${(spendPct * 100).toStringAsFixed(0)}%)',
-                                        style: const TextStyle(fontSize: 11, color: Colors.white70),
+                                        style: const TextStyle(
+                                            fontSize: 11,
+                                            color: Colors.white70),
                                       ),
                                       CurrencyText(
                                         'Còn lại: ${_formatCurrency(remaining)}',
-                                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                                        style: const TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white),
                                       ),
                                     ],
                                   ),
@@ -1028,25 +1052,31 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen>
                         ),
                       );
                     },
-                    loading: () => const SliverToBoxAdapter(child: SizedBox(height: 80)),
-                    error: (err, _) => SliverToBoxAdapter(child: Text('Lỗi: $err')),
+                    loading: () =>
+                        const SliverToBoxAdapter(child: SizedBox(height: 80)),
+                    error: (err, _) =>
+                        SliverToBoxAdapter(child: Text('Lỗi: $err')),
                   ),
-
                   budgetsAsync.when(
                     data: (budgets) {
                       final groups = recurring.groups;
                       if (groups.isEmpty) {
                         return SliverToBoxAdapter(
                           child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 32),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 20, vertical: 32),
                             child: _buildPeriodDataMotion(
                               child: Container(
                                 padding: const EdgeInsets.all(22),
                                 decoration: BoxDecoration(
-                                  color: isDark ? AppTokens.darkCard : Colors.white,
+                                  color: isDark
+                                      ? AppTokens.darkCard
+                                      : Colors.white,
                                   borderRadius: BorderRadius.circular(22),
                                   border: Border.all(
-                                    color: isDark ? AppTokens.darkBorder : AppTokens.lightBorder,
+                                    color: isDark
+                                        ? AppTokens.darkBorder
+                                        : AppTokens.lightBorder,
                                   ),
                                 ),
                                 child: Column(
@@ -1054,10 +1084,12 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen>
                                     Container(
                                       padding: const EdgeInsets.all(14),
                                       decoration: BoxDecoration(
-                                        color: accent.primary.withValues(alpha: 0.12),
+                                        color: accent.primary
+                                            .withValues(alpha: 0.12),
                                         shape: BoxShape.circle,
                                       ),
-                                      child: Icon(Icons.edit_note_rounded, size: 36, color: accent.primary),
+                                      child: Icon(Icons.edit_note_rounded,
+                                          size: 36, color: accent.primary),
                                     ),
                                     const SizedBox(height: 14),
                                     Text(
@@ -1066,7 +1098,9 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen>
                                       style: TextStyle(
                                         fontSize: 15,
                                         fontWeight: FontWeight.w800,
-                                        color: isDark ? AppTokens.darkText : AppTokens.lightText,
+                                        color: isDark
+                                            ? AppTokens.darkText
+                                            : AppTokens.lightText,
                                       ),
                                     ),
                                     const SizedBox(height: 6),
@@ -1075,58 +1109,75 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen>
                                       textAlign: TextAlign.center,
                                       style: TextStyle(
                                         fontSize: 12,
-                                        color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
+                                        color: isDark
+                                            ? AppTokens.darkMuted
+                                            : AppTokens.lightMuted,
                                       ),
                                     ),
                                     const SizedBox(height: 20),
-
                                     SizedBox(
                                       width: double.infinity,
                                       height: 46,
                                       child: ElevatedButton.icon(
-                                        onPressed: () => _copyBudgetFromPreviousMonth(
+                                        onPressed: () =>
+                                            _copyBudgetFromPreviousMonth(
                                           context,
                                           ref,
                                           anchorMonth,
                                           budgets,
                                           cycleStore,
                                         ),
-                                        icon: const Icon(Icons.content_copy_rounded, size: 17),
+                                        icon: const Icon(
+                                            Icons.content_copy_rounded,
+                                            size: 17),
                                         label: const FittedBox(
                                           fit: BoxFit.scaleDown,
                                           child: Text(
                                             'Sao chép từ tháng trước',
-                                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+                                            style: TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w800),
                                           ),
                                         ),
                                         style: ElevatedButton.styleFrom(
                                           backgroundColor: accent.primary,
                                           foregroundColor: Colors.white,
-                                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 16),
+                                          shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(14)),
                                         ),
                                       ),
                                     ),
                                     const SizedBox(height: 10),
-
                                     SizedBox(
                                       width: double.infinity,
                                       height: 44,
                                       child: OutlinedButton.icon(
-                                        onPressed: () => _openBudgetSetupSheet(context),
-                                        icon: const Icon(Icons.add_rounded, size: 16),
+                                        onPressed: () =>
+                                            _openBudgetSetupSheet(context),
+                                        icon: const Icon(Icons.add_rounded,
+                                            size: 16),
                                         label: const FittedBox(
                                           fit: BoxFit.scaleDown,
                                           child: Text(
                                             'Thiết lập ngân sách mới',
-                                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                                            style: TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w700),
                                           ),
                                         ),
                                         style: OutlinedButton.styleFrom(
                                           foregroundColor: accent.primary,
-                                          side: BorderSide(color: accent.primary.withValues(alpha: 0.5)),
-                                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                          side: BorderSide(
+                                              color: accent.primary
+                                                  .withValues(alpha: 0.5)),
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 16),
+                                          shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(14)),
                                         ),
                                       ),
                                     ),
@@ -1139,7 +1190,8 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen>
                       }
 
                       return SliverPadding(
-                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 18, vertical: 8),
                         sliver: SliverList(
                           delegate: SliverChildBuilderDelegate(
                             (context, index) {
@@ -1194,10 +1246,12 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen>
                     loading: () => const SliverToBoxAdapter(
                       child: Padding(
                         padding: EdgeInsets.all(32),
-                        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                        child: Center(
+                            child: CircularProgressIndicator(strokeWidth: 2)),
                       ),
                     ),
-                    error: (err, _) => SliverToBoxAdapter(child: Text('Lỗi: $err')),
+                    error: (err, _) =>
+                        SliverToBoxAdapter(child: Text('Lỗi: $err')),
                   ),
                 ],
 

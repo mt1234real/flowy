@@ -242,8 +242,13 @@ class _SpendingInsightsScreenState
     }
   }
 
-  void _openBucket(InsightsBucket bucket, bool fromScheme) {
-    Navigator.of(context).push(flowySurfaceRoute<void>(
+  bool _openingBucket = false;
+
+  Future<void> _openBucket(InsightsBucket bucket, bool fromScheme) async {
+    if (_openingBucket || ModalRoute.of(context)?.isCurrent != true) return;
+    _openingBucket = true;
+    HapticFeedback.selectionClick();
+    final route = flowyReferenceRoute<void>(
         builder: (_) => SpendingInsightsScreen(
             initialPeriod: _period,
             anchor:
@@ -263,7 +268,13 @@ class _SpendingInsightsScreenState
                 : (_classification != 'all'
                     ? _classification
                     : widget.classification),
-            detailColor: bucket.color)));
+            detailColor: bucket.color));
+    try {
+      Navigator.of(context).push(route);
+      await route.completed;
+    } finally {
+      _openingBucket = false;
+    }
   }
 
   Widget _card(Widget child) => InsightsGlass(child: child);
@@ -405,7 +416,8 @@ class _SpendingInsightsScreenState
   Widget _content(InsightsData data) {
     final cycles = ref.watch(cycleStartDaysByMonthProvider);
     final boundary = ref.watch(dayCutoffProvider);
-    final anchor = widget.anchor == null ? ref.watch(fiscalTodayProvider) : _anchor;
+    final anchor =
+        widget.anchor == null ? ref.watch(fiscalTodayProvider) : _anchor;
     final window = insightsWindow(_period, anchor, cycles, custom: _custom);
     final previous = insightsWindow(_period, anchor, cycles,
         custom: _custom, previous: true);
@@ -1180,7 +1192,6 @@ class _SpendingInsightsScreenState
                       isVisible: _sessionReveal,
                       style: const TextStyle(fontWeight: FontWeight.w700)))),
           onTap: () {
-            HapticFeedback.selectionClick();
             _openBucket(bucket, grouped);
           });
     }
@@ -1248,7 +1259,6 @@ class _SpendingInsightsScreenState
                 clipBehavior: Clip.antiAlias,
                 child: InkWell(
                     onTap: () {
-                      HapticFeedback.selectionClick();
                       _openBucket(bucket, grouped);
                     },
                     child: Padding(
