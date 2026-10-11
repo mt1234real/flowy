@@ -58,3 +58,15 @@ app.*.map.json
 **/key.properties
 *.jks
 *.keystore
+
+# Keep filtered local context and output/cache out of future history
+/[Pp]ROJECT_CONTEXT.md
+/[Cc]ONTEXT_UPDATE_1.md
+/[Cc]ONTEXT_UPDATE_2.md
+/[Cc]ONTEXT_UPDATE_3.md
+/[Cc]ONTEXT_UPDATE_4.md
+/[Cc]ONTEXT_UPDATE_5.md
+/[Cc]ONTEXT_UPDATE_6.md
+/[p]roject_codebase.xml
+/android/[b]uild/
+/android/.[k]otlin/
