@@ -294,6 +294,7 @@ LedgerSummary computeLedgerSummary(
   var moneyOut = 0.0;
   for (final item in items) {
     final tx = item.standardTx;
+    if (tx?.isBalanceAdjustment == true) continue;
     if (tx != null && tx.type == CategoryType.transfer) {
       if (walletId == null) {
         continue;
@@ -412,14 +413,14 @@ final unifiedLedgerStreamProvider = StreamProvider.autoDispose<List<UnifiedLedge
         if (criteria.minAmount != null && tx.amount < criteria.minAmount!) continue;
         if (criteria.maxAmount != null && tx.amount > criteria.maxAmount!) continue;
 
-        final isIncome = tx.type == CategoryType.income ||
+        final isIncome = tx.type.increasesWallet ||
             (tx.type == CategoryType.transfer &&
                 criteria.walletId != null &&
                 tx.toWalletId == criteria.walletId);
         final wallet = walletsMap[criteria.walletId ?? tx.walletId];
         final category = categoriesMap[tx.categoryId];
         final categoryName = category?.name ?? 'Chung';
-        final title = tx.note ?? tx.merchant ?? categoryName;
+        final title = tx.isBalanceAdjustment ? 'Kiểm kê ví · Điều chỉnh số dư' : tx.note ?? tx.merchant ?? categoryName;
 
         if (searchQuery.isNotEmpty) {
           final normalizedQuery = removeDiacritics(searchQuery);
@@ -437,7 +438,7 @@ final unifiedLedgerStreamProvider = StreamProvider.autoDispose<List<UnifiedLedge
             amount: tx.amount,
             isMoneyIn: isIncome,
             title: title,
-            subtitle: '${DateFormat('HH:mm').format(tx.date)} • ${wallet?.name ?? 'Ví'} • $categoryName',
+            subtitle: '${DateFormat('HH:mm').format(tx.date)} • ${wallet?.name ?? 'Ví'} • ${tx.isBalanceAdjustment ? 'Điều chỉnh số dư' : categoryName}',
             note: tx.note,
             merchant: tx.merchant,
             categoryName: categoryName,
@@ -961,27 +962,30 @@ class _LedgerScreenState extends ConsumerState<LedgerScreen> with TickerProvider
             : 'Đã chuyển vào Thùng rác: ${item.title}',
         actionColor: accent.primary,
         onUndo: () async {
-          if (mounted) {
-            setState(() => _restoringTxIds.add(item.id));
-          }
-
-          if (item.isDebt) {
-            await db.restoreDebtTransaction(item.id);
-          } else {
-            await db.restoreTransaction(item.standardTx!.id);
-          }
-
-          _dismissingTxIds.remove(item.id);
-          ref.invalidate(unifiedLedgerStreamProvider);
-
-          if (mounted) {
-            setState(() {});
+          try {
+            if (item.isDebt) {
+              await db.restoreDebtTransaction(item.id);
+            } else {
+              await db.restoreTransaction(item.standardTx!.id);
+            }
+            _dismissingTxIds.remove(item.id);
+            ref.invalidate(unifiedLedgerStreamProvider);
+            if (mounted) {
+              setState(() => _restoringTxIds.add(item.id));
+            }
+          } catch (_) {
+            if (mounted) {
+              AppFeedback.showError(context, 'Không thể hoàn tác. Giao dịch vẫn ở Thùng rác.');
+            }
           }
         },
       );
     } catch (e) {
       if (mounted) {
         setState(() => _dismissingTxIds.remove(item.id));
+      }
+      if (mounted) {
+        AppFeedback.showError(context, 'Không thể xóa giao dịch. Chưa có thay đổi nào được lưu.');
       }
       rethrow;
     }

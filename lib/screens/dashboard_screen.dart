@@ -2,7 +2,6 @@ import '../widgets/ambient_canvas.dart';
 import '../services/fiscal_day.dart';
 import '../widgets/currency_text.dart';
 import '../features/notifications/notification_center_screen.dart';
-import '../features/notifications/notification_host.dart';
 // ==============================================================================
 // File: lib/screens/dashboard_screen.dart
 // Architecture: Executive Real-Time Financial Dashboard with Preserved Motion Transitions
@@ -40,10 +39,8 @@ import '../widgets/avatar_customization_sheet.dart';
 import '../widgets/category_icon_badge.dart';
 import '../widgets/category_tree_modal.dart';
 import '../widgets/dashboard_hero_card.dart';
-import '../widgets/overrun_resolution_sheet.dart';
 import '../widgets/preserved_balance_tumbler.dart';
 import '../widgets/quick_entry_sheet.dart';
-import '../widgets/safe_to_spend_breakdown_sheet.dart';
 import '../widgets/spending_trend_chart.dart';
 import '../widgets/two_stage_overscroll_header.dart';
 import 'ledger_screen.dart'
@@ -83,6 +80,12 @@ final dashboardPeriodTransactionsProvider = StreamProvider.autoDispose
             t.date.isSmallerThanValue(range.end)))
       .watch();
 });
+
+// Formula inputs must come from the same committed database snapshot.
+final dashboardFinancialSnapshotProvider = StreamProvider.autoDispose
+    .family<DashboardFinancialSnapshot, DateTimeRange>((ref, range) =>
+        ref.watch(databaseProvider).watchDashboardFinancialSnapshot(
+            range.start, range.end));
 
 final dashboardWalletsStreamProvider =
     StreamProvider.autoDispose<List<Wallet>>((ref) {
@@ -195,33 +198,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
       initialTransaction: tx,
       prefilledDailySafe: dailySafe,
     );
-  }
-
-  bool _isBillCategory(Category? cat) {
-    if (cat == null) return false;
-    final nameLower = cat.name.toLowerCase();
-    final billKeywords = [
-      'bill',
-      'hóa đơn',
-      'hoa don',
-      'điện',
-      'nước',
-      'internet',
-      'wifi',
-      'tiền nhà',
-      'tiền trọ',
-      'thuê nhà',
-      'trả góp',
-      'vay',
-      'nợ',
-      'bảo hiểm',
-      'học phí',
-      'phí quản lý',
-    ];
-    for (final kw in billKeywords) {
-      if (nameLower.contains(kw)) return true;
-    }
-    return false;
   }
 
   Widget _buildProfileAvatar(UserProfile profile, bool isDark) {
@@ -354,19 +330,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
     final periodEnd = dashboardMode == CycleMode.customCycle
         ? boundary.end(cycleRange.endDate)
         : boundary.start(DateTime(currentMonth.year, currentMonth.month + 1, 1));
-    final periodTxsAsync = ref.watch(dashboardPeriodTransactionsProvider(
+    final financial = ref.watch(dashboardFinancialSnapshotProvider(
         DateTimeRange(start: periodStart, end: periodEnd)));
+    final periodTxsAsync = financial.whenData((data) => data.transactions);
 
     final txsAsync = ref.watch(recentTransactionsStreamProvider);
-    final walletsAsync = ref.watch(dashboardWalletsStreamProvider);
-    final categoriesAsync = ref.watch(categoriesTreeStreamProvider);
-    final budgetsAsync = ref.watch(dashboardBudgetsStreamProvider);
-
-    final fastRecoveryTotalDays = ref.watch(fastRecoveryTotalDaysProvider);
-    final fastRecoveryDaysRemaining =
-        ref.watch(fastRecoveryDaysRemainingProvider);
-    final fastRecoveryLimit = ref.watch(fastRecoveryDailyLimitProvider);
-    final amortizedDeduction = ref.watch(amortizedDailyDeductionProvider);
+    final walletsAsync = financial.whenData((data) => data.wallets);
+    final categoriesAsync = financial.whenData((data) => data.categories);
+    final budgetsAsync = financial.whenData((data) => data.budgets);
 
     final Map<String, Category> categoriesMap = {
       for (final c in categoriesAsync.valueOrNull ?? <Category>[]) c.id: c,
@@ -395,9 +366,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
         ? cycleRange.startDate
         : DateTime(currentMonth.year, currentMonth.month, 1);
 
-    final cycleEndDate = dashboardMode == CycleMode.customCycle
-        ? cycleRange.endDate
-        : DateTime(currentMonth.year, currentMonth.month + 1, 0, 23, 59, 59);
 
     final totalCycleDays = dashboardMode == CycleMode.customCycle
         ? cycleRange.daysCount
@@ -405,8 +373,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
 
     final int daysElapsed =
         math.max(1, now.difference(cycleStartDate).inDays + 1);
-    final int daysRemaining =
-        math.max(1, cycleEndDate.difference(now).inDays + 1);
 
     final allBudgets = budgetsAsync.valueOrNull ?? <Budget>[];
     final recurringBudgetsForThisPeriod = allBudgets.where((b) {
@@ -418,138 +384,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
     final totalRecurringBudget =
         recurringBudgetsForThisPeriod.fold(0.0, (sum, b) => sum + b.amount);
     final hasRecurringBudget = recurringBudgetsForThisPeriod.isNotEmpty;
-
-    final List<UnpaidBillItem> unpaidBillItems = [];
-    double unpaidBillsTotal = 0.0;
-
-    for (final b in recurringBudgetsForThisPeriod) {
-      final cat = categoriesMap[b.categoryId];
-      if (_isBillCategory(cat)) {
-        final isParent =
-            cat != null && (cat.parentId == null || cat.parentId!.isEmpty);
-        final spentForCat = cycleTxs.where((t) {
-          if (t.type != CategoryType.expense) return false;
-          if (isParent) {
-            if (t.categoryId == b.categoryId) return true;
-            final sub = categoriesMap[t.categoryId];
-            return sub != null && sub.parentId == b.categoryId;
-          } else {
-            return t.categoryId == b.categoryId;
-          }
-        }).fold(0.0, (s, t) => s + t.amount);
-
-        final remainingDue = math.max(0.0, b.amount - spentForCat);
-        if (remainingDue > 0) {
-          unpaidBillsTotal += remainingDue;
-          unpaidBillItems.add(
-            UnpaidBillItem(
-              categoryName: cat?.name ?? 'Hóa đơn',
-              budgetAmount: b.amount,
-              spentAmount: spentForCat,
-              remainingDue: remainingDue,
-            ),
-          );
-        }
-      }
-    }
-
-    final double freeBudgetRemaining;
-    if (hasRecurringBudget) {
-      final rawFree = totalRecurringBudget - totalExpense - unpaidBillsTotal;
-      freeBudgetRemaining =
-          math.max(0.0, math.min(rawFree, totalWalletBalance));
-    } else {
-      final rawLiquidity = totalWalletBalance - unpaidBillsTotal;
-      freeBudgetRemaining = math.max(0.0, rawLiquidity);
-    }
-
-    final double todaySpent = cycleTxs.where((t) {
-      return t.type == CategoryType.expense &&
-          boundary.contains(t.date, now);
-    }).fold(0.0, (sum, t) => sum + t.amount);
-
-    final double originalBaseLimit = daysRemaining > 0
-        ? ((freeBudgetRemaining + todaySpent) / daysRemaining).floorToDouble()
-        : 150000.0;
-
-    final bool isOverSpentToday = todaySpent > originalBaseLimit;
-    final double overAmount = math.max(0.0, todaySpent - originalBaseLimit);
-
-    if (periodTxsAsync.hasValue && walletsAsync.hasValue && budgetsAsync.hasValue && !isOverSpentToday &&
-        (fastRecoveryDaysRemaining > 0 ||
-            fastRecoveryTotalDays > 0 ||
-            amortizedDeduction > 0)) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        if (ref.read(fastRecoveryDaysRemainingProvider) > 0 ||
-            ref.read(fastRecoveryTotalDaysProvider) > 0) {
-          ref.read(fastRecoveryTotalDaysProvider.notifier).state = 0;
-          ref.read(fastRecoveryDaysRemainingProvider.notifier).state = 0;
-          ref.read(fastRecoveryDailyLimitProvider.notifier).state = 0.0;
-        }
-        if (ref.read(amortizedDailyDeductionProvider) > 0) {
-          ref.read(amortizedDailyDeductionProvider.notifier).state = 0.0;
-        }
-      });
-    }
-
-    double effectiveDailyLimit = originalBaseLimit;
-    if (isOverSpentToday) {
-      if (fastRecoveryDaysRemaining > 0) {
-        effectiveDailyLimit = fastRecoveryLimit;
-      } else if (amortizedDeduction > 0) {
-        effectiveDailyLimit =
-            math.max(0.0, originalBaseLimit - amortizedDeduction);
-      }
-    }
-
-    final double safeToSpendToday =
-        math.max(0.0, effectiveDailyLimit - todaySpent);
-    if (periodTxsAsync.hasValue &&
-        walletsAsync.hasValue &&
-        budgetsAsync.hasValue &&
-        categoriesAsync.hasValue) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        final previous = ref.read(notificationDailySnapshotProvider);
-        final day = DateTime(now.year, now.month, now.day);
-        if (previous?.safe != safeToSpendToday ||
-            previous?.spent != todaySpent ||
-            previous?.day != day) {
-          ref.read(notificationDailySnapshotProvider.notifier).state =
-              (safe: safeToSpendToday, spent: todaySpent, day: day);
-        }
-      });
-    }
-    final double dailyProgressRatio = effectiveDailyLimit > 0
-        ? (todaySpent / effectiveDailyLimit).clamp(0.0, 1.0)
-        : 1.0;
-
-    Color activeColor;
-    final bool isAlarmRed = totalWalletBalance <= 0 ||
-        (freeBudgetRemaining <= (totalRecurringBudget * 0.05) &&
-            totalRecurringBudget > 0);
-
-    if (isAlarmRed) {
-      activeColor = const Color(0xFFEF4444);
-    } else if (isOverSpentToday) {
-      activeColor = const Color(0xFFF59E0B);
-    } else {
-      activeColor = const Color(0xFF10B981);
-    }
-
-    final safeToSpendBreakdown = SafeToSpendBreakdown(
-      totalBudget:
-          hasRecurringBudget ? totalRecurringBudget : totalWalletBalance,
-      totalSpent: totalExpense,
-      unpaidBills: unpaidBillsTotal,
-      unpaidBillItems: unpaidBillItems,
-      freeBudgetRemaining: freeBudgetRemaining,
-      daysRemaining: daysRemaining,
-      safeToSpendDaily: safeToSpendToday,
-      hasRecurringBudget: hasRecurringBudget,
-      totalWalletBalance: totalWalletBalance,
-    );
 
     final baseBudgetForBurnRate = hasRecurringBudget
         ? totalRecurringBudget
@@ -779,24 +613,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                             horizontal: 18, vertical: 6),
                         sliver: SliverToBoxAdapter(
                           child: DashboardHeroCard(
-                            breakdown: safeToSpendBreakdown,
-                            safeToSpendToday: safeToSpendToday,
-                            effectiveDailyLimit: effectiveDailyLimit,
-                            todaySpent: todaySpent,
-                            dailyProgressRatio: dailyProgressRatio,
-                            activeColor: activeColor,
-                            daysRemaining: daysRemaining,
-                            anchorMonth: currentMonth,
                             isVisible: _balancesVisible,
-                            isOverSpentToday: isOverSpentToday,
-                            overAmount: overAmount,
-                            baseDailyLimit: originalBaseLimit,
-                            freeBudgetRemaining: freeBudgetRemaining,
-                            fastRecoveryTotalDays: fastRecoveryTotalDays,
-                            fastRecoveryDaysRemaining:
-                                fastRecoveryDaysRemaining,
-                            fastRecoveryDailyLimit: fastRecoveryLimit,
-                            amortizedDailyDeduction: amortizedDeduction,
+                            onVaultTap: _openSecretVaultWithSlideDownTransition,
                           ),
                         ),
                       ),
@@ -980,7 +798,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                                 (context, index) {
                                   final tx = txs[index];
                                   final isExpense =
-                                      tx.type == CategoryType.expense;
+                                      tx.type == CategoryType.expense ||
+                                      tx.type == CategoryType.balanceAdjustmentOut;
                                   final wallet = walletsMap[tx.walletId];
                                   final category = categoriesMap[tx.categoryId];
 
@@ -992,7 +811,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                                         onTap: () => _openQuickEntrySheet(
                                             context,
                                             tx: tx,
-                                            dailySafe: effectiveDailyLimit),
+                                            dailySafe: null),
                                         borderRadius: BorderRadius.circular(16),
                                         child: Container(
                                           padding: const EdgeInsets.symmetric(
@@ -1029,7 +848,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                                                       children: [
                                                         Expanded(
                                                           child: Text(
-                                                            tx.note ??
+                                                            tx.isBalanceAdjustment
+                                                                ? 'Kiểm kê ví · Điều chỉnh số dư'
+                                                                : tx.note ??
                                                                 tx.merchant ??
                                                                 category
                                                                     ?.name ??

@@ -1,3 +1,5 @@
+import 'package:pfm_app/services/budget_spending.dart';
+import 'package:pfm_app/services/budget_spending_provider.dart';
 import 'dart:async';
 
 import 'package:drift/native.dart';
@@ -286,10 +288,14 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     SharedPreferences.setMockInitialValues({});
     final prefs = await SharedPreferences.getInstance();
+    final fixtureDb=db??AppDatabase.forTesting(NativeDatabase.memory());
+    if(db==null)addTearDown(fixtureDb.close);
     await tester.pumpWidget(ProviderScope(
         overrides: [
           sharedPreferencesProvider.overrideWithValue(prefs),
-          if (db != null) databaseProvider.overrideWithValue(db),
+          databaseProvider.overrideWithValue(fixtureDb),
+          budgetSpendingDateProvider.overrideWithValue(DateTime(2026,10,28)),
+          budgetSpendingDataProvider.overrideWith((ref)=>(updates??Stream.value(budgets??rows)).map((values)=>BudgetSpendingData(values,[],categories??cats,expenses??[],[],[],[],[]))),
           activeBudgetsStreamProvider
               .overrideWith((ref) => updates ?? Stream.value(budgets ?? rows)),
           allCategoriesStreamProvider
@@ -512,15 +518,15 @@ void main() {
     return db;
   }
 
-  Future<void> save(WidgetTester tester, {bool edit = true}) async {
+  Future<void> save(WidgetTester tester, {required AppDatabase db, bool edit = true}) async {
     final button = find.text(
-        edit ? '✓ CẬP NHẬT HẠN MỨC THÁNG NÀY' : '✓ LƯU HẠN MỨC CHO THÁNG NÀY');
+        edit ? '✓ CẬP NHẬT NGÂN SÁCH' : '✓ LƯU NGÂN SÁCH');
     await tester.ensureVisible(button);
     await tester.runAsync(() async {
       await tester.tap(button);
+      await db.select(db.budgetRhythms).watch().firstWhere((rows)=>rows.isNotEmpty);
     });
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
   }
 
   Future<void> enter80(WidgetTester tester) async {
@@ -541,7 +547,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     await enter80(tester);
-    await save(tester);
+    await save(tester, db:db);
     final saved = await tester.runAsync(() => db.select(db.budgets).get());
     expect(saved!.singleWhere((b) => b.id == 'food').amount, 100);
     expect(saved.singleWhere((b) => b.id == 'cafe').amount, 80);
@@ -555,7 +561,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     await enter80(tester);
-    await save(tester, edit: false);
+    await save(tester, db:db, edit: false);
     final saved = await tester.runAsync(() => db.select(db.budgets).get());
     expect(saved!.length, 2);
     expect(saved.singleWhere((b) => b.categoryId == 'Food').amount, 80);
@@ -576,7 +582,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
     await enter80(tester);
-    await save(tester, edit: false);
+    await save(tester, db:db, edit: false);
     final saved = await tester.runAsync(() => db.select(db.budgets).get());
     expect(saved!.singleWhere((b) => b.categoryId == 'Groceries').amount, 80);
     expect(saved.singleWhere((b) => b.id == 'food').amount, 100);

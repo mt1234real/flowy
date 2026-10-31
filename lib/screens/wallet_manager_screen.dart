@@ -277,7 +277,7 @@ class _WalletManagerScreenState extends ConsumerState<WalletManagerScreen> {
                         const SizedBox(height: 10),
 
                         Text(
-                          '💡 Hệ thống sẽ tự động tạo giao dịch ${calculatedDelta > 0 ? 'Thu nhập' : 'Chi phí'} để khớp số dư và lưu lại vết kiểm kê.',
+                          '💡 Chênh lệch được lưu là Điều chỉnh số dư, không tính vào thu nhập hoặc chi tiêu.',
                           style: TextStyle(
                             fontSize: 11,
                             color: isDark ? AppTokens.darkMuted : AppTokens.lightMuted,
@@ -298,25 +298,34 @@ class _WalletManagerScreenState extends ConsumerState<WalletManagerScreen> {
                               HapticFeedback.mediumImpact();
                               final targetBalance = double.tryParse(
                                 realBalanceController.text.replaceAll(RegExp(r'[^0-9.-]'), ''),
-                              ) ??
-                                  wallet.balance;
+                              );
+                              if (targetBalance == null || !targetBalance.isFinite) {
+                                AppFeedback.showError(context, 'Hãy nhập số dư thực tế hợp lệ.');
+                                return;
+                              }
                               final reason = reasonController.text.trim().isEmpty
                                   ? 'Kiểm kê định kỳ'
                                   : reasonController.text.trim();
 
                               final db = ref.read(databaseProvider);
-                              await db.adjustWalletBalance(
-                                walletId: wallet.id,
-                                realBalance: targetBalance,
-                                reason: reason,
-                              );
-
-                              if (context.mounted) {
-                                AppFeedback.showSuccess(
-                                  context,
-                                  'Đã cập nhật số dư ví "${wallet.name}" thành công!',
+                              try {
+                                await db.adjustWalletBalance(
+                                  walletId: wallet.id,
+                                  realBalance: targetBalance,
+                                  reason: reason,
                                 );
-                                Navigator.of(context).pop();
+
+                                if (context.mounted) {
+                                  AppFeedback.showSuccess(
+                                    context,
+                                    'Đã cập nhật số dư ví "${wallet.name}" thành công!',
+                                  );
+                                  Navigator.of(context).pop();
+                                }
+                              } catch (_) {
+                                if (context.mounted) {
+                                  AppFeedback.showError(context, 'Không thể điều chỉnh số dư. Chưa có thay đổi nào được lưu.');
+                                }
                               }
                             },
                             child: const Text(

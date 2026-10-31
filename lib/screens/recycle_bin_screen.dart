@@ -106,9 +106,9 @@ StreamProvider.autoDispose<List<UnifiedRecycleBinItem>>((ref) {
       final deletedTime = tx.deletedAt ?? now;
       final elapsedDays = now.difference(deletedTime).inDays;
       final daysLeft = math.max(0, 30 - elapsedDays);
-      final isIncome = tx.type == CategoryType.income;
+      final isIncome = tx.type.increasesWallet;
 
-      final title = tx.note ?? tx.merchant ?? cat?.name ?? 'Giao dịch';
+      final title = tx.isBalanceAdjustment ? 'Kiểm kê ví · Điều chỉnh số dư' : tx.note ?? tx.merchant ?? cat?.name ?? 'Giao dịch';
       final subtitle =
           '${DateFormat('dd/MM HH:mm').format(tx.date)} • ${w?.name ?? 'Ví'} • ${cat?.name ?? 'Chung'}';
 

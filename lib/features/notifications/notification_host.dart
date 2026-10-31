@@ -40,6 +40,7 @@ class _NotificationHostState extends ConsumerState<NotificationHost>
       db.watchAllTransactions(),
       db.select(db.debtTransactions).watch(),
       db.select(db.budgets).watch(),
+      db.select(db.budgetRhythms).watch(),
       db.select(db.debtContacts).watch()
     ]) {
       _subscriptions.add(stream.listen((_) {

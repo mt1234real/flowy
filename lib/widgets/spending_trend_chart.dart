@@ -294,7 +294,9 @@ class _SpendingTrendChartState extends ConsumerState<SpendingTrendChart>
                     const Expanded(
                         child: Text('XU HƯỚNG CHI TIÊU',
                             style: TextStyle(
-                                fontSize: 11, fontWeight: FontWeight.w800))),
+                                fontSize: 13,
+                                height: 1.35,
+                                fontWeight: FontWeight.w700))),
                     TextButton(
                         onPressed: _openInsights,
                         child: Container(

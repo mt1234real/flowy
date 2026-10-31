@@ -1,3 +1,4 @@
+import 'package:pfm_app/services/budget_spending_provider.dart';
 import 'dart:convert';
 
 import 'package:drift/drift.dart' hide Column, isNull, isNotNull;
@@ -353,15 +354,13 @@ void main() {
     expect(notices.single.isDismissed, isFalse);
   });
 
-  testWidgets('Dashboard -> snapshot -> Host -> dailyLimit uses real spending',
+  testWidgets('Dashboard per-budget changes never emit aggregate daily overrun',
       (tester) async {
     tester.view.physicalSize = const Size(800, 1000);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    final daysRemaining =
-        end.subtract(const Duration(days: 1)).difference(today).inDays + 1;
-    await budget(daysRemaining * 500000.0);
+    await budget(10000000);
     await insert('food', 100000);
     await insert('deposit', 3000000, goal: 'goal', envelope: 'savings');
     await tester.pumpWidget(UncontrolledProviderScope(
@@ -374,17 +373,15 @@ void main() {
         await tester.runAsync(
             () => Future<void>.delayed(const Duration(milliseconds: 20)));
         await tester.pump(const Duration(milliseconds: 50));
-        if (observed.inputs.any((input) => input.spent == spent)) return;
+        if (container.read(budgetSpendingOverviewProvider).valueOrNull?.items.single.spent == spent) return;
       }
-      fail('No Host dailyLimit call for spent=$spent');
+      fail('No committed budget view for spent=$spent');
     }
 
     try {
       await waitForSpent(100000);
-      final snapshot = container.read(notificationDailySnapshotProvider)!;
-      expect(snapshot.spent, 100000);
-      expect(snapshot.safe, 400000);
-      expect(observed.inputs.last, (safe: 400000.0, spent: 100000.0));
+      expect(container.read(notificationDailySnapshotProvider),isNull);
+      expect(observed.inputs,isEmpty);
       expect(await tester.runAsync(() => db.select(db.appNotifications).get()),
           isEmpty);
       await tester.runAsync(() async {
@@ -394,10 +391,9 @@ void main() {
       await waitForSpent(600000);
       final notices =
           await tester.runAsync(() => db.select(db.appNotifications).get());
-      expect(notices!.length, 1);
-      expect(notices.single.dedupKey, startsWith('safe:'));
-      expect(notices.single.body, contains('600.000'));
-      expect(observed.inputs.last.safe, 0);
+      expect(notices,isEmpty);
+      expect(observed.inputs,isEmpty);
+      expect(container.read(budgetSpendingOverviewProvider).requireValue.items.single.remaining,9400000);
       expect(tester.takeException(), isNull);
     } finally {
       await tester.pumpWidget(const SizedBox.shrink());

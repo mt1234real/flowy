@@ -3449,6 +3449,361 @@ class BudgetsCompanion extends UpdateCompanion<Budget> {
   }
 }
 
+class $BudgetRhythmsTable extends BudgetRhythms
+    with TableInfo<$BudgetRhythmsTable, BudgetRhythm> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $BudgetRhythmsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _budgetIdMeta =
+      const VerificationMeta('budgetId');
+  @override
+  late final GeneratedColumn<String> budgetId = GeneratedColumn<String>(
+      'budget_id', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: true,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'REFERENCES budgets (id) ON DELETE CASCADE'));
+  static const VerificationMeta _rhythmMeta = const VerificationMeta('rhythm');
+  @override
+  late final GeneratedColumn<String> rhythm = GeneratedColumn<String>(
+      'rhythm', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _weekStartMeta =
+      const VerificationMeta('weekStart');
+  @override
+  late final GeneratedColumn<int> weekStart = GeneratedColumn<int>(
+      'week_start', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(1));
+  static const VerificationMeta _carryRuleMeta =
+      const VerificationMeta('carryRule');
+  @override
+  late final GeneratedColumn<String> carryRule = GeneratedColumn<String>(
+      'carry_rule', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant('none'));
+  static const VerificationMeta _remainingUsesMeta =
+      const VerificationMeta('remainingUses');
+  @override
+  late final GeneratedColumn<int> remainingUses = GeneratedColumn<int>(
+      'remaining_uses', aliasedName, true,
+      type: DriftSqlType.int, requiredDuringInsert: false);
+  static const VerificationMeta _pinnedMeta = const VerificationMeta('pinned');
+  @override
+  late final GeneratedColumn<bool> pinned = GeneratedColumn<bool>(
+      'pinned', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('CHECK ("pinned" IN (0, 1))'),
+      defaultValue: const Constant(false));
+  @override
+  List<GeneratedColumn> get $columns =>
+      [budgetId, rhythm, weekStart, carryRule, remainingUses, pinned];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'budget_rhythms';
+  @override
+  VerificationContext validateIntegrity(Insertable<BudgetRhythm> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('budget_id')) {
+      context.handle(_budgetIdMeta,
+          budgetId.isAcceptableOrUnknown(data['budget_id']!, _budgetIdMeta));
+    } else if (isInserting) {
+      context.missing(_budgetIdMeta);
+    }
+    if (data.containsKey('rhythm')) {
+      context.handle(_rhythmMeta,
+          rhythm.isAcceptableOrUnknown(data['rhythm']!, _rhythmMeta));
+    } else if (isInserting) {
+      context.missing(_rhythmMeta);
+    }
+    if (data.containsKey('week_start')) {
+      context.handle(_weekStartMeta,
+          weekStart.isAcceptableOrUnknown(data['week_start']!, _weekStartMeta));
+    }
+    if (data.containsKey('carry_rule')) {
+      context.handle(_carryRuleMeta,
+          carryRule.isAcceptableOrUnknown(data['carry_rule']!, _carryRuleMeta));
+    }
+    if (data.containsKey('remaining_uses')) {
+      context.handle(
+          _remainingUsesMeta,
+          remainingUses.isAcceptableOrUnknown(
+              data['remaining_uses']!, _remainingUsesMeta));
+    }
+    if (data.containsKey('pinned')) {
+      context.handle(_pinnedMeta,
+          pinned.isAcceptableOrUnknown(data['pinned']!, _pinnedMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {budgetId};
+  @override
+  BudgetRhythm map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return BudgetRhythm(
+      budgetId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}budget_id'])!,
+      rhythm: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}rhythm'])!,
+      weekStart: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}week_start'])!,
+      carryRule: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}carry_rule'])!,
+      remainingUses: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}remaining_uses']),
+      pinned: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}pinned'])!,
+    );
+  }
+
+  @override
+  $BudgetRhythmsTable createAlias(String alias) {
+    return $BudgetRhythmsTable(attachedDatabase, alias);
+  }
+}
+
+class BudgetRhythm extends DataClass implements Insertable<BudgetRhythm> {
+  final String budgetId;
+  final String rhythm;
+  final int weekStart;
+  final String carryRule;
+  final int? remainingUses;
+  final bool pinned;
+  const BudgetRhythm(
+      {required this.budgetId,
+      required this.rhythm,
+      required this.weekStart,
+      required this.carryRule,
+      this.remainingUses,
+      required this.pinned});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['budget_id'] = Variable<String>(budgetId);
+    map['rhythm'] = Variable<String>(rhythm);
+    map['week_start'] = Variable<int>(weekStart);
+    map['carry_rule'] = Variable<String>(carryRule);
+    if (!nullToAbsent || remainingUses != null) {
+      map['remaining_uses'] = Variable<int>(remainingUses);
+    }
+    map['pinned'] = Variable<bool>(pinned);
+    return map;
+  }
+
+  BudgetRhythmsCompanion toCompanion(bool nullToAbsent) {
+    return BudgetRhythmsCompanion(
+      budgetId: Value(budgetId),
+      rhythm: Value(rhythm),
+      weekStart: Value(weekStart),
+      carryRule: Value(carryRule),
+      remainingUses: remainingUses == null && nullToAbsent
+          ? const Value.absent()
+          : Value(remainingUses),
+      pinned: Value(pinned),
+    );
+  }
+
+  factory BudgetRhythm.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return BudgetRhythm(
+      budgetId: serializer.fromJson<String>(json['budgetId']),
+      rhythm: serializer.fromJson<String>(json['rhythm']),
+      weekStart: serializer.fromJson<int>(json['weekStart']),
+      carryRule: serializer.fromJson<String>(json['carryRule']),
+      remainingUses: serializer.fromJson<int?>(json['remainingUses']),
+      pinned: serializer.fromJson<bool>(json['pinned']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'budgetId': serializer.toJson<String>(budgetId),
+      'rhythm': serializer.toJson<String>(rhythm),
+      'weekStart': serializer.toJson<int>(weekStart),
+      'carryRule': serializer.toJson<String>(carryRule),
+      'remainingUses': serializer.toJson<int?>(remainingUses),
+      'pinned': serializer.toJson<bool>(pinned),
+    };
+  }
+
+  BudgetRhythm copyWith(
+          {String? budgetId,
+          String? rhythm,
+          int? weekStart,
+          String? carryRule,
+          Value<int?> remainingUses = const Value.absent(),
+          bool? pinned}) =>
+      BudgetRhythm(
+        budgetId: budgetId ?? this.budgetId,
+        rhythm: rhythm ?? this.rhythm,
+        weekStart: weekStart ?? this.weekStart,
+        carryRule: carryRule ?? this.carryRule,
+        remainingUses:
+            remainingUses.present ? remainingUses.value : this.remainingUses,
+        pinned: pinned ?? this.pinned,
+      );
+  BudgetRhythm copyWithCompanion(BudgetRhythmsCompanion data) {
+    return BudgetRhythm(
+      budgetId: data.budgetId.present ? data.budgetId.value : this.budgetId,
+      rhythm: data.rhythm.present ? data.rhythm.value : this.rhythm,
+      weekStart: data.weekStart.present ? data.weekStart.value : this.weekStart,
+      carryRule: data.carryRule.present ? data.carryRule.value : this.carryRule,
+      remainingUses: data.remainingUses.present
+          ? data.remainingUses.value
+          : this.remainingUses,
+      pinned: data.pinned.present ? data.pinned.value : this.pinned,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('BudgetRhythm(')
+          ..write('budgetId: $budgetId, ')
+          ..write('rhythm: $rhythm, ')
+          ..write('weekStart: $weekStart, ')
+          ..write('carryRule: $carryRule, ')
+          ..write('remainingUses: $remainingUses, ')
+          ..write('pinned: $pinned')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+      budgetId, rhythm, weekStart, carryRule, remainingUses, pinned);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is BudgetRhythm &&
+          other.budgetId == this.budgetId &&
+          other.rhythm == this.rhythm &&
+          other.weekStart == this.weekStart &&
+          other.carryRule == this.carryRule &&
+          other.remainingUses == this.remainingUses &&
+          other.pinned == this.pinned);
+}
+
+class BudgetRhythmsCompanion extends UpdateCompanion<BudgetRhythm> {
+  final Value<String> budgetId;
+  final Value<String> rhythm;
+  final Value<int> weekStart;
+  final Value<String> carryRule;
+  final Value<int?> remainingUses;
+  final Value<bool> pinned;
+  final Value<int> rowid;
+  const BudgetRhythmsCompanion({
+    this.budgetId = const Value.absent(),
+    this.rhythm = const Value.absent(),
+    this.weekStart = const Value.absent(),
+    this.carryRule = const Value.absent(),
+    this.remainingUses = const Value.absent(),
+    this.pinned = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  BudgetRhythmsCompanion.insert({
+    required String budgetId,
+    required String rhythm,
+    this.weekStart = const Value.absent(),
+    this.carryRule = const Value.absent(),
+    this.remainingUses = const Value.absent(),
+    this.pinned = const Value.absent(),
+    this.rowid = const Value.absent(),
+  })  : budgetId = Value(budgetId),
+        rhythm = Value(rhythm);
+  static Insertable<BudgetRhythm> custom({
+    Expression<String>? budgetId,
+    Expression<String>? rhythm,
+    Expression<int>? weekStart,
+    Expression<String>? carryRule,
+    Expression<int>? remainingUses,
+    Expression<bool>? pinned,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (budgetId != null) 'budget_id': budgetId,
+      if (rhythm != null) 'rhythm': rhythm,
+      if (weekStart != null) 'week_start': weekStart,
+      if (carryRule != null) 'carry_rule': carryRule,
+      if (remainingUses != null) 'remaining_uses': remainingUses,
+      if (pinned != null) 'pinned': pinned,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  BudgetRhythmsCompanion copyWith(
+      {Value<String>? budgetId,
+      Value<String>? rhythm,
+      Value<int>? weekStart,
+      Value<String>? carryRule,
+      Value<int?>? remainingUses,
+      Value<bool>? pinned,
+      Value<int>? rowid}) {
+    return BudgetRhythmsCompanion(
+      budgetId: budgetId ?? this.budgetId,
+      rhythm: rhythm ?? this.rhythm,
+      weekStart: weekStart ?? this.weekStart,
+      carryRule: carryRule ?? this.carryRule,
+      remainingUses: remainingUses ?? this.remainingUses,
+      pinned: pinned ?? this.pinned,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (budgetId.present) {
+      map['budget_id'] = Variable<String>(budgetId.value);
+    }
+    if (rhythm.present) {
+      map['rhythm'] = Variable<String>(rhythm.value);
+    }
+    if (weekStart.present) {
+      map['week_start'] = Variable<int>(weekStart.value);
+    }
+    if (carryRule.present) {
+      map['carry_rule'] = Variable<String>(carryRule.value);
+    }
+    if (remainingUses.present) {
+      map['remaining_uses'] = Variable<int>(remainingUses.value);
+    }
+    if (pinned.present) {
+      map['pinned'] = Variable<bool>(pinned.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('BudgetRhythmsCompanion(')
+          ..write('budgetId: $budgetId, ')
+          ..write('rhythm: $rhythm, ')
+          ..write('weekStart: $weekStart, ')
+          ..write('carryRule: $carryRule, ')
+          ..write('remainingUses: $remainingUses, ')
+          ..write('pinned: $pinned, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $DebtContactsTable extends DebtContacts
     with TableInfo<$DebtContactsTable, DebtContact> {
   @override
@@ -5308,6 +5663,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $SavingsGoalsTable savingsGoals = $SavingsGoalsTable(this);
   late final $TransactionsTable transactions = $TransactionsTable(this);
   late final $BudgetsTable budgets = $BudgetsTable(this);
+  late final $BudgetRhythmsTable budgetRhythms = $BudgetRhythmsTable(this);
   late final $DebtContactsTable debtContacts = $DebtContactsTable(this);
   late final $DebtTransactionsTable debtTransactions =
       $DebtTransactionsTable(this);
@@ -5327,6 +5683,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         savingsGoals,
         transactions,
         budgets,
+        budgetRhythms,
         debtContacts,
         debtTransactions,
         appNotifications,
@@ -5376,6 +5733,13 @@ abstract class _$AppDatabase extends GeneratedDatabase {
                 limitUpdateKind: UpdateKind.delete),
             result: [
               TableUpdate('budgets', kind: UpdateKind.delete),
+            ],
+          ),
+          WritePropagation(
+            on: TableUpdateQuery.onTableName('budgets',
+                limitUpdateKind: UpdateKind.delete),
+            result: [
+              TableUpdate('budget_rhythms', kind: UpdateKind.delete),
             ],
           ),
           WritePropagation(
@@ -7772,6 +8136,20 @@ final class $$BudgetsTableReferences
     return ProcessedTableManager(
         manager.$state.copyWith(prefetchedData: [item]));
   }
+
+  static MultiTypedResultKey<$BudgetRhythmsTable, List<BudgetRhythm>>
+      _budgetRhythmsRefsTable(_$AppDatabase db) =>
+          MultiTypedResultKey.fromTable(db.budgetRhythms,
+              aliasName: 'budgets__id__budget_rhythms__budget_id');
+
+  $$BudgetRhythmsTableProcessedTableManager get budgetRhythmsRefs {
+    final manager = $$BudgetRhythmsTableTableManager($_db, $_db.budgetRhythms)
+        .filter((f) => f.budgetId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_budgetRhythmsRefsTable($_db));
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: cache));
+  }
 }
 
 class $$BudgetsTableFilterComposer
@@ -7816,6 +8194,27 @@ class $$BudgetsTableFilterComposer
                   $removeJoinBuilderFromRootComposer,
             ));
     return composer;
+  }
+
+  Expression<bool> budgetRhythmsRefs(
+      Expression<bool> Function($$BudgetRhythmsTableFilterComposer f) f) {
+    final $$BudgetRhythmsTableFilterComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.id,
+        referencedTable: $db.budgetRhythms,
+        getReferencedColumn: (t) => t.budgetId,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$BudgetRhythmsTableFilterComposer(
+              $db: $db,
+              $table: $db.budgetRhythms,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return f(composer);
   }
 }
 
@@ -7908,6 +8307,27 @@ class $$BudgetsTableAnnotationComposer
             ));
     return composer;
   }
+
+  Expression<T> budgetRhythmsRefs<T extends Object>(
+      Expression<T> Function($$BudgetRhythmsTableAnnotationComposer a) f) {
+    final $$BudgetRhythmsTableAnnotationComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.id,
+        referencedTable: $db.budgetRhythms,
+        getReferencedColumn: (t) => t.budgetId,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$BudgetRhythmsTableAnnotationComposer(
+              $db: $db,
+              $table: $db.budgetRhythms,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return f(composer);
+  }
 }
 
 class $$BudgetsTableTableManager extends RootTableManager<
@@ -7921,7 +8341,7 @@ class $$BudgetsTableTableManager extends RootTableManager<
     $$BudgetsTableUpdateCompanionBuilder,
     (Budget, $$BudgetsTableReferences),
     Budget,
-    PrefetchHooks Function({bool categoryId})> {
+    PrefetchHooks Function({bool categoryId, bool budgetRhythmsRefs})> {
   $$BudgetsTableTableManager(_$AppDatabase db, $BudgetsTable table)
       : super(TableManagerState(
           db: db,
@@ -7974,10 +8394,13 @@ class $$BudgetsTableTableManager extends RootTableManager<
                     $$BudgetsTableReferences(db, table, e)
                   ))
               .toList(),
-          prefetchHooksCallback: ({categoryId = false}) {
+          prefetchHooksCallback: (
+              {categoryId = false, budgetRhythmsRefs = false}) {
             return PrefetchHooks(
               db: db,
-              explicitlyWatchedTables: [],
+              explicitlyWatchedTables: [
+                if (budgetRhythmsRefs) db.budgetRhythms
+              ],
               addJoins: <
                   T extends TableManagerState<
                       dynamic,
@@ -8005,7 +8428,21 @@ class $$BudgetsTableTableManager extends RootTableManager<
                 return state;
               },
               getPrefetchedDataCallback: (items) async {
-                return [];
+                return [
+                  if (budgetRhythmsRefs)
+                    await $_getPrefetchedData<Budget, $BudgetsTable,
+                            BudgetRhythm>(
+                        currentTable: table,
+                        referencedTable: $$BudgetsTableReferences
+                            ._budgetRhythmsRefsTable(db),
+                        managerFromTypedResult: (p0) =>
+                            $$BudgetsTableReferences(db, table, p0)
+                                .budgetRhythmsRefs,
+                        referencedItemsForCurrentItem: (item,
+                                referencedItems) =>
+                            referencedItems.where((e) => e.budgetId == item.id),
+                        typedResults: items)
+                ];
               },
             );
           },
@@ -8023,7 +8460,298 @@ typedef $$BudgetsTableProcessedTableManager = ProcessedTableManager<
     $$BudgetsTableUpdateCompanionBuilder,
     (Budget, $$BudgetsTableReferences),
     Budget,
-    PrefetchHooks Function({bool categoryId})>;
+    PrefetchHooks Function({bool categoryId, bool budgetRhythmsRefs})>;
+typedef $$BudgetRhythmsTableCreateCompanionBuilder = BudgetRhythmsCompanion
+    Function({
+  required String budgetId,
+  required String rhythm,
+  Value<int> weekStart,
+  Value<String> carryRule,
+  Value<int?> remainingUses,
+  Value<bool> pinned,
+  Value<int> rowid,
+});
+typedef $$BudgetRhythmsTableUpdateCompanionBuilder = BudgetRhythmsCompanion
+    Function({
+  Value<String> budgetId,
+  Value<String> rhythm,
+  Value<int> weekStart,
+  Value<String> carryRule,
+  Value<int?> remainingUses,
+  Value<bool> pinned,
+  Value<int> rowid,
+});
+
+final class $$BudgetRhythmsTableReferences
+    extends BaseReferences<_$AppDatabase, $BudgetRhythmsTable, BudgetRhythm> {
+  $$BudgetRhythmsTableReferences(
+      super.$_db, super.$_table, super.$_typedResult);
+
+  static $BudgetsTable _budgetIdTable(_$AppDatabase db) =>
+      db.budgets.createAlias('budget_rhythms__budget_id__budgets__id');
+
+  $$BudgetsTableProcessedTableManager get budgetId {
+    final $_column = $_itemColumn<String>('budget_id')!;
+
+    final manager = $$BudgetsTableTableManager($_db, $_db.budgets)
+        .filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_budgetIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: [item]));
+  }
+}
+
+class $$BudgetRhythmsTableFilterComposer
+    extends Composer<_$AppDatabase, $BudgetRhythmsTable> {
+  $$BudgetRhythmsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get rhythm => $composableBuilder(
+      column: $table.rhythm, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get weekStart => $composableBuilder(
+      column: $table.weekStart, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get carryRule => $composableBuilder(
+      column: $table.carryRule, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get remainingUses => $composableBuilder(
+      column: $table.remainingUses, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get pinned => $composableBuilder(
+      column: $table.pinned, builder: (column) => ColumnFilters(column));
+
+  $$BudgetsTableFilterComposer get budgetId {
+    final $$BudgetsTableFilterComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.budgetId,
+        referencedTable: $db.budgets,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$BudgetsTableFilterComposer(
+              $db: $db,
+              $table: $db.budgets,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+}
+
+class $$BudgetRhythmsTableOrderingComposer
+    extends Composer<_$AppDatabase, $BudgetRhythmsTable> {
+  $$BudgetRhythmsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get rhythm => $composableBuilder(
+      column: $table.rhythm, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get weekStart => $composableBuilder(
+      column: $table.weekStart, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get carryRule => $composableBuilder(
+      column: $table.carryRule, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get remainingUses => $composableBuilder(
+      column: $table.remainingUses,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get pinned => $composableBuilder(
+      column: $table.pinned, builder: (column) => ColumnOrderings(column));
+
+  $$BudgetsTableOrderingComposer get budgetId {
+    final $$BudgetsTableOrderingComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.budgetId,
+        referencedTable: $db.budgets,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$BudgetsTableOrderingComposer(
+              $db: $db,
+              $table: $db.budgets,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+}
+
+class $$BudgetRhythmsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $BudgetRhythmsTable> {
+  $$BudgetRhythmsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get rhythm =>
+      $composableBuilder(column: $table.rhythm, builder: (column) => column);
+
+  GeneratedColumn<int> get weekStart =>
+      $composableBuilder(column: $table.weekStart, builder: (column) => column);
+
+  GeneratedColumn<String> get carryRule =>
+      $composableBuilder(column: $table.carryRule, builder: (column) => column);
+
+  GeneratedColumn<int> get remainingUses => $composableBuilder(
+      column: $table.remainingUses, builder: (column) => column);
+
+  GeneratedColumn<bool> get pinned =>
+      $composableBuilder(column: $table.pinned, builder: (column) => column);
+
+  $$BudgetsTableAnnotationComposer get budgetId {
+    final $$BudgetsTableAnnotationComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.budgetId,
+        referencedTable: $db.budgets,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$BudgetsTableAnnotationComposer(
+              $db: $db,
+              $table: $db.budgets,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+}
+
+class $$BudgetRhythmsTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $BudgetRhythmsTable,
+    BudgetRhythm,
+    $$BudgetRhythmsTableFilterComposer,
+    $$BudgetRhythmsTableOrderingComposer,
+    $$BudgetRhythmsTableAnnotationComposer,
+    $$BudgetRhythmsTableCreateCompanionBuilder,
+    $$BudgetRhythmsTableUpdateCompanionBuilder,
+    (BudgetRhythm, $$BudgetRhythmsTableReferences),
+    BudgetRhythm,
+    PrefetchHooks Function({bool budgetId})> {
+  $$BudgetRhythmsTableTableManager(_$AppDatabase db, $BudgetRhythmsTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$BudgetRhythmsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$BudgetRhythmsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$BudgetRhythmsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> budgetId = const Value.absent(),
+            Value<String> rhythm = const Value.absent(),
+            Value<int> weekStart = const Value.absent(),
+            Value<String> carryRule = const Value.absent(),
+            Value<int?> remainingUses = const Value.absent(),
+            Value<bool> pinned = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              BudgetRhythmsCompanion(
+            budgetId: budgetId,
+            rhythm: rhythm,
+            weekStart: weekStart,
+            carryRule: carryRule,
+            remainingUses: remainingUses,
+            pinned: pinned,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String budgetId,
+            required String rhythm,
+            Value<int> weekStart = const Value.absent(),
+            Value<String> carryRule = const Value.absent(),
+            Value<int?> remainingUses = const Value.absent(),
+            Value<bool> pinned = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              BudgetRhythmsCompanion.insert(
+            budgetId: budgetId,
+            rhythm: rhythm,
+            weekStart: weekStart,
+            carryRule: carryRule,
+            remainingUses: remainingUses,
+            pinned: pinned,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (
+                    e.readTable<$BudgetRhythmsTable, BudgetRhythm>(table),
+                    $$BudgetRhythmsTableReferences(db, table, e)
+                  ))
+              .toList(),
+          prefetchHooksCallback: ({budgetId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins: <
+                  T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic>>(state) {
+                if (budgetId) {
+                  state = state.withJoin(
+                    currentTable: table,
+                    currentColumn: table.budgetId,
+                    referencedTable:
+                        $$BudgetRhythmsTableReferences._budgetIdTable(db),
+                    referencedColumn:
+                        $$BudgetRhythmsTableReferences._budgetIdTable(db).id,
+                  ) as T;
+                }
+
+                return state;
+              },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ));
+}
+
+typedef $$BudgetRhythmsTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $BudgetRhythmsTable,
+    BudgetRhythm,
+    $$BudgetRhythmsTableFilterComposer,
+    $$BudgetRhythmsTableOrderingComposer,
+    $$BudgetRhythmsTableAnnotationComposer,
+    $$BudgetRhythmsTableCreateCompanionBuilder,
+    $$BudgetRhythmsTableUpdateCompanionBuilder,
+    (BudgetRhythm, $$BudgetRhythmsTableReferences),
+    BudgetRhythm,
+    PrefetchHooks Function({bool budgetId})>;
 typedef $$DebtContactsTableCreateCompanionBuilder = DebtContactsCompanion
     Function({
   required String id,
@@ -9297,6 +10025,8 @@ class $AppDatabaseManager {
       $$TransactionsTableTableManager(_db, _db.transactions);
   $$BudgetsTableTableManager get budgets =>
       $$BudgetsTableTableManager(_db, _db.budgets);
+  $$BudgetRhythmsTableTableManager get budgetRhythms =>
+      $$BudgetRhythmsTableTableManager(_db, _db.budgetRhythms);
   $$DebtContactsTableTableManager get debtContacts =>
       $$DebtContactsTableTableManager(_db, _db.debtContacts);
   $$DebtTransactionsTableTableManager get debtTransactions =>

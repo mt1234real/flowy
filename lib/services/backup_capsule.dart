@@ -400,10 +400,11 @@ String ledgerFingerprint(String path) {
             'debt_contacts',
             'savings_goals',
             'budgets',
+            if (db.select("SELECT name FROM sqlite_master WHERE type='table' AND name='budget_rhythms'").isNotEmpty) 'budget_rhythms',
             'project_budgets'
           ])
             table: db
-                .select('SELECT * FROM $table ORDER BY id')
+                .select('SELECT * FROM $table ORDER BY ${table == 'budget_rhythms' ? 'budget_id' : 'id'}')
                 .map((r) => Map<String, dynamic>.from(r))
                 .toList(),
         })))
@@ -574,9 +575,9 @@ void reconcileBackup(String path, BackupReconciliation diff,
       if (row['deleted_at'] != null) continue;
       final type = row['type'];
       final income = entry.table == 'transactions'
-          ? type == 1
+          ? type == 1 || type == 4
           : type == 'BORROW' || type == 'COLLECT';
-      if (entry.table == 'transactions' && ![0, 1, 3].contains(type)) {
+      if (entry.table == 'transactions' && ![0, 1, 3, 4, 5].contains(type)) {
         throw StateError('Giao dịch cần đối soát riêng');
       }
       if (entry.table == 'debt_transactions' &&

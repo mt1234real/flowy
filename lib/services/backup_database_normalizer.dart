@@ -73,6 +73,9 @@ class _BackupMigrationDatabase extends AppDatabase {
   _BackupMigrationDatabase(File file) : super.forTesting(NativeDatabase(file));
 
   @override
+  bool get disposableMigrationCopy => true;
+
+  @override
   MigrationStrategy get migration {
     final appMigration = super.migration;
     return MigrationStrategy(

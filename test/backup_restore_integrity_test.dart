@@ -75,6 +75,7 @@ void _legacy(File file, int version) {
   final db = sql.sqlite3.open(file.path);
   try {
     db.execute('PRAGMA foreign_keys=OFF');
+    if (version < 12) db.execute('DROP TABLE budget_rhythms');
     if (version < 11) {
       db.execute('ALTER TABLE transactions DROP COLUMN goal_id');
     }
@@ -208,7 +209,7 @@ void main() {
     });
   }
 
-  for (final version in List.generate(11, (index) => index + 1)) {
+  for (final version in List.generate(12, (index) => index + 1)) {
     test(
         'Schema $version normalizes before inspection and selective accounting',
         () async {
@@ -236,7 +237,7 @@ void main() {
       }
       final prepared = File(await prepareBackupForInspection(cloud.path));
       expect(await cloud.readAsBytes(), original);
-      validateBackupDatabase(prepared.path, 11);
+      validateBackupDatabase(prepared.path, 12);
       expect(backupStatistics(prepared.path)['wallets'], 2);
       final diff = inspectReconciliation(local.path, prepared.path);
       expect(diff.entries.length, 8);
@@ -247,7 +248,7 @@ void main() {
           diff.entries.map((e) => e.key).toSet(),
           {'source': 'source', 'destination': 'destination'});
       _read(prepared, (db) {
-        expect(db.select('PRAGMA user_version').single.values.single, 11);
+        expect(db.select('PRAGMA user_version').single.values.single, 12);
         expect(db.select('PRAGMA quick_check').single.values.single, 'ok');
         expect(db.select('PRAGMA foreign_key_check'), isEmpty);
         expect(
@@ -330,7 +331,7 @@ void main() {
       } else {
         final raw = sql.sqlite3.open(cloud.path);
         try {
-          if (invalid == 'newer') raw.execute('PRAGMA user_version=12');
+          if (invalid == 'newer') raw.execute('PRAGMA user_version=13');
           if (invalid == 'unsupported-zero') {
             raw.execute('PRAGMA user_version=0');
           }
@@ -357,7 +358,7 @@ void main() {
     });
   }
 
-  for (final version in [1, 5, 10, 11, 12, 0, -1, -2]) {
+  for (final version in [1, 5, 10, 11, 12, 13, 0, -1, -2]) {
     final label = switch (version) {
       -1 => 'malformed file',
       -2 => 'damaged schema 5 migration',
@@ -393,7 +394,7 @@ void main() {
         }),
       });
       final prefs = await SharedPreferences.getInstance();
-      final rejected = version > 11 || version <= 0;
+      final rejected = version > 12 || version <= 0;
       if (rejected) FlutterSecureStorage.setMockInitialValues({});
       final beforeSecurity = await VaultSecurityService.storage.readAll();
       final beforePrefs = {
@@ -450,7 +451,7 @@ void main() {
         } else {
           await service.restorePreparedBackup(local);
           _read(live, (db) {
-            expect(db.select('PRAGMA user_version').single.values.single, 11);
+            expect(db.select('PRAGMA user_version').single.values.single, 12);
             expect(
                 db.select('SELECT balance FROM wallets WHERE id=?',
                     ['source']).single['balance'],

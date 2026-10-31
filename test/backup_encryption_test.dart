@@ -983,7 +983,7 @@ void main() {
           final prepared = await service.downloadAndDecryptBackup(restoreId);
           await service.restorePreparedBackup(prepared);
           final raw = sql.sqlite3.open(live.path);
-          expect(raw.select('PRAGMA user_version').single.values.single, 11);
+          expect(raw.select('PRAGMA user_version').single.values.single, 12);
           expect(raw.select('SELECT balance FROM wallets').single['balance'],
               9000000);
           expect(

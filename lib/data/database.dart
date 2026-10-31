@@ -28,8 +28,40 @@ import 'package:path_provider/path_provider.dart';
 part 'database.g.dart';
 
 // --- ENUMS ---
-enum CategoryType { expense, income, debt, transfer }
+// Append only: persisted integer values 0..3 must never change.
+enum CategoryType {
+  expense,
+  income,
+  debt,
+  transfer,
+  balanceAdjustmentIn,
+  balanceAdjustmentOut
+}
+
+extension BalanceAdjustmentType on CategoryType {
+  bool get isBalanceAdjustment =>
+      this == CategoryType.balanceAdjustmentIn ||
+      this == CategoryType.balanceAdjustmentOut;
+  bool get increasesWallet =>
+      this == CategoryType.income || this == CategoryType.balanceAdjustmentIn;
+}
+
+extension TransactionBalanceAdjustment on Transaction {
+  bool get isBalanceAdjustment => type.isBalanceAdjustment;
+  double get signedWalletAdjustment =>
+      type == CategoryType.balanceAdjustmentIn ? amount : -amount;
+}
 enum EnvelopeType { needs, wants, savings }
+
+/// One committed read view for every input to Dashboard's existing formula.
+class DashboardFinancialSnapshot {
+  const DashboardFinancialSnapshot(this.transactions, this.wallets,
+      this.budgets, this.categories);
+  final List<Transaction> transactions;
+  final List<Wallet> wallets;
+  final List<Budget> budgets;
+  final List<Category> categories;
+}
 
 class VaultTransactionDeletionException implements Exception {
   final String message;
@@ -143,6 +175,19 @@ class Budgets extends Table {
 
   @override
   Set<Column> get primaryKey => {id};
+}
+
+// Optional, explicit management rhythm; old Budgets remain period budgets.
+// Configuration only: this table never owns money or creates transactions.
+class BudgetRhythms extends Table {
+  TextColumn get budgetId => text().references(Budgets, #id, onDelete: KeyAction.cascade)();
+  TextColumn get rhythm => text()(); // weekly | period
+  IntColumn get weekStart => integer().withDefault(const Constant(1))();
+  TextColumn get carryRule => text().withDefault(const Constant('none'))(); // none | signed
+  IntColumn get remainingUses => integer().nullable()();
+  BoolColumn get pinned => boolean().withDefault(const Constant(false))();
+  @override
+  Set<Column> get primaryKey => {budgetId};
 }
 
 class DebtContacts extends Table {
@@ -285,6 +330,7 @@ class AppNotifications extends Table {
   Categories,
   Transactions,
   Budgets,
+  BudgetRhythms,
   DebtContacts,
   DebtTransactions,
   ProjectBudgets,
@@ -297,8 +343,10 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
   AppDatabase.forTesting(super.e);
 
+  bool get disposableMigrationCopy => false;
+
   @override
-  int get schemaVersion => 11; // 🌟 v11: Thêm Transactions.goalId phục vụ Vault Isolation
+  int get schemaVersion => 12; // v12: optional budget rhythm configuration; existing financial rows unchanged
 
   @override
   MigrationStrategy get migration {
@@ -307,6 +355,15 @@ class AppDatabase extends _$AppDatabase {
         await m.createAll();
       },
       onUpgrade: (Migrator m, int from, int to) async {
+        // Snapshot the real v11 database before the additive configuration migration.
+        if (from == 11 && !disposableMigrationCopy) {
+          final locations = await customSelect('PRAGMA database_list').get();
+          final path = locations.firstWhere((row) => row.read<String>('name') == 'main').read<String>('file');
+          if (path.isNotEmpty) {
+            final backup = '$path.pre-budget-rhythm-${DateTime.now().microsecondsSinceEpoch}.sqlite';
+            await customStatement("VACUUM INTO '${backup.replaceAll("'", "''")}'");
+          }
+        }
         if (from < 3) {
           await m.createTable(debtContacts);
           await m.createTable(debtTransactions);
@@ -344,9 +401,11 @@ class AppDatabase extends _$AppDatabase {
         if (from < 11) {
           await m.addColumn(transactions, transactions.goalId);
         }
+        if (from < 12) await m.createTable(budgetRhythms);
       },
       beforeOpen: (details) async {
         await customStatement('PRAGMA foreign_keys = ON');
+        await normalizeLegacyWalletAudits();
         // Repair the former category editor's self-parent bug without changing
         // category IDs or any linked transactions and budgets.
         await customStatement(
@@ -362,6 +421,54 @@ class AppDatabase extends _$AppDatabase {
             .go();
       },
     );
+  }
+
+  /// Data-only repair, no schema change. Only the dedicated audit ID namespace
+  /// AND the exact structural contract of the former writer establish origin.
+  /// Names/merchant/note/amount anomalies are never evidence of audit origin.
+  Future<int> normalizeLegacyWalletAudits() async {
+    final candidates = await (select(transactions)
+          ..where((t) =>
+              t.id.like('tx_audit_%') &
+              t.type.isIn(
+                  [CategoryType.expense.index, CategoryType.income.index]) &
+              t.envelopeType.equals('needs') &
+              t.goalId.isNull() &
+              t.toWalletId.isNull() &
+              t.projectBudgetId.isNull() &
+              t.rawReceiptText.isNull() &
+              t.isAiParsed.equals(false) &
+              t.isCycleStart.equals(false)))
+        .get();
+    final verified = candidates
+        .where((t) =>
+            RegExp(r'^tx_audit_[0-9]{13}$').hasMatch(t.id) &&
+            t.amount.isFinite &&
+            t.amount > 0)
+        .toList();
+    if (verified.isEmpty) return 0;
+    final databases = await customSelect('PRAGMA database_list').get();
+    final main = databases.where((row) => row.read<String>('name') == 'main');
+    final path = main.isEmpty ? '' : main.first.read<String>('file');
+    if (path.isNotEmpty) {
+      // SQLite creates a consistent standalone copy including WAL contents.
+      // Failure aborts the repair; never mutate real data without its snapshot.
+      final backup = '$path.pre-audit-classification-'
+          '${DateTime.now().microsecondsSinceEpoch}.sqlite';
+      await customStatement("VACUUM INTO '${backup.replaceAll("'", "''")}'");
+    }
+    return transaction(() async {
+      var repaired = 0;
+      for (final tx in verified) {
+        repaired += await (update(transactions)
+              ..where((t) => t.id.equals(tx.id) & t.type.equals(tx.type.index)))
+            .write(TransactionsCompanion(
+                type: Value(tx.type == CategoryType.income
+                    ? CategoryType.balanceAdjustmentIn
+                    : CategoryType.balanceAdjustmentOut)));
+      }
+      return repaired;
+    });
   }
 
   SimpleSelectStatement<EntityArchives, EntityArchive> _archives(String type) =>
@@ -534,6 +641,23 @@ class AppDatabase extends _$AppDatabase {
   // TRANSACTION DAOs & REACTIVE STREAMS
   // ==========================================
 
+  Stream<DashboardFinancialSnapshot> watchDashboardFinancialSnapshot(
+      DateTime start, DateTime end) {
+    // Explicit dependencies cover every formula input. A committed mutation
+    // invalidates the read view; no provider/UI refresh or polling is needed.
+    return customSelect('SELECT 1',
+        readsFrom: {transactions, wallets, budgets, categories})
+        .watch()
+        .asyncMap((_) => transaction(() async {
+          final txs = await (select(transactions)..where((t) =>
+            t.deletedAt.isNull() & t.goalId.isNull() &
+            (t.envelopeType.equals('savings').not() | t.envelopeType.isNull()) &
+            t.date.isBiggerOrEqualValue(start) & t.date.isSmallerThanValue(end))).get();
+          return DashboardFinancialSnapshot(txs, await select(wallets).get(),
+              await select(budgets).get(), await select(categories).get());
+        }));
+  }
+
   Stream<List<Transaction>> watchAllTransactions() {
     return (select(transactions)
       ..where((t) => t.deletedAt.isNull())
@@ -561,9 +685,9 @@ class AppDatabase extends _$AppDatabase {
       final wallet = await (select(wallets)..where((w) => w.id.equals(tx.walletId.value))).getSingleOrNull();
       if (wallet != null) {
         double delta = 0.0;
-        if (tx.type.value == CategoryType.income) {
+        if (tx.type.value.increasesWallet) {
           delta = tx.amount.value;
-        } else if (tx.type.value == CategoryType.expense) {
+        } else if (tx.type.value == CategoryType.expense || tx.type.value == CategoryType.balanceAdjustmentOut) {
           delta = -tx.amount.value;
         }
 
@@ -945,9 +1069,9 @@ class AppDatabase extends _$AppDatabase {
         await _applyTransferBalanceDelta(tx, sourceDelta: tx.amount);
       } else if (wallet != null) {
         double reversal = 0.0;
-        if (tx.type == CategoryType.income) {
+        if (tx.type.increasesWallet) {
           reversal = -tx.amount;
-        } else if (tx.type == CategoryType.expense) {
+        } else if (tx.type == CategoryType.expense || tx.type == CategoryType.balanceAdjustmentOut) {
           reversal = tx.amount;
         }
 
@@ -982,9 +1106,9 @@ class AppDatabase extends _$AppDatabase {
         await _applyTransferBalanceDelta(tx, sourceDelta: -tx.amount);
       } else if (wallet != null) {
         double delta = 0.0;
-        if (tx.type == CategoryType.income) {
+        if (tx.type.increasesWallet) {
           delta = tx.amount;
-        } else if (tx.type == CategoryType.expense) {
+        } else if (tx.type == CategoryType.expense || tx.type == CategoryType.balanceAdjustmentOut) {
           delta = -tx.amount;
         }
 
@@ -1328,8 +1452,11 @@ class AppDatabase extends _$AppDatabase {
     required double realBalance,
     required String reason,
   }) async {
+    if (!realBalance.isFinite) throw ArgumentError('Số dư không hợp lệ');
     await transaction(() async {
-      final wallet = await (select(wallets)..where((w) => w.id.equals(walletId))).getSingleOrNull();
+      final wallet = await (select(wallets)
+            ..where((w) => w.id.equals(walletId)))
+          .getSingleOrNull();
       if (wallet == null) {
         throw StateError('Không tìm thấy ví với ID: $walletId');
       }
@@ -1352,11 +1479,13 @@ class AppDatabase extends _$AppDatabase {
 
       await into(transactions).insert(
         TransactionsCompanion(
-          id: Value('tx_audit_${DateTime.now().millisecondsSinceEpoch}'),
+          id: Value('tx_audit_${const Uuid().v4()}'),
           walletId: Value(walletId),
           categoryId: Value(catId),
           amount: Value(auditAmount),
-          type: Value(isPositive ? CategoryType.income : CategoryType.expense),
+          type: Value(isPositive
+              ? CategoryType.balanceAdjustmentIn
+              : CategoryType.balanceAdjustmentOut),
           envelopeType: const Value('needs'),
           date: Value(DateTime.now()),
           note: Value('Kiểm kê số dư ví [${wallet.name}]: $reason'),

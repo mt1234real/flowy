@@ -9,7 +9,8 @@ import 'package:intl/intl.dart';
 import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 import '../../data/database.dart';
-import '../../screens/budget_screen.dart' show resolveBudgetWindow;
+import '../../services/budget_windows.dart';
+import '../../services/budget_spending.dart';
 import 'notification_preferences.dart';
 
 class NotificationPlatform {
@@ -329,9 +330,12 @@ class NotificationCoordinator {
       }
     }
     if (prefs.flag('budget80') || prefs.flag('budget100')) {
-      for (final budget in await db.select(db.budgets).get()) {
+      final overview=deriveBudgetSpending(await readBudgetSpendingData(db),fiscalToday,boundary,cycles);
+      for (final item in overview.items) {
+        if(item.error!=null)continue;
+        final budget=item.budget;
         if (budget.amount <= 0) continue;
-        final window = resolveBudgetWindow(budget, cycles);
+        final window = ResolvedBudgetWindow(startDate:item.start,endDate:item.end.subtract(const Duration(seconds:1)),label:'');
         if (now.isBefore(boundary.start(window.startDate)) || !now.isBefore(boundary.end(window.endDate))) {
           continue;
         }
@@ -344,20 +348,10 @@ class NotificationCoordinator {
               .map((c) => c.id));
           changed = ids.length != before;
         }
-        final category =
-            categories.where((c) => c.id == budget.categoryId).firstOrNull;
-        final spent = await db.calculateRecurringSpentForCategory(
-          categoryId: budget.categoryId,
-          startDate: boundary.start(window.startDate),
-          // The DAO's end is inclusive; the fiscal window's end is exclusive.
-          endDate: boundary
-              .end(window.endDate)
-              .subtract(const Duration(microseconds: 1)),
-          isParentCategory: category?.parentId?.isEmpty ?? true,
-        );
-        final threshold = spent >= budget.amount
+        final spent = item.spent;
+        final threshold = spent >= item.available
             ? 100
-            : spent >= budget.amount * .8
+            : spent >= item.available * .8
                 ? 80
                 : 0;
         if (threshold == 0 || !prefs.flag('budget$threshold')) continue;
@@ -373,7 +367,7 @@ class NotificationCoordinator {
             threshold == 100
                 ? '$name đã chạm hạn mức'
                 : '$name gần chạm hạn mức',
-            'Đã dùng ${(spent / budget.amount * 100).toStringAsFixed(0)}%: ${_money(spent)} / ${_money(budget.amount)}. Còn $remaining ngày trong chu kỳ.',
+            'Đã dùng ${item.available>0?(spent/item.available*100).toStringAsFixed(0):'—'}%: ${_money(spent)} / ${_money(item.available)}. Còn $remaining ngày trong ${item.rhythm==SpendingRhythm.weekly?'tuần':'kỳ'}; đây là kế hoạch, không xác nhận tiền dành riêng.',
             'budget',
             {
               'target': 'budget_insights',

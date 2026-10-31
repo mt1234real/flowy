@@ -1,3 +1,6 @@
+import '../services/budget_spending.dart';
+import '../services/budget_spending_provider.dart';
+export '../services/budget_windows.dart' show ResolvedBudgetWindow, resolveBudgetWindow;
 import '../services/fiscal_day.dart';
 import '../widgets/ambient_canvas.dart';
 // ==============================================================================
@@ -96,34 +99,6 @@ final projectBudgetsStreamProvider = StreamProvider.autoDispose<List<ProjectBudg
   final db = ref.watch(databaseProvider);
   return db.watchProjectBudgets();
 });
-
-// Helper model chứa dải ngày đã được tính toán động cho một bản ghi Budget
-class ResolvedBudgetWindow {
-  final DateTime startDate;
-  final DateTime endDate;
-  final String label;
-
-  const ResolvedBudgetWindow({
-    required this.startDate,
-    required this.endDate,
-    required this.label,
-  });
-}
-
-// Helper phân giải dải ngày chu kỳ định kỳ dựa trên periodMonth và cycleStartDay
-ResolvedBudgetWindow resolveBudgetWindow(Budget budget, Map<String, int> cycleStore) {
-  final anchor = budget.periodMonth;
-  final tempStore = Map<String, int>.from(cycleStore);
-  final monthKey = DateFormat('yyyy-MM').format(anchor);
-  tempStore[monthKey] = budget.cycleStartDay;
-
-  final cycleRange = computeMonthCycleRange(anchor, tempStore);
-  return ResolvedBudgetWindow(
-    startDate: cycleRange.startDate,
-    endDate: cycleRange.endDate,
-    label: '${DateFormat('dd/MM').format(cycleRange.startDate)} – ${DateFormat('dd/MM').format(cycleRange.endDate)}',
-  );
-}
 
 class RecurringBudgetChild {
   const RecurringBudgetChild(this.category, this.budget, this.spent);
@@ -663,7 +638,8 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen>
       context: context,
       mode: FluidSheetMode.nestedScrollable,
       backgroundColor: Colors.transparent,
-      builder: (_, __) => _BudgetSetupSheet(
+      builder: (_, controller) => _BudgetSetupSheet(
+          scrollController: controller,
           editBudget: editBudget,
           initialCategory: initialCategory,
           childParent: childParent),
@@ -731,6 +707,8 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen>
             periodMonth: drift.Value(curMonthNormalized),
           ),
         );
+        final cfg=await (db.select(db.budgetRhythms)..where((r)=>r.budgetId.equals(src.id))).getSingleOrNull();
+        if(cfg!=null) await db.into(db.budgetRhythms).insertOnConflictUpdate(cfg.copyWith(budgetId:newId,pinned:false).toCompanion(false));
       }
     });
 
@@ -754,15 +732,22 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen>
     final cycleStore = ref.watch(cycleStartDaysByMonthProvider);
     final cycleRange = computeMonthCycleRange(anchorMonth, cycleStore);
 
-    final budgetsAsync = ref.watch(activeBudgetsStreamProvider);
-    final categoriesAsync = ref.watch(allCategoriesStreamProvider);
-    final expensesAsync = ref.watch(expenseTransactionsStreamProvider);
-    final projectBudgetsAsync = ref.watch(projectBudgetsStreamProvider);
+    final planData = ref.watch(budgetSpendingDataProvider);
+    final budgetsAsync = planData.whenData((d)=>d.budgets);
+    final categoriesAsync = planData.whenData((d)=>d.categories);
+    final expensesAsync = planData.whenData((d)=>d.expenses);
+    final projectBudgetsAsync = planData.whenData((d)=>d.projects);
+    final data=planData.valueOrNull;
+    final configured={for(final cfg in data?.rhythms??<BudgetRhythm>[])cfg.budgetId};
+    final today=ref.watch(budgetSpendingDateProvider);
+    final asOf= !today.isBefore(cycleRange.startDate) && today.isBefore(boundary.end(cycleRange.endDate)) ? today : cycleRange.startDate;
+    final individual=data==null?null:deriveBudgetSpending(data,asOf,boundary,cycleStore);
+
 
     final recurring = deriveRecurringBudgetGroups(
-      budgets: budgetsAsync.valueOrNull ?? [],
+      budgets: (budgetsAsync.valueOrNull ?? <Budget>[]).where((b)=>!configured.contains(b.id)).toList(),
       categories: categoriesAsync.valueOrNull ?? [],
-      expenses: expensesAsync.valueOrNull ?? [],
+      expenses: (expensesAsync.valueOrNull ?? <Transaction>[]).where((t)=>data==null || !configured.contains(individual?.ownerByTransactionId[t.id])).toList(),
       projects: projectBudgetsAsync.valueOrNull ?? [],
       anchorMonth: anchorMonth,
       startInclusive: boundary.start(cycleRange.startDate),
@@ -900,6 +885,10 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen>
                 // TAB 1: NGÂN SÁCH ĐỊNH KỲ (MONTHLY RECURRING)
                 // ===============================================================
                 if (currentTopTab == BudgetTopTab.recurring) ...[
+                  if(individual!=null && individual.items.any((b)=>configured.contains(b.budget.id))) SliverToBoxAdapter(child:Padding(padding:const EdgeInsets.symmetric(horizontal:18,vertical:8),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+                    const Text('Theo từng ngân sách',style:TextStyle(fontWeight:FontWeight.w700)),
+                    for(final b in individual.items.where((b)=>configured.contains(b.budget.id))) Material(type:MaterialType.transparency,child:ListTile(contentPadding:EdgeInsets.zero,title:Text('${b.name} · ${b.rhythm==SpendingRhythm.weekly?'Tuần':'Kỳ'}'),subtitle:CurrencyText(b.error??'${b.remaining<0?'Vượt':b.remaining==0?'Đã dùng hết':'Còn'}${b.remaining==0?'':' ${_formatCurrency(b.remaining.abs())}'} · ${DateFormat('dd/MM').format(b.start)} – ${DateFormat('dd/MM').format(b.end.subtract(const Duration(days:1)))}'),trailing:const Icon(Icons.edit_outlined,size:18),onTap:()=>_openBudgetSetupSheet(context,editBudget:b.budget))),
+                  ]))),
                   SliverPadding(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
@@ -968,7 +957,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen>
                                     runSpacing: 4,
                                     children: [
                                       Text(
-                                        'TỔNG NGÂN SÁCH THÁNG ${DateFormat('MM/yyyy').format(anchorMonth)}',
+                                        'NGÂN SÁCH KỲ CHƯA CẤU HÌNH · ${DateFormat('MM/yyyy').format(anchorMonth)}',
                                         style: TextStyle(
                                           fontSize: 11,
                                           fontWeight: FontWeight.w700,
@@ -2383,7 +2372,7 @@ class _ProjectBudgetEditModalState extends ConsumerState<_ProjectBudgetEditModal
     final amount = double.tryParse(_amountBuffer) ?? 0.0;
 
     final titleInvalid = title.isEmpty;
-    final amountInvalid = amount <= 0;
+    final amountInvalid = !amount.isFinite || amount <= 0;
 
     if (titleInvalid || amountInvalid) {
       HapticFeedback.heavyImpact();
@@ -2729,9 +2718,9 @@ class _ProjectBudgetEditModalState extends ConsumerState<_ProjectBudgetEditModal
 // 🌟 BOTTOM SHEET: THIẾT LẬP HẠN MỨC ĐỊNH KỲ RIÊNG CHO THÁNG HIỆN TẠI
 // ==============================================================================
 
-Future<void> showInsightsBudgetEditor(BuildContext context, {required Category category, required DateTime anchor, Budget? budget}) {
-  return AppAnimationPolicy.showFluidSheet<void>(context: context, mode: FluidSheetMode.nestedScrollable,
-    builder: (_, __) => _BudgetSetupSheet(editBudget: budget, initialCategory: category, initialAnchor: anchor));
+Future<void> showInsightsBudgetEditor(BuildContext context, {Category? category, required DateTime anchor, Budget? budget, bool enableBlur = true, SpendingRhythm? initialRhythm}) {
+  return AppAnimationPolicy.showFluidSheet<void>(context: context, mode: FluidSheetMode.scrollable, enableBlur: enableBlur,
+    builder: (_, controller) => _BudgetSetupSheet(scrollController: controller, editBudget: budget, initialCategory: category, initialAnchor: anchor, initialRhythm: initialRhythm));
 }
 
 class _BudgetSetupSheet extends ConsumerStatefulWidget {
@@ -2739,6 +2728,8 @@ class _BudgetSetupSheet extends ConsumerStatefulWidget {
   final Category? initialCategory;
   final DateTime? initialAnchor;
   final Category? childParent;
+  final ScrollController? scrollController;
+  final SpendingRhythm? initialRhythm;
 
   const _BudgetSetupSheet({
     super.key,
@@ -2746,6 +2737,8 @@ class _BudgetSetupSheet extends ConsumerStatefulWidget {
     this.initialCategory,
     this.initialAnchor,
     this.childParent,
+    this.scrollController,
+    this.initialRhythm,
   });
 
   @override
@@ -2758,6 +2751,26 @@ class _BudgetSetupSheetState extends ConsumerState<_BudgetSetupSheet> {
 
   late int _cycleStartDay;
   String _amountBuffer = '1000000';
+  SpendingRhythm _rhythm = SpendingRhythm.period;
+  int _weekStart = 1;
+  String _carryRule = 'none';
+  bool _pinned = false, _configLoaded = false, _saving = false;
+  String? _configError;
+  final _uses = TextEditingController();
+
+  Future<void> _loadRhythm() async {
+    try {
+      final db=ref.read(databaseProvider);
+      final cfg=widget.editBudget==null?null:await (db.select(db.budgetRhythms)..where((r)=>r.budgetId.equals(widget.editBudget!.id))).getSingleOrNull();
+      if(!mounted)return;
+      setState(() {
+        _rhythm=cfg==null?(widget.initialRhythm??SpendingRhythm.period):cfg.rhythm=='weekly'?SpendingRhythm.weekly:SpendingRhythm.period;
+        _weekStart=(cfg?.weekStart??1).clamp(1,7);_carryRule=['none','signed'].contains(cfg?.carryRule)?cfg!.carryRule:'none';_pinned=cfg?.pinned??false;
+        _uses.text=cfg?.remainingUses?.toString()??'';_configLoaded=true;_configError=null;
+      });
+    } catch (_) { if(mounted)setState(()=>_configError='Chưa tải được cấu hình ngân sách'); }
+  }
+
 
   final AppValidationFeedbackController _categoryFeedback =
   AppValidationFeedbackController();
@@ -2775,6 +2788,7 @@ class _BudgetSetupSheetState extends ConsumerState<_BudgetSetupSheet> {
   @override
   void initState() {
     super.initState();
+    _loadRhythm();
     final DateTime anchorMonth = widget.initialAnchor ?? ref.read(budgetAnchorMonthProvider);
     final cycleStore = ref.read(cycleStartDaysByMonthProvider);
     final cycleRange = computeMonthCycleRange(anchorMonth, cycleStore);
@@ -2793,6 +2807,7 @@ class _BudgetSetupSheetState extends ConsumerState<_BudgetSetupSheet> {
 
   @override
   void dispose() {
+    _uses.dispose();
     _categoryFeedback.dispose();
     _amountFeedback.dispose();
     super.dispose();
@@ -2855,6 +2870,11 @@ class _BudgetSetupSheetState extends ConsumerState<_BudgetSetupSheet> {
   }
 
   Future<void> _saveBudget() async {
+    if(!_configLoaded || _saving)return;
+    final uses = _uses.text.trim().isEmpty ? null : int.tryParse(_uses.text.trim());
+    if(_rhythm==SpendingRhythm.period && _uses.text.trim().isNotEmpty && (uses==null || uses<=0)) {
+      HapticFeedback.heavyImpact();setState(()=>_configError='Số lần còn lại phải là số nguyên dương');return;
+    }
     final amount = double.tryParse(_amountBuffer) ?? 0.0;
     final categoryInvalid = _selectedCategoryId == null ||
         (widget.childParent != null &&
@@ -2879,6 +2899,9 @@ class _BudgetSetupSheetState extends ConsumerState<_BudgetSetupSheet> {
     final budgetId =
         widget.editBudget?.id ?? 'b_${monthKey}_$_selectedCategoryId';
 
+    setState(()=>_saving=true);
+    try {
+      await db.transaction(() async {
     await db.into(db.budgets).insertOnConflictUpdate(
       BudgetsCompanion(
         id: drift.Value(budgetId),
@@ -2889,6 +2912,13 @@ class _BudgetSetupSheetState extends ConsumerState<_BudgetSetupSheet> {
         drift.Value(DateTime(anchorMonth.year, anchorMonth.month, 1)),
       ),
     );
+        final saved=await (db.select(db.budgets)..where((b)=>b.id.equals(budgetId))).getSingle();
+        await saveBudgetRhythm(db,saved,rhythm:_rhythm,weekStart:_weekStart,carryRule:_carryRule,remainingUses:uses,pinned:_pinned);
+      });
+    } catch (_) {
+      if(mounted)setState((){_saving=false;_configError='Không lưu được ngân sách. Chưa có thay đổi nào được lưu.';});
+      return;
+    }
 
     HapticFeedback.mediumImpact();
 
@@ -2896,7 +2926,7 @@ class _BudgetSetupSheetState extends ConsumerState<_BudgetSetupSheet> {
 
     AppFeedback.showSuccess(
       context,
-      'Đã lưu hạn mức ${_formatCurrency(amount)} cho Tháng ${DateFormat('MM/yyyy').format(anchorMonth)}.',
+      'Đã lưu ngân sách ${_rhythm==SpendingRhythm.weekly?'tuần':'kỳ'} ${_formatCurrency(amount)}.',
       emitHaptic: false,
     );
     Navigator.of(context).pop();
@@ -3004,6 +3034,7 @@ class _BudgetSetupSheetState extends ConsumerState<_BudgetSetupSheet> {
         child: SafeArea(
           top: false,
           child: SingleChildScrollView(
+            controller: widget.scrollController,
             physics: const ClampingScrollPhysics(),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -3232,6 +3263,22 @@ class _BudgetSetupSheetState extends ConsumerState<_BudgetSetupSheet> {
                 // ============================================================
                 // 2. HERO AMOUNT DISPLAY
                 // ============================================================
+
+                const SizedBox(height:12),
+                if(!_configLoaded) TextButton(onPressed:_loadRhythm,child:const Text('Tải cấu hình ngân sách')),
+                if(_configError!=null) Text(_configError!,style:const TextStyle(color:AppTokens.expense)),
+                DropdownButtonFormField<SpendingRhythm>(
+                  key: ValueKey('rhythm-${_rhythm.name}'),initialValue:_rhythm,decoration:const InputDecoration(labelText:'Nhịp quản lý'),
+                  items:const [DropdownMenuItem(value:SpendingRhythm.weekly,child:Text('Theo tuần')),DropdownMenuItem(value:SpendingRhythm.period,child:Text('Theo kỳ'))],
+                  onChanged:(v){if(v!=null)setState(()=>_rhythm=v);}),
+                if(_rhythm==SpendingRhythm.weekly) DropdownButtonFormField<int>(key:ValueKey('week-$_weekStart'),initialValue:_weekStart,decoration:const InputDecoration(labelText:'Ngày bắt đầu tuần'),items:List.generate(7,(i)=>DropdownMenuItem(value:i+1,child:Text(i==6?'Chủ nhật':'Thứ ${i+2}'))),onChanged:(v){if(v!=null)setState(()=>_weekStart=v);}),
+                if(_rhythm==SpendingRhythm.period)...[
+                  DropdownButtonFormField<int>(initialValue:_cycleStartDay,decoration:const InputDecoration(labelText:'Ngày bắt đầu kỳ mỗi tháng'),items:List.generate(31,(i)=>DropdownMenuItem(value:i+1,child:Text('Ngày ${i+1}'))),onChanged:(v){if(v!=null)setState(()=>_cycleStartDay=v);}),
+                  TextField(controller:_uses,keyboardType:TextInputType.number,decoration:const InputDecoration(labelText:'Số lần chi còn lại (không bắt buộc)')),
+                ],
+                DropdownButtonFormField<String>(key:ValueKey('carry-$_carryRule'),initialValue:_carryRule,decoration:const InputDecoration(labelText:'Chuyển dư'),items:const [DropdownMenuItem(value:'none',child:Text('Không chuyển dư')),DropdownMenuItem(value:'signed',child:Text('Chuyển cả dư và vượt'))],onChanged:(v){if(v!=null)setState(()=>_carryRule=v);}),
+                const Text('Tuần: chuyển dư trong cửa sổ ngân sách này. Kỳ: chuyển giữa các kỳ liền nhau cùng danh mục, gồm cả khoản vượt. Không tạo giao dịch hoặc tiền dành riêng.',style:TextStyle(fontSize:11)),
+                Material(type:MaterialType.transparency,child:SwitchListTile(contentPadding:EdgeInsets.zero,title:const Text('Ghim trên Dashboard'),value:_pinned,onChanged:(v)=>setState(()=>_pinned=v))),
                 AppValidationFeedback(
                   controller: _amountFeedback,
                   builder: (context, visual) {
@@ -3254,7 +3301,7 @@ class _BudgetSetupSheetState extends ConsumerState<_BudgetSetupSheet> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'HẠN MỨC THÁNG',
+                            _rhythm==SpendingRhythm.weekly?'HẠN MỨC TUẦN':'HẠN MỨC KỲ',
                             style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.w800,
@@ -3313,11 +3360,11 @@ class _BudgetSetupSheetState extends ConsumerState<_BudgetSetupSheet> {
                         borderRadius: BorderRadius.circular(16),
                       ),
                     ),
-                    onPressed: _saveBudget,
+                    onPressed: !_configLoaded || _saving ? null : _saveBudget,
                     child: Text(
                       widget.editBudget != null
-                          ? '✓ CẬP NHẬT HẠN MỨC THÁNG NÀY'
-                          : '✓ LƯU HẠN MỨC CHO THÁNG NÀY',
+                          ? '✓ CẬP NHẬT NGÂN SÁCH'
+                          : '✓ LƯU NGÂN SÁCH',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(

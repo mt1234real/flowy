@@ -1,3 +1,4 @@
+import 'package:pfm_app/services/budget_spending.dart';
 import 'package:drift/drift.dart' hide Column, isNull, isNotNull;
 import 'package:drift/native.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -177,7 +178,8 @@ void main() {
     db.notificationSpent.clear();
     final coordinator = NotificationCoordinator(db);
     await coordinator.refresh(prefs, cycles, boundary: boundary);
-    expect(db.notificationSpent, [uiSpent]);
+    final overview=deriveBudgetSpending(await readBudgetSpendingData(db),boundary.date(DateTime.now()),boundary,cycles);
+    expect(overview.items.single.spent,uiSpent);
     final notices = (await db.select(db.appNotifications).get())
         .where((n) => n.type == 'budget')
         .toList();

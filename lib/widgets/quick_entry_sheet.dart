@@ -68,6 +68,10 @@ StreamProvider.autoDispose<List<Wallet>>((ref) {
       .watch();
 });
 
+final _adjustmentWalletProvider = StreamProvider.autoDispose.family<Wallet?, String>(
+    (ref, id) => (ref.watch(databaseProvider).select(ref.watch(databaseProvider).wallets)
+          ..where((w) => w.id.equals(id))).watchSingleOrNull());
+
 final quickEntryDebtContactsStreamProvider =
 StreamProvider.autoDispose<List<DebtContact>>((ref) {
   final db = ref.watch(databaseProvider);
@@ -193,6 +197,32 @@ class QuickEntrySheet extends ConsumerStatefulWidget {
       }) {
     if (initialTransaction != null && initialDebtTransaction != null) {
       throw ArgumentError('Chỉ có thể chỉnh sửa một giao dịch mỗi lần');
+    }
+    if (initialTransaction?.isBalanceAdjustment == true) {
+      final tx = initialTransaction!;
+      return AppAnimationPolicy.showFluidSheet<void>(
+        context: context,
+        mode: FluidSheetMode.scrollable,
+        builder: (context, controller) => Consumer(builder: (context, ref, _) {
+          final wallet = ref.watch(_adjustmentWalletProvider(tx.walletId)).valueOrNull;
+          return ListView(
+            controller: controller,
+            physics: const ClampingScrollPhysics(),
+            shrinkWrap: true,
+            padding: const EdgeInsets.all(24),
+            children: [
+              Text('Kiểm kê ví · Điều chỉnh số dư', style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 16),
+              Text(wallet?.name ?? 'Ví'),
+              Text(DateFormat('dd/MM/yyyy HH:mm').format(tx.date)),
+              CurrencyText('${tx.type.increasesWallet ? '+' : '−'}${NumberFormat.currency(locale: 'vi_VN', symbol: '₫', decimalDigits: 0).format(tx.amount)}'),
+              if (tx.note?.isNotEmpty == true) Text(tx.note!),
+              const SizedBox(height: 12),
+              const Text('Điều chỉnh số dư không tính vào thu nhập, chi tiêu hoặc ngân sách danh mục.'),
+            ],
+          );
+        }),
+      );
     }
     HapticFeedback.selectionClick();
     return AppAnimationPolicy.showFluidSheet(
@@ -565,7 +595,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
   }
 
   void _checkOverrunCondition(double calculatedAmount) {
-    final double dailySafeLimit = widget.prefilledDailySafe ?? 150000.0;
+    final double dailySafeLimit = widget.prefilledDailySafe ?? double.infinity;
     final bool isOver = _activeTab == CategoryType.expense &&
         dailySafeLimit > 0 &&
         calculatedAmount > dailySafeLimit;
@@ -1160,7 +1190,7 @@ class _QuickEntrySheetState extends ConsumerState<QuickEntrySheet>
     final debtContactsAsync = ref.watch(quickEntryDebtContactsStreamProvider);
 
     final double calculatedAmount = _evaluateExpression();
-    final double dailySafeLimit = widget.prefilledDailySafe ?? 150000.0;
+    final double dailySafeLimit = widget.prefilledDailySafe ?? double.infinity;
     final bool isLargeSpend = _activeTab == CategoryType.expense &&
         dailySafeLimit > 0 &&
         calculatedAmount > dailySafeLimit;

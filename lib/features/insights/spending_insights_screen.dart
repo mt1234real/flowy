@@ -1,3 +1,4 @@
+import '../../services/budget_spending_provider.dart';
 import '../../services/fiscal_day.dart';
 import '../../widgets/flowy_selection_picker.dart';
 import '../../widgets/preserved_balance_tumbler.dart';
@@ -29,6 +30,7 @@ String _dates(InsightsWindow window) =>
     '${DateFormat('dd/MM/yyyy').format(window.start)} – ${DateFormat('dd/MM/yyyy').format(window.end.subtract(const Duration(days: 1)))}';
 
 class SpendingInsightsScreen extends ConsumerStatefulWidget {
+  final String? budgetScopeId;
   final InsightsPeriod initialPeriod;
   final DateTime? anchor;
   final Set<String> initialWallets;
@@ -42,6 +44,7 @@ class SpendingInsightsScreen extends ConsumerStatefulWidget {
   final Color? detailColor;
   const SpendingInsightsScreen(
       {super.key,
+      this.budgetScopeId,
       this.initialPeriod = InsightsPeriod.cycle,
       this.anchor,
       this.initialWallets = const {},
@@ -250,6 +253,7 @@ class _SpendingInsightsScreenState
     HapticFeedback.selectionClick();
     final route = flowyReferenceRoute<void>(
         builder: (_) => SpendingInsightsScreen(
+            budgetScopeId: widget.budgetScopeId,
             initialPeriod: _period,
             anchor:
                 widget.anchor == null ? ref.read(fiscalTodayProvider) : _anchor,
@@ -431,9 +435,25 @@ class _SpendingInsightsScreenState
         .firstOrNull;
     String classification(Transaction t) =>
         insightsClassification(t, needsScheme);
-    final scopedTransactions = widget.classification == 'all'
+    final budgetState = widget.budgetScopeId == null
+        ? null
+        : ref.watch(budgetSpendingOverviewProvider);
+    if (budgetState != null && !budgetState.hasValue) {
+      return Center(
+          child: Text(budgetState.hasError
+              ? 'Chưa tải được ngân sách'
+              : 'Đang tải ngân sách…'));
+    }
+    final sourceTransactions = widget.budgetScopeId == null
         ? data.transactions
         : data.transactions
+            .where((t) =>
+                budgetState!.requireValue.ownerByTransactionId[t.id] ==
+                widget.budgetScopeId)
+            .toList();
+    final scopedTransactions = widget.classification == 'all'
+        ? sourceTransactions
+        : sourceTransactions
             .where((t) => classification(t) == widget.classification)
             .toList();
     final report = buildInsightsReport(
@@ -1123,6 +1143,53 @@ class _SpendingInsightsScreenState
 
   Widget _detailBudgetCard(Category category, InsightsData data,
       InsightsWindow window, Map<String, int> cycles, double spent) {
+    if (widget.budgetScopeId != null) {
+      final b = ref
+          .watch(budgetSpendingOverviewProvider)
+          .valueOrNull
+          ?.items
+          .where((b) => b.budget.id == widget.budgetScopeId)
+          .firstOrNull;
+      if (b == null) {
+        return _card(const Text('Ngân sách không còn trong kỳ đang theo dõi.'));
+      }
+      if (widget.detailCategoryId != b.budget.categoryId ||
+          window.start != b.start ||
+          window.end != b.end) {
+        return _card(Text(
+            'Phạm vi phân tích khác kỳ/danh mục của ngân sách ${b.name}.'));
+      }
+      return _card(
+          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('Ngân sách • ${b.name}',
+            style: const TextStyle(fontWeight: FontWeight.w700)),
+        const SizedBox(height: 8),
+        CurrencyText('Hạn mức khả dụng: ${_display(b.available)}',
+            isVisible: _sessionReveal),
+        const SizedBox(height: 8),
+        ExcludeSemantics(
+            child: LinearProgressIndicator(
+                value: _sessionReveal && b.available > 0 && b.ratio.isFinite
+                    ? b.ratio.clamp(0.0, 1.0)
+                    : 0,
+                minHeight: 4)),
+        const SizedBox(height: 8),
+        Text(!_sessionReveal
+            ? 'Thông tin tài chính đang ẩn'
+            : b.available > 0 && b.ratio.isFinite
+                ? 'Đã dùng ${(b.ratio * 100).toStringAsFixed(0)}% hạn mức.'
+                : 'Chưa có tỷ lệ hợp lệ'),
+        CurrencyText(
+            '${!_sessionReveal ? 'Số tiền đang ẩn' : b.remaining < 0 ? 'Vượt' : 'Còn'} ${_display(b.remaining.abs())}',
+            isVisible: _sessionReveal),
+        TextButton(
+            onPressed: () => showInsightsBudgetEditor(context,
+                category: category,
+                anchor: b.budget.periodMonth,
+                budget: b.budget),
+            child: const Text('Điều chỉnh ngân sách')),
+      ]));
+    }
     final budget = data.budgets
         .where((b) =>
             b.categoryId == category.id &&
