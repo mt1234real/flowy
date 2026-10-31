@@ -1,6 +1,7 @@
 import 'dart:ui' as ui;
 import 'dart:io';
 
+import 'package:flutter/cupertino.dart' show CupertinoPageTransitionsBuilder;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -127,7 +128,8 @@ Future<GlobalKey<NavigatorState>> _mount(WidgetTester tester) async {
         TargetPlatform.android: FadeUpwardsPageTransitionsBuilder(),
       }),
     ),
-    home: _page('root'),
+    onGenerateRoute: (settings) => flowyWorkspaceRoute<dynamic>(
+        settings: settings, builder: (_) => _page('root')),
   ));
   await tester.pumpAndSettle();
   return key;
@@ -150,6 +152,35 @@ Future<void> _expectBackgroundPixels(
   image.dispose();
 }
 
+class _GestureLifecycleProbe extends StatefulWidget {
+  const _GestureLifecycleProbe({super.key});
+  @override
+  State<_GestureLifecycleProbe> createState() => _GestureLifecycleProbeState();
+}
+
+class _GestureLifecycleProbeState extends State<_GestureLifecycleProbe> {
+  int deactivations = 0;
+  int activations = 0;
+  int builds = 0;
+  @override
+  void deactivate() {
+    deactivations++;
+    super.deactivate();
+  }
+
+  @override
+  void activate() {
+    activations++;
+    super.activate();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    builds++;
+    return _page('child');
+  }
+}
+
 void main() {
   setUpAll(() async {
     final font = FontLoader('N4RFixture')
@@ -157,6 +188,335 @@ void main() {
           rootBundle.load('assets/google_fonts/BeVietnamPro-Regular.ttf'));
     await font.load();
   });
+
+  for (final cancel in [true, false]) {
+    testWidgets('predictiveVsyncDemand_${cancel ? "cancel" : "commit"}',
+        (tester) async {
+      final nav = await _mount(tester);
+      final route = flowyReferenceRoute<void>(builder: (_) => _page('child'));
+      nav.currentState!.push(route);
+      await tester.pumpAndSettle();
+      expect(tester.binding.transientCallbackCount, 0);
+      await _back(tester, 'startBackGesture');
+      expect(tester.binding.transientCallbackCount, 1);
+      await _back(tester, 'updateBackGestureProgress');
+      final progress = route.animation!.value;
+      final rect = tester.getRect(find.byKey(const ValueKey('child')));
+      for (var frame = 0; frame < 4; frame++) {
+        await tester.pump(const Duration(microseconds: 8333));
+        // Requesting vsync cannot manufacture progress or another animation.
+        expect(route.animation!.value, progress);
+        expect(tester.getRect(find.byKey(const ValueKey('child'))), rect);
+        expect(tester.binding.transientCallbackCount, 1);
+        expect(tester.binding.hasScheduledFrame, true);
+      }
+      await _back(tester, cancel ? 'cancelBackGesture' : 'commitBackGesture');
+      await tester.pumpAndSettle();
+      expect(nav.currentState!.userGestureInProgress, false);
+      expect(tester.binding.transientCallbackCount, 0);
+      expect(tester.binding.hasScheduledFrame, false);
+      expect(find.text('child'), cancel ? findsOneWidget : findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('predictiveVsyncDemand_pauseStopsRequests', (tester) async {
+    final nav = await _mount(tester);
+    nav.currentState!
+        .push(flowyReferenceRoute<void>(builder: (_) => _page('child')));
+    await tester.pumpAndSettle();
+    await _back(tester, 'startBackGesture');
+    expect(tester.binding.transientCallbackCount, 1);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    expect(tester.binding.transientCallbackCount, 0);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await _back(tester, 'updateBackGestureProgress');
+    expect(tester.binding.transientCallbackCount, 1);
+    await _back(tester, 'cancelBackGesture');
+    await tester.pumpAndSettle();
+    expect(tester.binding.transientCallbackCount, 0);
+    expect(tester.binding.hasScheduledFrame, false);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('predictiveVsyncDemand_disposeCancelsPendingRequest',
+      (tester) async {
+    final nav = await _mount(tester);
+    nav.currentState!
+        .push(flowyReferenceRoute<void>(builder: (_) => _page('child')));
+    await tester.pumpAndSettle();
+    await _back(tester, 'startBackGesture');
+    expect(tester.binding.transientCallbackCount, 1);
+    await tester.pumpWidget(const SizedBox());
+    await tester.pumpAndSettle();
+    expect(tester.binding.transientCallbackCount, 0);
+    expect(tester.binding.hasScheduledFrame, false);
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final edge in [0, 1]) {
+    for (final cancel in [false, true]) {
+      testWidgets(
+          'predictiveStableSubtree_edge${edge}_${cancel ? "cancel" : "commit"}',
+          (tester) async {
+        final nav = await _mount(tester);
+        final probe = GlobalKey<_GestureLifecycleProbeState>();
+        final route = flowyReferenceRoute<void>(
+            builder: (_) => _GestureLifecycleProbe(key: probe));
+        nav.currentState!.push(route);
+        await tester.pumpAndSettle();
+        final state = probe.currentState!;
+        final builds = state.builds;
+        final deactivations = state.deactivations;
+        final activations = state.activations;
+        final child = find.byKey(const ValueKey('child'));
+        final renderObject = tester.renderObject(child);
+        await _back(tester, 'startBackGesture', edge);
+        // Both directions, with non-rounded progress values.
+        for (final progress in [
+          .0312345,
+          .4123456,
+          .7245678,
+          .1912345,
+          .4345678
+        ]) {
+          await tester.binding.defaultBinaryMessenger.handlePlatformMessage(
+              'flutter/backgesture',
+              const StandardMethodCodec()
+                  .encodeMethodCall(MethodCall('updateBackGestureProgress', {
+                'touchOffset': [edge == 0 ? 160.0 : 640.0, 320.0],
+                'progress': progress,
+                'swipeEdge': edge,
+              })),
+              (_) {});
+          await tester.pump();
+          expect(route.animation!.value, closeTo(1 - progress, 1e-12));
+          expect(tester.renderObject(child), same(renderObject));
+          expect(state.deactivations, deactivations);
+          expect(state.activations, activations);
+          expect(state.builds, builds,
+              reason: 'Progress must rebuild motion, not the page subtree');
+          final transforms = tester
+              .widgetList<Transform>(
+                  find.ancestor(of: child, matching: find.byType(Transform)))
+              .toList();
+          expect(
+              transforms.any((transform) =>
+                  (transform.transform.entry(0, 0) - (1 - .1 * progress))
+                      .abs() <
+                  1e-10),
+              isTrue);
+        }
+        final beforeRelease = tester.getRect(child);
+        await _back(tester, cancel ? 'cancelBackGesture' : 'commitBackGesture');
+        expect(tester.getRect(child), beforeRelease);
+        expect(state.deactivations, deactivations);
+        expect(state.activations, activations);
+        await tester.pumpAndSettle();
+        if (cancel) {
+          expect(probe.currentState, same(state));
+          expect(state.deactivations, deactivations);
+          expect(state.activations, activations);
+          expect(tester.getRect(child), const Rect.fromLTWH(0, 0, 800, 600));
+        } else {
+          expect(probe.currentState, isNull);
+        }
+        expect(nav.currentState!.userGestureInProgress, false);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
+  for (final nested in [false, true]) {
+    for (final edge in [0, 1]) {
+      for (final cancel in [false, true]) {
+        testWidgets(
+            'coveredPredictiveSaturation_${nested ? "nested" : "root"}_edge${edge}_${cancel ? "cancel" : "commit"}',
+            (tester) async {
+          final nav = GlobalKey<NavigatorState>();
+          final probe = GlobalKey<_GestureLifecycleProbeState>();
+          await tester.pumpWidget(MaterialApp(
+            navigatorKey: nav,
+            theme: ThemeData(
+              platform: TargetPlatform.android,
+              pageTransitionsTheme: const PageTransitionsTheme(builders: {
+                TargetPlatform.android: FadeUpwardsPageTransitionsBuilder(),
+              }),
+            ),
+            onGenerateRoute: (settings) => flowyWorkspaceRoute<dynamic>(
+                settings: settings,
+                builder: (_) => nested
+                    ? _page('workspace')
+                    : _GestureLifecycleProbe(key: probe)),
+          ));
+          await tester.pumpAndSettle();
+          if (nested) {
+            nav.currentState!.push(flowyReferenceRoute<void>(
+                builder: (_) => _GestureLifecycleProbe(key: probe)));
+            await tester.pumpAndSettle();
+          }
+          final route =
+              flowyReferenceRoute<void>(builder: (_) => _page('front'));
+          nav.currentState!.push(route);
+          await tester.pumpAndSettle();
+          final state = probe.currentState!;
+          final deactivations = state.deactivations;
+          final activations = state.activations;
+          final covered =
+              find.byKey(const ValueKey('child'), skipOffstage: false);
+          final render = tester.renderObject(covered);
+          await _back(tester, 'startBackGesture', edge);
+          final builds = state.builds;
+          for (final progress in [.4, .99, 1.0, 1.0, .99, 1.0, .5, .1]) {
+            await tester.binding.defaultBinaryMessenger.handlePlatformMessage(
+                'flutter/backgesture',
+                const StandardMethodCodec()
+                    .encodeMethodCall(MethodCall('updateBackGestureProgress', {
+                  'touchOffset': [edge == 0 ? 160.0 : 640.0, 300.0],
+                  'progress': progress,
+                  'swipeEdge': edge,
+                })),
+                (_) {});
+            await tester.pump();
+            expect(nav.currentState!.userGestureInProgress, true);
+            expect(state.deactivations, deactivations,
+                reason: 'Covered page must stay mounted at progress $progress');
+            expect(state.activations, activations);
+            expect(state.builds, builds);
+            expect(probe.currentState, same(state));
+            expect(tester.renderObject(covered), same(render));
+            expect(
+                tester.getRect(covered), const Rect.fromLTWH(0, 0, 800, 600));
+          }
+          await _back(
+              tester, cancel ? 'cancelBackGesture' : 'commitBackGesture');
+          await tester.pumpAndSettle();
+          expect(probe.currentState, same(state));
+          expect(state.deactivations, deactivations);
+          expect(state.activations, activations);
+          expect(nav.currentState!.userGestureInProgress, false);
+          expect(tester.binding.transientCallbackCount, 0);
+          expect(tester.takeException(), isNull);
+        });
+      }
+    }
+  }
+
+  for (final platform in [TargetPlatform.android, TargetPlatform.iOS]) {
+    testWidgets(
+        'workspace_normalPilotAndNonPilotMatchOriginal_${platform.name}',
+        (tester) async {
+      Future<List<Object>> sample(bool workspace) async {
+        final nav = GlobalKey<NavigatorState>();
+        final theme = ThemeData(
+          platform: platform,
+          pageTransitionsTheme: const PageTransitionsTheme(builders: {
+            TargetPlatform.android: FadeUpwardsPageTransitionsBuilder(),
+            TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+          }),
+        );
+        await tester.pumpWidget(MaterialApp(
+          navigatorKey: nav,
+          theme: theme,
+          onGenerateRoute: (settings) => workspace
+              ? flowyWorkspaceRoute<dynamic>(
+                  settings: settings, builder: (_) => _page('root'))
+              : PreservedMaterialPageRoute<dynamic>(
+                  settings: settings, builder: (_) => _page('root')),
+        ));
+        await tester.pumpAndSettle();
+        final poses = <Object>[];
+        // Include an ordinary route AFTER the pilot has popped: adjacency must
+        // switch back to the native theme, not retain pilot secondary motion.
+        for (final pilot in [true, false]) {
+          final route = pilot
+              ? flowyReferenceRoute<int>(builder: (_) => _page('front'))
+              : PreservedMaterialPageRoute<int>(builder: (_) => _page('front'));
+          final result = nav.currentState!.push(route);
+          await tester.pump();
+          for (final ms in [45, 55, 100, 180]) {
+            await tester.pump(Duration(milliseconds: ms));
+            poses.addAll([
+              tester.getRect(
+                  find.byKey(const ValueKey('root'), skipOffstage: false)),
+              tester.getRect(find.byKey(const ValueKey('front'))),
+              _pageOpacity(tester, 'root'),
+              _pageOpacity(tester, 'front'),
+            ]);
+          }
+          await tester.pumpAndSettle();
+          nav.currentState!.pop(42);
+          await tester.pump();
+          for (final ms in [45, 55, 100, 180]) {
+            await tester.pump(Duration(milliseconds: ms));
+            poses.addAll([
+              tester.getRect(
+                  find.byKey(const ValueKey('root'), skipOffstage: false)),
+              _pageOpacity(tester, 'root'),
+            ]);
+          }
+          await tester.pumpAndSettle();
+          expect(await result, 42);
+        }
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+        return poses;
+      }
+
+      expect(await sample(true), await sample(false));
+    });
+  }
+
+  for (final edge in [0, 1]) {
+    testWidgets('nativeCancelAtZero_verticalDriftDoesNotSnap_edge$edge',
+        (tester) async {
+      final nav = await _mount(tester);
+      final route = flowyReferenceRoute<void>(builder: (_) => _page('child'));
+      nav.currentState!.push(route);
+      await tester.pumpAndSettle();
+      await _back(tester, 'startBackGesture', edge);
+      final child = find.byKey(const ValueKey('child'), skipOffstage: false);
+      final element = tester.element(child);
+      Offset? nearZero;
+      // Android may finish its cancellation spring before notifying Flutter.
+      // Recorded input had 107.25px vertical drift at progress .0083301356,
+      // followed by progress zero and the cancel callback. The page must
+      // already meet its resting plane without a final 10.725dp reset.
+      for (final progress in [.6, .3, .5, .1, .008330135606229305, 0.0]) {
+        await tester.binding.defaultBinaryMessenger.handlePlatformMessage(
+            'flutter/backgesture',
+            const StandardMethodCodec()
+                .encodeMethodCall(MethodCall('updateBackGestureProgress', {
+              'touchOffset': [edge == 0 ? 160.0 : 640.0, 407.25],
+              'progress': progress,
+              'swipeEdge': edge,
+            })),
+            (_) {});
+        await tester.pump();
+        expect(route.animation!.value, closeTo(1 - progress, 1e-12));
+        expect(tester.element(child), same(element));
+        expect(
+            tester.getTopLeft(
+                find.byKey(const ValueKey('root'), skipOffstage: false)),
+            Offset.zero);
+        if (progress == .008330135606229305) {
+          nearZero = tester.getTopLeft(child);
+        }
+      }
+      final atZero = tester.getRect(child);
+      expect(atZero, const Rect.fromLTWH(0, 0, 800, 600),
+          reason: 'Zero progress must restore the plane even before cancel');
+      expect((nearZero!.dy - atZero.top).abs(), lessThan(.5));
+      await _back(tester, 'cancelBackGesture');
+      expect(tester.getRect(child), atZero);
+      await tester.pumpAndSettle();
+      expect(tester.getRect(child), atZero);
+      expect(nav.currentState!.userGestureInProgress, false);
+      expect(tester.binding.transientCallbackCount, 0);
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets('predictiveCommit_paintedBackingLimitsDoubleContent',
       (tester) async {
@@ -186,7 +546,11 @@ void main() {
             reason: 'Includes exposed margins, not only the overlapping area');
       }
       expect(alpha + parentWeight, greaterThanOrEqualTo(.60));
-      expect(_slides('child'), findsNothing);
+      expect(
+          tester
+              .widgetList<SlideTransition>(_slides('child'))
+              .every((slide) => slide.position.value == Offset.zero),
+          isTrue);
     }
     await tester.pumpAndSettle();
     expect(tester.getTopLeft(find.byKey(const ValueKey('root'))), Offset.zero);
@@ -360,14 +724,21 @@ void main() {
             expect(alpha, lessThanOrEqualTo(lastAlpha + .00001));
             lastAlpha = alpha;
           }
-          // The accepting page owns one clip/fade; normal slide wrappers
-          // are absent throughout predictive preview/settlement.
+          // Normal wrappers remain mounted but neutral: only the accepting
+          // page's predictive pose may affect clipping, travel or alpha.
           expect(find.ancestor(of: child, matching: find.byType(ClipRRect)),
               findsOneWidget);
+          final fades = tester
+              .widgetList<FadeTransition>(find.ancestor(
+                  of: child, matching: find.byType(FadeTransition)))
+              .toList();
+          expect(fades.where((fade) => fade.opacity.value != 1),
+              hasLength(cancel ? 0 : (alpha == 1 ? 0 : 1)));
           expect(
-              tester.widgetList<FadeTransition>(find.ancestor(
-                  of: child, matching: find.byType(FadeTransition))),
-              hasLength(1));
+              tester
+                  .widgetList<SlideTransition>(_slides('child'))
+                  .every((slide) => slide.position.value == Offset.zero),
+              isTrue);
         }
         await tester.pumpAndSettle();
         expect(nav.currentState!.userGestureInProgress, false);
@@ -471,10 +842,12 @@ void main() {
           reason: 'Only the accepting route owns predictive presentation');
       expect(route.popGestureInProgress, true);
       expect(
-          find.ancestor(
-              of: parent,
-              matching: find.byType(ClipRRect, skipOffstage: false)),
-          findsNothing);
+          tester
+              .widgetList<ClipRRect>(find.ancestor(
+                  of: parent,
+                  matching: find.byType(ClipRRect, skipOffstage: false)))
+              .every((clip) => clip.borderRadius == BorderRadius.zero),
+          isTrue);
       expect(tester.getTopLeft(parent), Offset.zero);
       expect(tester.getSize(parent), const Size(800, 600));
       final child = find.byKey(const ValueKey('child'));
@@ -489,17 +862,23 @@ void main() {
           expect(tester.getTopLeft(parent), Offset.zero);
         }
         expect(
-            find.ancestor(
-                of: parent,
-                matching: find.byType(ClipRRect, skipOffstage: false)),
-            findsNothing);
+            tester
+                .widgetList<ClipRRect>(find.ancestor(
+                    of: parent,
+                    matching: find.byType(ClipRRect, skipOffstage: false)))
+                .every((clip) => clip.borderRadius == BorderRadius.zero),
+            isTrue);
       }
       await tester.pumpAndSettle();
       expect(nav.currentState!.userGestureInProgress, false);
       if (cancel) {
         expect(tester.getTopLeft(child), Offset.zero);
-        expect(find.ancestor(of: child, matching: find.byType(ClipRRect)),
-            findsNothing);
+        expect(
+            tester
+                .widgetList<ClipRRect>(
+                    find.ancestor(of: child, matching: find.byType(ClipRRect)))
+                .every((clip) => clip.borderRadius == BorderRadius.zero),
+            isTrue);
         // Cancelled owner must not become an owner of the next child's gesture.
         nav.currentState!
             .push(flowyReferenceRoute<void>(builder: (_) => _page('next')));

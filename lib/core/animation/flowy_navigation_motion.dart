@@ -30,6 +30,64 @@ PreservedMaterialPageRoute<T> flowyReferenceRoute<T>({
       maintainState: maintainState,
     );
 
+/// Root workspace keeps the same secondary ancestry while a pilot page is
+/// covered/uncovered, including native progress reaching one before release.
+/// Other routes retain their theme transition and delegated-transition contract.
+PreservedMaterialPageRoute<T> flowyWorkspaceRoute<T>({
+  required WidgetBuilder builder,
+  RouteSettings? settings,
+  bool maintainState = true,
+}) =>
+    _FlowyWorkspaceRoute<T>(
+      builder: builder,
+      settings: settings,
+      maintainState: maintainState,
+    );
+
+class _FlowyWorkspaceRoute<T> extends PreservedMaterialPageRoute<T> {
+  _FlowyWorkspaceRoute({
+    required super.builder,
+    super.settings,
+    super.maintainState,
+  });
+
+  bool _pilotAbove = false;
+
+  bool get _ownsPilotSecondary =>
+      _pilotAbove &&
+      navigator != null &&
+      Theme.of(navigator!.context).platform == TargetPlatform.android;
+
+  @override
+  DelegatedTransitionBuilder? get delegatedTransition => _ownsPilotSecondary
+      ? _FlowyReferenceRoute._previousPilotPage
+      : super.delegatedTransition;
+
+  @override
+  void didChangeNext(Route<dynamic>? nextRoute) {
+    _pilotAbove = nextRoute is _FlowyReferenceRoute;
+    super.didChangeNext(nextRoute);
+  }
+
+  @override
+  Widget buildTransitions(BuildContext context, Animation<double> animation,
+      Animation<double> secondaryAnimation, Widget child) {
+    if (Theme.of(context).platform != TargetPlatform.android) {
+      return super
+          .buildTransitions(context, animation, secondaryAnimation, child);
+    }
+    // Own this wrapper instead of receiving one from Flutter: a received
+    // wrapper is removed at secondary.isDismissed, even during a held gesture.
+    // Keep adjacency through pop settlement; the next route change selects
+    // its own contract without cutting off the covered page's return slide.
+    return _ReferenceSecondaryTransition(
+      animation: _pilotAbove ? secondaryAnimation : kAlwaysDismissedAnimation,
+      child: super.buildTransitions(context, animation,
+          _pilotAbove ? kAlwaysDismissedAnimation : secondaryAnimation, child),
+    );
+  }
+}
+
 class _FlowyReferenceRoute<T> extends PreservedMaterialPageRoute<T> {
   _FlowyReferenceRoute({
     required super.builder,
@@ -94,7 +152,6 @@ class _FlowyReferenceRoute<T> extends PreservedMaterialPageRoute<T> {
       route: this,
       animation: animation,
       normal: normal,
-      child: child,
     );
   }
 
@@ -147,15 +204,27 @@ class _ReferenceContentMotion extends StatelessWidget {
               curve: const Interval(0, .43, curve: Curves.easeInOutCubic)));
 
   @override
-  Widget build(BuildContext context) => FadeTransition(
-        opacity: (incoming ? _inAlpha : _outAlpha).animate(animation),
-        child: SlideTransition(
-          position: (incoming
-                  ? (direction > 0 ? _inRight : _inLeft)
-                  : (direction > 0 ? _outRight : _outLeft))
-              .animate(animation),
-          child: child,
-        ),
+  Widget build(BuildContext context) => ListenableBuilder(
+        listenable: Navigator.of(context).userGestureInProgressNotifier,
+        builder: (context, _) {
+          final predictive = Navigator.of(context).userGestureInProgress;
+          // Keep the page ancestry mounted. Predictive motion owns its pose;
+          // the normal slide/fade remains present but neutral until it settles.
+          return FadeTransition(
+            opacity: predictive
+                ? kAlwaysCompleteAnimation
+                : (incoming ? _inAlpha : _outAlpha).animate(animation),
+            child: SlideTransition(
+              position: predictive
+                  ? const AlwaysStoppedAnimation(Offset.zero)
+                  : (incoming
+                          ? (direction > 0 ? _inRight : _inLeft)
+                          : (direction > 0 ? _outRight : _outLeft))
+                      .animate(animation),
+              child: child,
+            ),
+          );
+        },
       );
 }
 
@@ -184,12 +253,10 @@ class _ReferenceSecondaryTransition extends StatelessWidget {
   Widget build(BuildContext context) => ListenableBuilder(
         listenable: Navigator.of(context).userGestureInProgressNotifier,
         builder: (context, _) {
-          // Predictive preview/settlement owns only the accepting foreground page.
-          if (Navigator.of(context).userGestureInProgress) {
-            return child ?? const SizedBox.shrink();
-          }
           return ColoredBox(
-            color: Theme.of(context).scaffoldBackgroundColor,
+            color: Navigator.of(context).userGestureInProgress
+                ? Colors.transparent
+                : Theme.of(context).scaffoldBackgroundColor,
             child: DualTransitionBuilder(
               animation: ReverseAnimation(animation),
               forwardBuilder: (context, progress, child) =>
@@ -217,14 +284,10 @@ enum _BackPhase { preview, cancel, commit }
 /// methods seek and settle the Navigator-owned animation, including PopScope.
 class _ReferenceBackGesture extends StatefulWidget {
   const _ReferenceBackGesture(
-      {required this.route,
-      required this.animation,
-      required this.normal,
-      required this.child});
+      {required this.route, required this.animation, required this.normal});
   final PageRoute<dynamic> route;
   final Animation<double> animation;
   final Widget normal;
-  final Widget child;
   @override
   State<_ReferenceBackGesture> createState() => _ReferenceBackGestureState();
 }
@@ -236,6 +299,39 @@ class _ReferenceBackGestureState extends State<_ReferenceBackGesture>
   PredictiveBackEvent? _latest;
   double _releaseProgress = 0;
   double _releaseDy = 0;
+  int? _gestureFrameCallbackId;
+
+  bool get _needsGestureFrame =>
+      mounted &&
+      _phase == _BackPhase.preview &&
+      widget.route.isCurrent &&
+      widget.route.popGestureInProgress &&
+      (WidgetsBinding.instance.lifecycleState == null ||
+          WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed);
+
+  // Native back events can arrive just after a vsync. On-demand frame requests
+  // then miss alternating vsyncs even with cheap content. Keep one request ahead
+  // during the owned preview only; events still seek Navigator's clock directly.
+  // This callback never interpolates progress, rebuilds the page or owns a clock.
+  void _requestGestureFrame() {
+    if (_gestureFrameCallbackId != null || !_needsGestureFrame) return;
+    _gestureFrameCallbackId =
+        WidgetsBinding.instance.scheduleFrameCallback((_) {
+      _gestureFrameCallbackId = null;
+      _requestGestureFrame();
+    });
+  }
+
+  void _stopGestureFrames() {
+    final id = _gestureFrameCallbackId;
+    if (id != null) WidgetsBinding.instance.cancelFrameCallbackWithId(id);
+    _gestureFrameCallbackId = null;
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) _stopGestureFrames();
+  }
 
   @override
   void initState() {
@@ -245,6 +341,7 @@ class _ReferenceBackGestureState extends State<_ReferenceBackGesture>
 
   @override
   void dispose() {
+    _stopGestureFrames();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -261,6 +358,7 @@ class _ReferenceBackGestureState extends State<_ReferenceBackGesture>
       _start = _latest = event;
     });
     widget.route.handleStartBackGesture(progress: 1 - event.progress);
+    _requestGestureFrame();
     return true;
   }
 
@@ -269,17 +367,19 @@ class _ReferenceBackGestureState extends State<_ReferenceBackGesture>
     if (!widget.route.isCurrent || !widget.route.popGestureInProgress) return;
     setState(() => _latest = event);
     widget.route.handleUpdateBackGestureProgress(progress: 1 - event.progress);
+    _requestGestureFrame();
   }
 
   double get _fingerDy =>
       ((_latest?.touchOffset?.dy ?? 0) - (_start?.touchOffset?.dy ?? 0)) * .1;
 
   void _release(_BackPhase phase) {
+    _stopGestureFrames();
     // Capture before Flutter's commit resets its route clock to 1. Cancellation
     // also retains vertical finger displacement rather than clearing its pose.
     setState(() {
       _releaseProgress = 1 - widget.animation.value;
-      _releaseDy = _fingerDy;
+      _releaseDy = _fingerDy * _releaseProgress;
       _phase = phase;
     });
   }
@@ -297,24 +397,30 @@ class _ReferenceBackGestureState extends State<_ReferenceBackGesture>
   }
 
   @override
-  Widget build(BuildContext context) => AnimatedBuilder(
-        animation: Listenable.merge([
-          widget.animation,
-          widget.route.navigator!.userGestureInProgressNotifier,
-        ]),
-        builder: (context, _) {
-          if (!widget.route.popGestureInProgress) return widget.normal;
-          return LayoutBuilder(builder: (context, constraints) {
+  Widget build(BuildContext context) => LayoutBuilder(
+        builder: (context, constraints) => AnimatedBuilder(
+          animation: Listenable.merge([
+            widget.animation,
+            widget.route.navigator!.userGestureInProgressNotifier,
+          ]),
+          builder: (context, _) {
+            final active = widget.route.popGestureInProgress;
             final size = constraints.biggest;
             final direction = _start?.swipeEdge == SwipeEdge.right ? -1.0 : 1.0;
-            final commit = _phase == _BackPhase.commit;
-            final progress =
-                commit ? _releaseProgress : 1 - widget.animation.value;
-            final dy = _phase == _BackPhase.preview
-                ? _fingerDy
-                : _phase == _BackPhase.cancel && _releaseProgress > 0
-                    ? _releaseDy * (progress / _releaseProgress).clamp(0.0, 1.0)
-                    : _releaseDy;
+            final commit = active && _phase == _BackPhase.commit;
+            final progress = !active
+                ? 0.0
+                : commit
+                    ? _releaseProgress
+                    : 1 - widget.animation.value;
+            final dy = !active
+                ? 0.0
+                : _phase == _BackPhase.preview
+                    ? _fingerDy * progress
+                    : _phase == _BackPhase.cancel && _releaseProgress > 0
+                        ? _releaseDy *
+                            (progress / _releaseProgress).clamp(0.0, 1.0)
+                        : _releaseDy;
             final settle = commit
                 ? Curves.easeOutCubic.transform(1 - widget.animation.value)
                 : 0.0;
@@ -353,13 +459,13 @@ class _ReferenceBackGestureState extends State<_ReferenceBackGesture>
                         BorderRadius.lerp(radius, BorderRadius.zero, settle)!,
                     child: FadeTransition(
                         opacity: AlwaysStoppedAnimation(alpha),
-                        child: widget.child),
+                        child: widget.normal),
                   ),
                 ),
               ),
             ]);
-          });
-        },
+          },
+        ),
       );
 }
 

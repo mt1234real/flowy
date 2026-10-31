@@ -19,6 +19,7 @@
 // ==============================================================================
 
 import 'dart:io';
+import 'core/animation/flowy_navigation_motion.dart';
 import 'package:path/path.dart' as p;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -135,7 +136,6 @@ class FlowyApp extends ConsumerWidget {
     final accent = ref.watch(accentPresetProvider);
     final fontName = ref.watch(fontFamilyProvider);
     final currencyFont = ref.watch(currencyFontProvider);
-    final hasCompletedOnboarding = ref.watch(hasCompletedOnboardingProvider);
     ref.watch(backupChangeObserverProvider);
 
     return KeyedSubtree(
@@ -164,9 +164,18 @@ class FlowyApp extends ConsumerWidget {
         themeMode: themeMode,
 
         // Điều hướng thông minh: Chưa hoàn thành -> WelcomeOnboardingScreen, đã hoàn thành -> MainScaffold
-        home: hasCompletedOnboarding
-            ? const MainScaffold()
-            : const WelcomeOnboardingScreen(),
+        onGenerateRoute: (settings) {
+          if (settings.name != Navigator.defaultRouteName) return null;
+          return flowyWorkspaceRoute<dynamic>(
+            settings: settings,
+            builder: (_) => Consumer(
+              builder: (context, ref, _) =>
+                  ref.watch(hasCompletedOnboardingProvider)
+                      ? const MainScaffold()
+                      : const WelcomeOnboardingScreen(),
+            ),
+          );
+        },
       ),
     );
   }
